@@ -1,5 +1,5 @@
 -- =========================================================================
--- EMLOXA WARE: FUNKY FRIDAY AUTO-PLAYER v16 (ULTIMATE OVERLAY SKINNING)
+-- EMLOXA WARE: FUNKY FRIDAY AUTO-PLAYER v17 (ULTIMATE OVERLAY SKINNING CORE)
 -- =========================================================================
 local GameModule = {}
 
@@ -112,7 +112,7 @@ function GameModule:Init(Window)
     end)
 
     -- ==========================================
-    -- 3. CUSTOM ARROWS (OVERLAY SKINNING)
+    -- 3. CUSTOM ARROWS (OVERLAY MASKING)
     -- ==========================================
     local ArrowTab = Window:CreateTab("Custom Arrows")
     local activeSkinId = nil
@@ -120,22 +120,31 @@ function GameModule:Init(Window)
 
     local function ApplyOverlay(parent)
         for _, obj in pairs(parent:GetDescendants()) do
-            if (obj:IsA("ImageLabel") or obj:IsA("ImageButton")) and obj.Name ~= "EmloxaSkin" then
-                -- Orijinali gizle
+            -- Sadece image özelliği olanları hedefle
+            local hasImage = pcall(function() return obj.Image end)
+            if hasImage and (obj:IsA("ImageLabel") or obj:IsA("ImageButton")) and obj.Name ~= "EmloxaSkin" then
+                
+                -- Orijinali şeffaflaştır
                 if obj.ImageTransparency < 1 then obj.ImageTransparency = 1 end
                 
-                -- Overlay oluştur/güncelle
+                -- Yeni kaplamayı oluştur
                 local overlay = obj:FindFirstChild("EmloxaSkin")
                 if not overlay then
                     overlay = Instance.new("ImageLabel")
                     overlay.Name = "EmloxaSkin"
                     overlay.Size = UDim2.new(1, 0, 1, 0)
+                    overlay.Position = UDim2.new(0, 0, 0, 0)
                     overlay.BackgroundTransparency = 1
                     overlay.ZIndex = obj.ZIndex + 1
                     overlay.Parent = obj
                 end
-                if overlay.Image ~= "rbxassetid://" .. activeSkinId then
+                
+                -- ID'yi uygula
+                if activeSkinId and overlay.Image ~= "rbxassetid://" .. activeSkinId then
                     overlay.Image = "rbxassetid://" .. activeSkinId
+                elseif not activeSkinId then
+                    overlay:Destroy()
+                    obj.ImageTransparency = 0
                 end
             end
         end
@@ -154,15 +163,12 @@ function GameModule:Init(Window)
         sideBtn:UpdateText("Apply To: " .. targetSide)
     end)
 
-    -- Loop
     RunService.RenderStepped:Connect(function()
-        if activeSkinId then
-            local ui = LocalPlayer.PlayerGui:FindFirstChild("Window")
-            if ui and ui:FindFirstChild("Game") then
-                local fields = ui.Game.Fields
-                local targets = (targetSide == "Both") and {fields.Left, fields.Right} or {fields[targetSide]}
-                for _, t in pairs(targets) do ApplyOverlay(t) end
-            end
+        local ui = LocalPlayer.PlayerGui:FindFirstChild("Window")
+        if ui and ui:FindFirstChild("Game") then
+            local fields = ui.Game.Fields
+            local targets = (targetSide == "Both") and {fields.Left, fields.Right} or {fields[targetSide]}
+            for _, t in pairs(targets) do ApplyOverlay(t) end
         end
     end)
 
