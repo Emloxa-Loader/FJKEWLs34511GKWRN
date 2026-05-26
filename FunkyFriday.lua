@@ -1,5 +1,5 @@
 -- =========================================================================
--- EMLOXA WARE: FUNKY FRIDAY AUTO-PLAYER v17 (ULTIMATE OVERLAY SKINNING CORE)
+-- EMLOXA WARE: FUNKY FRIDAY AUTO-PLAYER v18 (ULTIMATE RAPID-STRIKE CORE)
 -- =========================================================================
 local GameModule = {}
 
@@ -24,7 +24,7 @@ function GameModule:Init(Window)
     end)
 
     -- ==========================================
-    -- 2. AUTO PLAYER (PRIORITY CORE)
+    -- 2. AUTO PLAYER (RAPID-STRIKE CORE)
     -- ==========================================
     local FunkyTab = Window:CreateTab("Auto Player")
     local AutoPlayerEnabled = false
@@ -33,7 +33,7 @@ function GameModule:Init(Window)
     
     local LaneKeys = { Lane1 = Enum.KeyCode.A, Lane2 = Enum.KeyCode.S, Lane3 = Enum.KeyCode.W, Lane4 = Enum.KeyCode.D }
 
-    FunkyTab:CreateToggle("Enable Auto Player", function(s) AutoPlayerEnabled = s end)
+    FunkyTab:CreateToggle("Enable Auto Player (God Mode)", function(s) AutoPlayerEnabled = s end)
     FunkyTab:CreateToggle("Show Visualizer Dots", function(s) ShowVisualizer = s end)
     FunkyTab:CreateSlider("Aggression Range", 10, 80, 20, function(v) Aggression = v end)
 
@@ -53,6 +53,7 @@ function GameModule:Init(Window)
 
     RunService.RenderStepped:Connect(function()
         if not AutoPlayerEnabled then return end
+        
         local ui = LocalPlayer.PlayerGui:FindFirstChild("Window")
         if not ui or not ui:FindFirstChild("Game") or not ui.Game:FindFirstChild("Fields") then return end
         
@@ -67,6 +68,15 @@ function GameModule:Init(Window)
         
         local inner = ui.Game.Fields[mySide].Inner
 
+        -- ADIM 1: ÖNCE BİTEN HOLD NOTALARINI TEMİZLE (Race Condition önlemi)
+        for holdNote, key in pairs(ActiveHolds) do
+            if not holdNote.Parent or not holdNote:IsDescendantOf(game) then 
+                VirtualInputManager:SendKeyEvent(false, key, false, game)
+                ActiveHolds[holdNote] = nil
+            end
+        end
+
+        -- ADIM 2: YENİ NOTALARI İŞLE (Multi-Strike)
         for i = 1, 4 do
             local laneFrame = inner:FindFirstChild("Lane" .. i)
             if laneFrame then
@@ -76,37 +86,54 @@ function GameModule:Init(Window)
                 
                 if notesFolder then
                     local laneKey = LaneKeys["Lane" .. i]
-                    local closestNote = nil
-                    local minDistance = 9999
                     
+                    -- SADECE EN YAKIN OLANI DEĞİL, KUTUDAKİ TÜM NOTALARI AYNI ANDA TARA!
                     for _, note in pairs(notesFolder:GetChildren()) do
                         if note:IsA("GuiObject") then
                             ManageVisualizerDot(note, "EmloxaNoteDot", 14, Color3.fromRGB(50, 50, 50))
-                            local dist = math.abs((note.AbsolutePosition.Y + (note.AbsoluteSize.Y / 2)) - laneCenterY)
-                            if dist < minDistance then minDistance = dist; closestNote = note end
-                        end
-                    end
-                    
-                    if closestNote and minDistance <= Aggression then
-                        local isHoldNote = #closestNote:GetChildren() > 1
-                        if isHoldNote then
-                            if not ActiveHolds[closestNote] then
-                                ActiveHolds[closestNote] = laneKey
-                                VirtualInputManager:SendKeyEvent(true, laneKey, false, game)
+                            local noteCenterY = note.AbsolutePosition.Y + (note.AbsoluteSize.Y / 2)
+                            local dist = math.abs(noteCenterY - laneCenterY)
+                            
+                            -- EĞER NOTA HEDEF ALANINA GİRDİYSE
+                            if dist <= Aggression then
+                                local isHoldNote = #note:GetChildren() > 1
+                                
+                                if isHoldNote then
+                                    if not ActiveHolds[note] then
+                                        ActiveHolds[note] = laneKey
+                                        -- Rapid Re-Press: Sanal olarak bırakıp tekrar bas (Bugları ezer geçer)
+                                        VirtualInputManager:SendKeyEvent(false, laneKey, false, game)
+                                        VirtualInputManager:SendKeyEvent(true, laneKey, false, game)
+                                    end
+                                else
+                                    if not TappedNotes[note] then
+                                        TappedNotes[note] = true
+                                        task.spawn(function()
+                                            -- Şoklama Vuruşu: Tuşun durumu ne olursa olsun basmasını garanti et!
+                                            VirtualInputManager:SendKeyEvent(false, laneKey, false, game)
+                                            VirtualInputManager:SendKeyEvent(true, laneKey, false, game)
+                                            
+                                            task.wait(0.015)
+                                            
+                                            -- Akıllı Bırakma: Eğer aynı tuşta ŞU AN BİR HOLD NOTASI ÇALIŞIYORSA tuşu ASLA bırakma!
+                                            local isCurrentlyHeld = false
+                                            for activeHoldNote, k in pairs(ActiveHolds) do
+                                                if k == laneKey and activeHoldNote.Parent then
+                                                    isCurrentlyHeld = true
+                                                    break
+                                                end
+                                            end
+                                            
+                                            if not isCurrentlyHeld then
+                                                VirtualInputManager:SendKeyEvent(false, laneKey, false, game)
+                                            end
+                                        end)
+                                    end
+                                end
                             end
-                        elseif not TappedNotes[closestNote] then
-                            TappedNotes[closestNote] = true
-                            VirtualInputManager:SendKeyEvent(true, laneKey, false, game)
-                            task.spawn(function() task.wait(0.015); VirtualInputManager:SendKeyEvent(false, laneKey, false, game) end)
                         end
                     end
                 end
-            end
-        end
-        for holdNote, key in pairs(ActiveHolds) do
-            if not holdNote.Parent or not holdNote:IsDescendantOf(game) then 
-                VirtualInputManager:SendKeyEvent(false, key, false, game)
-                ActiveHolds[holdNote] = nil
             end
         end
     end)
@@ -115,15 +142,12 @@ function GameModule:Init(Window)
     -- 3. MISC & CLEANUP
     -- ==========================================
     local MiscTab = Window:CreateTab("Misc")
-    MiscTab:CreateButton("Clear Cache", function() TappedNotes = {}; ActiveHolds = {} end)
+    MiscTab:CreateButton("Clear Cache (Fix Lag)", function() TappedNotes = {}; ActiveHolds = {} end)
     MiscTab:CreateButton("Unload EMLOXA", function()
         for _, key in pairs(ActiveHolds) do VirtualInputManager:SendKeyEvent(false, key, false, game) end
         local ui = game:GetService("CoreGui"):FindFirstChild("EmloxaWareUI") or LocalPlayer.PlayerGui:FindFirstChild("EmloxaWareUI")
         if ui then ui:Destroy() end
     end)
-    
-    local Label = Instance.new("TextLabel", ArrowTab.Parent)
-    Label.Text = "Note: Changes are client-side."
 end
 
 return GameModule
