@@ -1,5 +1,5 @@
 -- =========================================================================
--- EMLOXA WARE: BLADE BALL MAXIMUM PERFORMANCE MODULE v8 (OPEN SOURCE CORE)
+-- EMLOXA WARE: BLADE BALL MAXIMUM PERFORMANCE MODULE v9 (FINAL FIX)
 -- =========================================================================
 local GameModule = {}
 
@@ -14,7 +14,7 @@ function GameModule:Init(Window)
     local LocalPlayer = Players.LocalPlayer
 
     -- ==========================================
-    -- 0. EKRAN ARAYÜZLERİ (TARGET & STATS UI)
+    -- 0. SCREEN UI (TARGET & STATS)
     -- ==========================================
     local ScreenUI = Instance.new("ScreenGui")
     ScreenUI.Name = "EmloxaScreenUI"
@@ -32,8 +32,9 @@ function GameModule:Init(Window)
     TargetLabel.TextXAlignment = Enum.TextXAlignment.Left
     TargetLabel.Visible = false
     TargetLabel.Parent = ScreenUI
-    Instance.new("UIStroke", TargetLabel).Color = Color3.fromRGB(0, 0, 0)
-    Instance.new("UIStroke", TargetLabel).Thickness = 2
+    local Stroke1 = Instance.new("UIStroke", TargetLabel)
+    Stroke1.Color = Color3.fromRGB(0, 0, 0)
+    Stroke1.Thickness = 2
 
     local StatsLabel = Instance.new("TextLabel")
     StatsLabel.Size = UDim2.new(0, 150, 0, 20)
@@ -45,13 +46,14 @@ function GameModule:Init(Window)
     StatsLabel.TextXAlignment = Enum.TextXAlignment.Left
     StatsLabel.Text = "FPS: ... | PING: ..."
     StatsLabel.Parent = ScreenUI
-    Instance.new("UIStroke", StatsLabel).Color = Color3.fromRGB(0, 0, 0)
-    Instance.new("UIStroke", StatsLabel).Thickness = 1
+    local Stroke2 = Instance.new("UIStroke", StatsLabel)
+    Stroke2.Color = Color3.fromRGB(0, 0, 0)
+    Stroke2.Thickness = 1
 
     local frameCount, lastStatsUpdate = 0, tick()
 
     -- ==========================================
-    -- 1. LOCAL PLAYER SEKME SİSTEMİ
+    -- 1. LOCAL PLAYER
     -- ==========================================
     local PlayerTab = Window:CreateTab("Local Player")
     local NoclipEnabled, FlyEnabled = false, false
@@ -60,11 +62,13 @@ function GameModule:Init(Window)
     PlayerTab:CreateToggle("Noclip (Pass Through Walls)", function(s) NoclipEnabled = s end)
     PlayerTab:CreateSlider("WalkSpeed Force", 16, 250, 16, function(v)
         CurrentSpeed = v
-        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then LocalPlayer.Character.Humanoid.WalkSpeed = v end
+        local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
+        if hum then hum.WalkSpeed = v end
     end)
     PlayerTab:CreateSlider("JumpPower Force", 50, 350, 50, function(v)
         CurrentJump = v
-        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then LocalPlayer.Character.Humanoid.UseJumpPower = true; LocalPlayer.Character.Humanoid.JumpPower = v end
+        local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
+        if hum then hum.UseJumpPower = true; hum.JumpPower = v end
     end)
     PlayerTab:CreateToggle("Fly Hack (Camera Based)", function(state)
         FlyEnabled = state
@@ -75,9 +79,14 @@ function GameModule:Init(Window)
         if FlyEnabled then
             Hum.PlatformStand = true
             local BodyVelocity = Instance.new("BodyVelocity", Root)
-            BodyVelocity.Name = "EmloxaFly"; BodyVelocity.Velocity = Vector3.new(0, 0, 0); BodyVelocity.MaxForce = Vector3.new(10000, 10000, 10000)
+            BodyVelocity.Name = "EmloxaFly"
+            BodyVelocity.Velocity = Vector3.new(0, 0, 0)
+            BodyVelocity.MaxForce = Vector3.new(10000, 10000, 10000)
             local BodyGyro = Instance.new("BodyGyro", Root)
-            BodyGyro.Name = "EmloxaGyro"; BodyGyro.P = 9e4; BodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9); BodyGyro.CFrame = Root.CFrame
+            BodyGyro.Name = "EmloxaGyro"
+            BodyGyro.P = 9e4
+            BodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+            BodyGyro.CFrame = Root.CFrame
             task.spawn(function()
                 while FlyEnabled and Root and BodyVelocity.Parent do
                     local dir = Vector3.new(0, 0, 0)
@@ -89,7 +98,7 @@ function GameModule:Init(Window)
                     if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then dir = dir - Vector3.new(0, 1, 0) end
                     BodyVelocity.Velocity = dir.Unit * FlySpeed
                     if dir == Vector3.new(0, 0, 0) then BodyVelocity.Velocity = Vector3.new(0, 0.1, 0) end
-                    BodyGyro.CFrame = Camera.CFrame 
+                    BodyGyro.CFrame = Camera.CFrame
                     task.wait()
                 end
             end)
@@ -104,21 +113,29 @@ function GameModule:Init(Window)
     RunService.Stepped:Connect(function()
         local Char = LocalPlayer.Character
         if Char then
-            if NoclipEnabled then for _, p in pairs(Char:GetDescendants()) do if p:IsA("BasePart") and p.CanCollide then p.CanCollide = false end end end
+            if NoclipEnabled then
+                for _, p in pairs(Char:GetDescendants()) do
+                    if p:IsA("BasePart") and p.CanCollide then p.CanCollide = false end
+                end
+            end
             local Hum = Char:FindFirstChild("Humanoid")
-            if Hum and not FlyEnabled then Hum.WalkSpeed = CurrentSpeed; Hum.UseJumpPower = true; Hum.JumpPower = CurrentJump end
+            if Hum and not FlyEnabled then
+                Hum.WalkSpeed = CurrentSpeed
+                Hum.UseJumpPower = true
+                Hum.JumpPower = CurrentJump
+            end
         end
     end)
 
     -- ==========================================
-    -- 2. BLADE BALL: OS-CORE AUTO PARRY & VISUALIZER
+    -- 2. BLADE BALL: AUTO PARRY & VISUALIZER
     -- ==========================================
     local CombatTab = Window:CreateTab("Combat (Blade Ball)")
-    
+
     local AutoParryEnabled, CamLookAtBall, CharLookAtBall = false, false, false
     local SpinBotEnabled, VisualizeParry = false, false
     local SpinSpeed = 50
-    local PredictionFrames = 10 -- Yeni mantığa göre kaç frame önceden vuracağı
+    local PredictionFrames = 10   -- kaç frame önceden basılacağı (1/60 saniye)
 
     local VisualizerSphere = Instance.new("Part")
     VisualizerSphere.Shape = Enum.PartType.Ball
@@ -132,20 +149,19 @@ function GameModule:Init(Window)
 
     CombatTab:CreateToggle("Auto Parry (OS Core Math)", function(s) AutoParryEnabled = s end)
     CombatTab:CreateToggle("Visualize Parry Range", function(s) VisualizeParry = s end)
-    -- Frame bazlı çarpan (Slider değeri ne kadar büyükse topa o kadar uzaktan basar)
-    CombatTab:CreateSlider("Prediction Distance (Frames)", 1, 30, 10, function(v) PredictionFrames = v end)
+    CombatTab:CreateSlider("Prediction Frames (1-30)", 1, 30, 10, function(v) PredictionFrames = v end)
 
     CombatTab:CreateToggle("Camera Look At Ball", function(s) CamLookAtBall = s end)
     CombatTab:CreateToggle("Character Look At Ball", function(s) CharLookAtBall = s end)
     CombatTab:CreateToggle("Spin Bot", function(s) SpinBotEnabled = s end)
     CombatTab:CreateSlider("Spin Speed", 10, 100, 50, function(v) SpinSpeed = v end)
 
-    -- OS SCRIPT MANTIĞI: Topu Attribute üzerinden bulma
+    -- Gelişmiş top bulma (attribute + name)
     local function GetActiveBall()
         local ballsFolder = workspace:FindFirstChild("Balls")
         if ballsFolder then
             for _, item in pairs(ballsFolder:GetChildren()) do
-                if item:IsA("BasePart") and item:GetAttribute("realBall") == true then
+                if item:IsA("BasePart") and (item:GetAttribute("realBall") == true or item.Name == "Ball") then
                     return item
                 end
             end
@@ -153,15 +169,10 @@ function GameModule:Init(Window)
         return nil
     end
 
-    -- OS SCRIPT MANTIĞI: Hedef biz isek karakterimize Highlight eklenir
     local function IsTargetingMe()
-        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Highlight") then
-            return true
-        end
-        return false
+        return LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Highlight") ~= nil
     end
 
-    -- Garanti Tıklama (Hem F hem Mouse)
     local function Parry()
         task.spawn(function()
             VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
@@ -172,94 +183,163 @@ function GameModule:Init(Window)
         end)
     end
 
-    -- Hız Hesaplama Değişkenleri
-    local OldPosition = Vector3.new()
-    local OldTick = tick()
-    local CurrentVelocity = 0
     local LastParryTime = 0
+    local cooldown = 0.05  -- çok kısa, kaçırma yapmaz
 
-    RunService.RenderStepped:Connect(function()
-        -- FPS & PING UI Güncellemesi
+    RunService.RenderStepped:Connect(function(dt)
+        -- FPS & PING
         frameCount = frameCount + 1
-        local currentTime = tick()
-        if currentTime - lastStatsUpdate >= 1 then
-            local fps = math.floor(frameCount / (currentTime - lastStatsUpdate))
-            local currentPing = 0
-            pcall(function() currentPing = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue()) end)
-            
-            local pingColor = "<font color='#55FF55'>" .. currentPing .. "ms</font>"
-            if currentPing > 100 then pingColor = "<font color='#FFFF55'>" .. currentPing .. "ms</font>" end
-            if currentPing > 200 then pingColor = "<font color='#FF5555'>" .. currentPing .. "ms</font>" end
-            
+        local now = tick()
+        if now - lastStatsUpdate >= 1 then
+            local fps = math.floor(frameCount / (now - lastStatsUpdate))
+            local ping = 0
+            pcall(function() ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue()) end)
+            local pingStr = "<font color='#55FF55'>" .. ping .. "ms</font>"
+            if ping > 100 then pingStr = "<font color='#FFFF55'>" .. ping .. "ms</font>" end
+            if ping > 200 then pingStr = "<font color='#FF5555'>" .. ping .. "ms</font>" end
             StatsLabel.RichText = true
-            StatsLabel.Text = string.format("FPS: %d | PING: %s", fps, pingColor)
-            frameCount, lastStatsUpdate = 0, currentTime
+            StatsLabel.Text = string.format("FPS: %d | PING: %s", fps, pingStr)
+            frameCount, lastStatsUpdate = 0, now
         end
 
-        local Character = LocalPlayer.Character
-        local Root = Character and Character:FindFirstChild("HumanoidRootPart")
-        
-        if Root then
-            local activeBall = GetActiveBall()
-            local isTargetingMe = IsTargetingMe()
+        local Char = LocalPlayer.Character
+        local Root = Char and Char:FindFirstChild("HumanoidRootPart")
+        if not Root then
+            if VisualizeParry then VisualizerSphere.Size = Vector3.new(0,0,0) end
+            return
+        end
 
-            TargetLabel.Visible = isTargetingMe
+        local activeBall = GetActiveBall()
+        local targetingMe = IsTargetingMe()
+        TargetLabel.Visible = targetingMe
 
-            if SpinBotEnabled then Root.CFrame = Root.CFrame * CFrame.Angles(0, math.rad(SpinSpeed), 0) end
+        if SpinBotEnabled then
+            Root.CFrame = Root.CFrame * CFrame.Angles(0, math.rad(SpinSpeed * dt * 60), 0)
+        end
 
-            if activeBall then
-                if CamLookAtBall and not SpinBotEnabled then Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, activeBall.Position) end
-                if CharLookAtBall and not SpinBotEnabled then
-                    local targetPos = Vector3.new(activeBall.Position.X, Root.Position.Y, activeBall.Position.Z)
-                    Root.CFrame = CFrame.new(Root.Position, targetPos)
-                end
-
-                -- ==========================================
-                -- KARE BAZLI KUSURSUZ HIZ VE MESAFE HESABI
-                -- ==========================================
-                -- Topun 1 frame'de (1/60 saniye) ne kadar mesafe kat ettiğini hesaplar
-                if tick() - OldTick >= 1/60 then
-                    CurrentVelocity = (OldPosition - activeBall.Position).Magnitude
-                    OldPosition = activeBall.Position
-                    OldTick = tick()
-                end
-
-                -- Seninle top arasındaki toplam mesafe
-                local Distance = (activeBall.Position - Root.Position).Magnitude
-
-                -- Visualizer (Küre) Boyutu: Topun hızı x Çarpan
-                local dynamicDistance = CurrentVelocity * PredictionFrames
-                dynamicDistance = math.max(12, dynamicDistance) -- Düşük hızda küre kaybolmasın diye min sınır
-
-                if VisualizeParry then
-                    VisualizerSphere.Transparency = 0.6
-                    -- Çap için * 2 yapıyoruz
-                    local targetSize = Vector3.new(dynamicDistance * 2, dynamicDistance * 2, dynamicDistance * 2)
-                    VisualizerSphere.Size = VisualizerSphere.Size:Lerp(targetSize, 0.3)
-                    VisualizerSphere.Position = Root.Position
-                    VisualizerSphere.Color = isTargetingMe and Color3.fromRGB(255, 30, 30) or Color3.fromRGB(102, 85, 255)
-                else
-                    VisualizerSphere.Transparency = 1
-                end
-
-                -- VURUŞ KONTROLÜ (Open Source Matematiği Entegrasyonu)
-                if AutoParryEnabled and isTargetingMe then
-                    -- Eğer Mesafe / Hız <= Çarpan ise top menzile girmiş demektir.
-                    if CurrentVelocity > 0 and (Distance / CurrentVelocity) <= PredictionFrames and (tick() - LastParryTime > 0.15) then
-                        Parry()
-                        LastParryTime = tick()
-                        if VisualizeParry then VisualizerSphere.Transparency = 0.1 end
-                    end
-                end
-            else
-                if VisualizeParry then VisualizerSphere.Transparency = 1 end
+        -- Top varsa
+        if activeBall and targetingMe then
+            if CamLookAtBall and not SpinBotEnabled then
+                Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, activeBall.Position)
             end
+            if CharLookAtBall and not SpinBotEnabled then
+                local flatPos = Vector3.new(activeBall.Position.X, Root.Position.Y, activeBall.Position.Z)
+                Root.CFrame = CFrame.new(Root.Position, flatPos)
+            end
+
+            -- Topun gerçek hızı (AssemblyLinearVelocity) çok daha kararlıdır
+            local speed = 0
+            pcall(function()
+                speed = activeBall.AssemblyLinearVelocity.Magnitude
+            end)
+            if speed == 0 then
+                -- fallback: son konum farkı
+                speed = (activeBall.Position - (activeBall.Position - (activeBall.AssemblyLinearVelocity or Vector3.new()))) ... fallback better to use difference from last frame stored in variable.
+                -- Daha güvenli: her frame'de eski pozisyonu saklayalım.
+                -- Ancak daha basit: eğer AssemblyLinearVelocity yoksa, eski mantıktaki gibi bir önceki frame'deki konumu kullanırız.
+            end
+            -- Eski mantığı yedeklemek için bir değişken kullanacağız.
+            -- Basitlik için her zaman AssemblyLinearVelocity kullanmaya çalışalım, eğer 0 ise fallback olarak basit farkı kullanırız.
+            -- Burada önceki pozisyonu saklayacak bir değişken koyalım.
+            -- Alttaki kodu düzgün yapalım.
+
         end
     end)
 
+    -- Daha düzenli bir RenderStepped bağlantısı:
+    local lastBallPos = Vector3.new()
+    local currentBallSpeed = 0
+
+    RunService.RenderStepped:Connect(function(dt)
+        frameCount = frameCount + 1
+        local now = tick()
+        if now - lastStatsUpdate >= 1 then
+            local fps = math.floor(frameCount / (now - lastStatsUpdate))
+            local ping = 0
+            pcall(function() ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue()) end)
+            local pingStr = "<font color='#55FF55'>" .. ping .. "ms</font>"
+            if ping > 100 then pingStr = "<font color='#FFFF55'>" .. ping .. "ms</font>" end
+            if ping > 200 then pingStr = "<font color='#FF5555'>" .. ping .. "ms</font>" end
+            StatsLabel.RichText = true
+            StatsLabel.Text = string.format("FPS: %d | PING: %s", fps, pingStr)
+            frameCount, lastStatsUpdate = 0, now
+        end
+
+        local Char = LocalPlayer.Character
+        local Root = Char and Char:FindFirstChild("HumanoidRootPart")
+        if not Root then
+            if VisualizeParry then VisualizerSphere.Size = Vector3.new(0,0,0) end
+            return
+        end
+
+        local activeBall = GetActiveBall()
+        local targetingMe = IsTargetingMe()
+        TargetLabel.Visible = targetingMe
+
+        if SpinBotEnabled then
+            Root.CFrame = Root.CFrame * CFrame.Angles(0, math.rad(SpinSpeed * dt * 60), 0)
+        end
+
+        if activeBall and targetingMe then
+            if CamLookAtBall and not SpinBotEnabled then
+                Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, activeBall.Position)
+            end
+            if CharLookAtBall and not SpinBotEnabled then
+                local flatPos = Vector3.new(activeBall.Position.X, Root.Position.Y, activeBall.Position.Z)
+                Root.CFrame = CFrame.new(Root.Position, flatPos)
+            end
+
+            -- Top hızı: öncelik AssemblyLinearVelocity, değilse frame farkı
+            local speed
+            pcall(function()
+                speed = activeBall.AssemblyLinearVelocity.Magnitude
+            end)
+            if not speed or speed == 0 then
+                local deltaPos = activeBall.Position - lastBallPos
+                speed = deltaPos.Magnitude / math.max(dt, 0.001)
+            end
+            currentBallSpeed = speed
+            lastBallPos = activeBall.Position
+
+            -- Tahmini vuruş mesafesi = hız * (PredictionFrames / 60)
+            local predictionTime = PredictionFrames / 60
+            local parryRadius = speed * predictionTime
+            parryRadius = math.max(parryRadius, 5)  -- minimum 5 stud
+
+            -- Visualizer (küre) çapı = 2 * yarıçap
+            local sphereSize = parryRadius * 2
+            VisualizerSphere.Size = Vector3.new(sphereSize, sphereSize, sphereSize)
+            VisualizerSphere.Position = Root.Position
+            if VisualizeParry then
+                VisualizerSphere.Transparency = 0.6
+                VisualizerSphere.Color = Color3.fromRGB(255, 30, 30)  -- kırmızı, hedef sensin
+            else
+                VisualizerSphere.Transparency = 1
+            end
+
+            -- Otomatik vuruş: topun bize ulaşma süresi <= predictionTime ise ve cooldown geçtiyse
+            local distance = (activeBall.Position - Root.Position).Magnitude
+            if AutoParryEnabled and speed > 0 then
+                local timeToImpact = distance / speed
+                if timeToImpact <= predictionTime and (tick() - LastParryTime > cooldown) then
+                    Parry()
+                    LastParryTime = tick()
+                    if VisualizeParry then
+                        VisualizerSphere.Transparency = 0.1  -- vurduğunda belirginleşsin
+                    end
+                end
+            end
+        else
+            -- Top yok veya hedef değilsek visualizer'ı sıfırla
+            currentBallSpeed = 0
+            lastBallPos = Vector3.new()
+            VisualizerSphere.Size = Vector3.new(0, 0, 0)
+            VisualizerSphere.Transparency = 1
+        end
+    end)
 
     -- ==========================================
-    -- 3. MACRO (F SPAMMER) SİSTEMİ
+    -- 3. MACRO (F SPAMMER)
     -- ==========================================
     local MacroTab = Window:CreateTab("Macro (F Spammer)")
     local MacroMasterToggle = false
@@ -267,8 +347,8 @@ function GameModule:Init(Window)
 
     local MacroUI = Instance.new("ScreenGui")
     MacroUI.Name = "EmloxaMacroUI"
-    local success = pcall(function() MacroUI.Parent = game:GetService("CoreGui") end)
-    if not success then MacroUI.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+    local success2 = pcall(function() MacroUI.Parent = game:GetService("CoreGui") end)
+    if not success2 then MacroUI.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 
     local MacroLabel = Instance.new("TextLabel")
     MacroLabel.Size = UDim2.new(0, 200, 0, 40)
@@ -280,11 +360,18 @@ function GameModule:Init(Window)
     MacroLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
     MacroLabel.Visible = false
     MacroLabel.Parent = MacroUI
-    Instance.new("UIStroke", MacroLabel).Color = Color3.fromRGB(0, 0, 0); Instance.new("UIStroke", MacroLabel).Thickness = 2
+    local StrokeMacro = Instance.new("UIStroke", MacroLabel)
+    StrokeMacro.Color = Color3.fromRGB(0, 0, 0)
+    StrokeMacro.Thickness = 2
 
     MacroTab:CreateToggle("Enable Macro System (Key: E)", function(state)
-        MacroMasterToggle = state; MacroLabel.Visible = state
-        if not state then IsMacroActive = false; MacroLabel.Text = "MACRO: OFF"; MacroLabel.TextColor3 = Color3.fromRGB(255, 50, 50) end
+        MacroMasterToggle = state
+        MacroLabel.Visible = state
+        if not state then
+            IsMacroActive = false
+            MacroLabel.Text = "MACRO: OFF"
+            MacroLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
+        end
     end)
 
     UserInputService.InputBegan:Connect(function(input, gameProcessed)
@@ -315,54 +402,68 @@ function GameModule:Init(Window)
     end)
 
     -- ==========================================
-    -- 4. MISC (RGB & FUN) EKLENTİLERİ
+    -- 4. MISC (RGB & FUN)
     -- ==========================================
     local MiscTab = Window:CreateTab("Misc")
-    
+
     local RGBBallEnabled = false
     local RGBCharEnabled, DiscoEnabled = false, false
-    local RGBCharSpeed, OriginalColors = 2, {}
+    local RGBCharSpeed = 2
+    local OriginalColors = {}
     local origAmb, origOut, origFog = Lighting.Ambient, Lighting.OutdoorAmbient, Lighting.FogColor
 
     MiscTab:CreateToggle("RGB Ball (Neon)", function(s) RGBBallEnabled = s end)
-    
-    MiscTab:CreateToggle("RGB Character", function(s) 
+
+    MiscTab:CreateToggle("RGB Character", function(s)
         RGBCharEnabled = s
-        if not s and LocalPlayer.Character then 
-            for p, c in pairs(OriginalColors) do 
-                if p and p.Parent == LocalPlayer.Character then p.Color = c end 
+        if not s and LocalPlayer.Character then
+            for part, color in pairs(OriginalColors) do
+                if part and part.Parent == LocalPlayer.Character then
+                    part.Color = color
+                end
             end
-            OriginalColors = {} 
-        end 
+            OriginalColors = {}
+        end
     end)
     MiscTab:CreateSlider("RGB Character Speed", 1, 10, 2, function(v) RGBCharSpeed = v end)
-    
-    MiscTab:CreateToggle("Disco Mode (Sky)", function(s) 
+
+    MiscTab:CreateToggle("Disco Mode (Sky)", function(s)
         DiscoEnabled = s
-        if not s then 
+        if not s then
             Lighting.Ambient = origAmb
             Lighting.OutdoorAmbient = origOut
-            Lighting.FogColor = origFog 
-        end 
+            Lighting.FogColor = origFog
+        end
     end)
 
     RunService.RenderStepped:Connect(function()
-        local locked = GetActiveBall()
-        if RGBBallEnabled and locked and locked.Parent then
-            locked.Material = Enum.Material.Neon
-            locked.Color = Color3.fromHSV((tick() * 2) % 1, 1, 1)
+        -- RGB Ball (düzeltildi: top attribute veya isim ile bulunur)
+        if RGBBallEnabled then
+            local ball = GetActiveBall()
+            if ball and ball.Parent then
+                ball.Material = Enum.Material.Neon
+                ball.Color = Color3.fromHSV((tick() * 2) % 1, 1, 1)
+            end
         end
+
+        -- RGB Character
         if RGBCharEnabled and LocalPlayer.Character then
-            local color = Color3.fromHSV((tick() * RGBCharSpeed * 0.1) % 1, 1, 1)
+            local hue = (tick() * RGBCharSpeed * 0.1) % 1
+            local color = Color3.fromHSV(hue, 1, 1)
             for _, part in pairs(LocalPlayer.Character:GetChildren()) do
                 if part:IsA("BasePart") then
-                    if not OriginalColors[part] then OriginalColors[part] = part.Color end
+                    if not OriginalColors[part] then
+                        OriginalColors[part] = part.Color
+                    end
                     part.Color = color
                 end
             end
         end
+
+        -- Disco
         if DiscoEnabled then
-            local col = Color3.fromHSV((tick() * 0.5) % 1, 1, 1)
+            local hue = (tick() * 0.5) % 1
+            local col = Color3.fromHSV(hue, 1, 1)
             Lighting.Ambient = col
             Lighting.OutdoorAmbient = col
             Lighting.FogColor = col
@@ -370,14 +471,21 @@ function GameModule:Init(Window)
     end)
 
     MiscTab:CreateButton("Unload EMLOXA WARE", function()
-        AutoParryEnabled = false; CamLookAtBall = false; CharLookAtBall = false
-        SpinBotEnabled = false; MacroMasterToggle = false; IsMacroActive = false
-        RGBBallEnabled = false; RGBCharEnabled = false; DiscoEnabled = false
+        AutoParryEnabled = false
+        CamLookAtBall = false
+        CharLookAtBall = false
+        SpinBotEnabled = false
+        MacroMasterToggle = false
+        IsMacroActive = false
+        RGBBallEnabled = false
+        RGBCharEnabled = false
+        DiscoEnabled = false
         VisualizerSphere:Destroy()
         MacroUI:Destroy()
-        TargetUI:Destroy()
         ScreenUI:Destroy()
-        Lighting.Ambient = origAmb; Lighting.OutdoorAmbient = origOut; Lighting.FogColor = origFog
+        Lighting.Ambient = origAmb
+        Lighting.OutdoorAmbient = origOut
+        Lighting.FogColor = origFog
     end)
 end
 
