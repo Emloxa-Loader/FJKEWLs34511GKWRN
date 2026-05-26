@@ -1,5 +1,5 @@
 -- =========================================================================
--- EMLOXA WARE: BLADE BALL MAXIMUM PERFORMANCE MODULE v5 (ULTIMATE TARGETING)
+-- EMLOXA WARE: BLADE BALL MAXIMUM PERFORMANCE MODULE v6 (SMART PREDICTION)
 -- =========================================================================
 local GameModule = {}
 
@@ -9,6 +9,7 @@ function GameModule:Init(Window)
     local UserInputService = game:GetService("UserInputService")
     local VirtualInputManager = game:GetService("VirtualInputManager")
     local Stats = game:GetService("Stats")
+    local Lighting = game:GetService("Lighting")
     local Camera = workspace.CurrentCamera
     local LocalPlayer = Players.LocalPlayer
 
@@ -100,17 +101,15 @@ function GameModule:Init(Window)
     end)
 
     -- ==========================================
-    -- 2. BLADE BALL: KUSURSUZ AUTO PARRY & VISUALIZER
+    -- 2. BLADE BALL: AKILLI AUTO PARRY & VISUALIZER
     -- ==========================================
     local CombatTab = Window:CreateTab("Combat (Blade Ball)")
     
     local AutoParryEnabled, CamLookAtBall, CharLookAtBall = false, false, false
     local SpinBotEnabled, VisualizeParry = false, false
     local SpinSpeed = 50
-    local BaseDistance = 15
-    local VelocityMultiplier = 5
+    local PredictionMultiplier = 3.5 -- Otomatik mesafe büyütme çarpanı
 
-    -- Savunma Yarıçapını Gösteren Şeffaf Küre
     local VisualizerSphere = Instance.new("Part")
     VisualizerSphere.Shape = Enum.PartType.Ball
     VisualizerSphere.Material = Enum.Material.ForceField
@@ -121,38 +120,24 @@ function GameModule:Init(Window)
     VisualizerSphere.CastShadow = false
     VisualizerSphere.Parent = workspace
 
-    CombatTab:CreateToggle("Auto Parry (Ultimate Target Lock)", function(s) AutoParryEnabled = s end)
+    CombatTab:CreateToggle("Auto Parry (Smart Velocity Math)", function(s) AutoParryEnabled = s end)
     CombatTab:CreateToggle("Visualize Parry Range", function(s) VisualizeParry = s end)
-    CombatTab:CreateSlider("Base Hit Distance", 10, 50, 15, function(v) BaseDistance = v end)
-    CombatTab:CreateSlider("Velocity Sensitivity", 1, 10, 5, function(v) VelocityMultiplier = v end)
+    CombatTab:CreateSlider("Prediction Sensitivity (1-10)", 1, 10, 4, function(v) PredictionMultiplier = v end)
 
     CombatTab:CreateToggle("Camera Look At Ball", function(s) CamLookAtBall = s end)
     CombatTab:CreateToggle("Character Look At Ball", function(s) CharLookAtBall = s end)
     CombatTab:CreateToggle("Spin Bot", function(s) SpinBotEnabled = s end)
     CombatTab:CreateSlider("Spin Speed", 10, 100, 50, function(v) SpinSpeed = v end)
 
-
-    -- ==========================================
-    -- TOP HEDEFLEME MANTIĞI (SENİN ANALİZİNE GÖRE)
-    -- ==========================================
     local LockedBall = nil
 
     local function GetActiveBall()
-        -- 1. Top zaten bulunmuşsa ve haritada var olmaya devam ediyorsa ona odaklanmaya devam et.
-        if LockedBall and LockedBall.Parent then
-            return LockedBall
-        end
-
-        -- 2. Top yok olduysa (patladıysa), yeni topu aramaya başla.
+        if LockedBall and LockedBall.Parent then return LockedBall end
         local ballsFolder = workspace:FindFirstChild("Balls")
         if ballsFolder then
             for _, item in pairs(ballsFolder:GetDescendants()) do
                 if item:IsA("BasePart") then
-                    local r = math.floor((item.Color.R * 255) + 0.5)
-                    local g = math.floor((item.Color.G * 255) + 0.5)
-                    local b = math.floor((item.Color.B * 255) + 0.5)
-                    
-                    -- SENİN FORMÜLÜN: Gerçek topun rengi 128, 128, 128 (Gri)
+                    local r, g, b = math.floor((item.Color.R * 255)+0.5), math.floor((item.Color.G * 255)+0.5), math.floor((item.Color.B * 255)+0.5)
                     if r == 128 and g == 128 and b == 128 then
                         LockedBall = item
                         return LockedBall
@@ -166,17 +151,10 @@ function GameModule:Init(Window)
     local function IsTargetingMe()
         local ballsFolder = workspace:FindFirstChild("Balls")
         if ballsFolder then
-            -- Bazen Highlight partın içinde, bazen direkt klasörde olabilir, hepsini tarıyoruz.
             for _, item in pairs(ballsFolder:GetDescendants()) do
                 if item:IsA("Highlight") then
-                    local r = math.floor((item.FillColor.R * 255) + 0.5)
-                    local g = math.floor((item.FillColor.G * 255) + 0.5)
-                    local b = math.floor((item.FillColor.B * 255) + 0.5)
-                    
-                    -- SENİN FORMÜLÜN: Eğer Highlight kırmızı (255, 30, 30) ise HEDEF BİZİZ!
-                    if r == 255 and g == 30 and b == 30 then
-                        return true
-                    end
+                    local r, g, b = math.floor((item.FillColor.R * 255)+0.5), math.floor((item.FillColor.G * 255)+0.5), math.floor((item.FillColor.B * 255)+0.5)
+                    if r == 255 and g == 30 and b == 30 then return true end
                 end
             end
         end
@@ -203,14 +181,10 @@ function GameModule:Init(Window)
             local activeBall = GetActiveBall()
             local isTargetingMe = false
 
-            if SpinBotEnabled then
-                Root.CFrame = Root.CFrame * CFrame.Angles(0, math.rad(SpinSpeed), 0)
-            end
+            if SpinBotEnabled then Root.CFrame = Root.CFrame * CFrame.Angles(0, math.rad(SpinSpeed), 0) end
 
             if activeBall then
                 isTargetingMe = IsTargetingMe()
-                
-                -- Hedef Yazısı (Kırmızı Yanıp Sönme Efektli)
                 TargetLabel.Visible = isTargetingMe
                 
                 if CamLookAtBall and not SpinBotEnabled then Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, activeBall.Position) end
@@ -219,16 +193,22 @@ function GameModule:Init(Window)
                     Root.CFrame = CFrame.new(Root.Position, targetPos)
                 end
 
-                -- GÖRSELLEŞTİRİCİ MATEMATİĞİ (Çap Hesaplama)
+                -- ==========================================
+                -- ZEKİ HESAPLAMA (AKILLI VURUŞ MESAFESİ)
+                -- ==========================================
                 local velocity = activeBall.AssemblyLinearVelocity.Magnitude
+                local ping = 0.1
+                pcall(function() ping = Stats.Network.ServerStatsItem["Data Ping"]:GetValue() / 1000 end)
                 
-                -- Hız ne kadar yüksekse çap o kadar mantıklı artar
-                local dynamicDistance = BaseDistance + (velocity * (VelocityMultiplier / 15))
-                dynamicDistance = math.clamp(dynamicDistance, BaseDistance, 150) -- Çapın max sınırını belirle
+                -- Sabit bir Base Distance YOK. Mesafe tamamen topun hızına (Velocity) ve Gecikmeye (Ping) bağlı!
+                -- Top yavaşsa (örn: 20 hız) çap minimum 12-15 civarı kalır. Top hızlıysa (örn: 200) çap deşhet büyür.
+                local calculatedDistance = 12 + (velocity * ping * PredictionMultiplier)
+                
+                -- Oyun çökmesin veya çok uzaktan vurup buga girmesin diye max sınır 120 yapıldı
+                local dynamicDistance = math.clamp(calculatedDistance, 12, 120)
 
                 if VisualizeParry then
                     VisualizerSphere.Transparency = 0.6
-                    -- LERP SİSTEMİ: Küre boyutu bir anda patlamaz, pürüzsüzce büyür ve küçülür
                     local targetSize = Vector3.new(dynamicDistance * 2, dynamicDistance * 2, dynamicDistance * 2)
                     VisualizerSphere.Size = VisualizerSphere.Size:Lerp(targetSize, 0.2)
                     VisualizerSphere.Position = Root.Position
@@ -237,15 +217,13 @@ function GameModule:Init(Window)
                     VisualizerSphere.Transparency = 1
                 end
 
-                -- VURUŞ TETİKLEYİCİSİ
                 if AutoParryEnabled and isTargetingMe then
                     local distance = (activeBall.Position - Root.Position).Magnitude
                     
-                    -- Top kürenin içine girdiği an ve son basıştan 0.15 sn geçtiyse vur
+                    -- Top akıllıca hesaplanan alanın içine girdiği milisaniyede vurur!
                     if distance <= dynamicDistance and (tick() - LastParryTime > 0.15) then
                         Parry()
                         LastParryTime = tick()
-                        -- Vuruş anında görsel küre parlasın
                         if VisualizeParry then VisualizerSphere.Transparency = 0.1 end
                     end
                 end
@@ -311,13 +289,73 @@ function GameModule:Init(Window)
         end
     end)
 
+    -- ==========================================
+    -- 4. MISC (RGB & FUN) EKLENTİLERİ
+    -- ==========================================
     local MiscTab = Window:CreateTab("Misc")
+    
+    local RGBBallEnabled = false
+    local RGBCharEnabled, DiscoEnabled = false, false
+    local RGBCharSpeed, OriginalColors = 2, {}
+    local origAmb, origOut, origFog = Lighting.Ambient, Lighting.OutdoorAmbient, Lighting.FogColor
+
+    MiscTab:CreateToggle("RGB Ball (Neon)", function(s) RGBBallEnabled = s end)
+    
+    MiscTab:CreateToggle("RGB Character", function(s) 
+        RGBCharEnabled = s
+        if not s and LocalPlayer.Character then 
+            for p, c in pairs(OriginalColors) do 
+                if p and p.Parent == LocalPlayer.Character then p.Color = c end 
+            end
+            OriginalColors = {} 
+        end 
+    end)
+    MiscTab:CreateSlider("RGB Character Speed", 1, 10, 2, function(v) RGBCharSpeed = v end)
+    
+    MiscTab:CreateToggle("Disco Mode (Sky)", function(s) 
+        DiscoEnabled = s
+        if not s then 
+            Lighting.Ambient = origAmb
+            Lighting.OutdoorAmbient = origOut
+            Lighting.FogColor = origFog 
+        end 
+    end)
+
+    RunService.RenderStepped:Connect(function()
+        -- RGB Ball Effect
+        if RGBBallEnabled and LockedBall and LockedBall.Parent then
+            LockedBall.Material = Enum.Material.Neon
+            LockedBall.Color = Color3.fromHSV((tick() * 2) % 1, 1, 1)
+        end
+
+        -- RGB Character Effect
+        if RGBCharEnabled and LocalPlayer.Character then
+            local color = Color3.fromHSV((tick() * RGBCharSpeed * 0.1) % 1, 1, 1)
+            for _, part in pairs(LocalPlayer.Character:GetChildren()) do
+                if part:IsA("BasePart") then
+                    if not OriginalColors[part] then OriginalColors[part] = part.Color end
+                    part.Color = color
+                end
+            end
+        end
+        
+        -- Disco Mode Effect
+        if DiscoEnabled then
+            local col = Color3.fromHSV((tick() * 0.5) % 1, 1, 1)
+            Lighting.Ambient = col
+            Lighting.OutdoorAmbient = col
+            Lighting.FogColor = col
+        end
+    end)
+
     MiscTab:CreateButton("Unload EMLOXA WARE", function()
         AutoParryEnabled = false; CamLookAtBall = false; CharLookAtBall = false
         SpinBotEnabled = false; MacroMasterToggle = false; IsMacroActive = false
+        RGBBallEnabled = false; RGBCharEnabled = false; DiscoEnabled = false
         VisualizerSphere:Destroy()
         MacroUI:Destroy()
         TargetUI:Destroy()
+        Lighting.Ambient = origAmb; Lighting.OutdoorAmbient = origOut; Lighting.FogColor = origFog
     end)
 end
 
