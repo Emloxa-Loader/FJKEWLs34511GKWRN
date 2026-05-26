@@ -1,5 +1,5 @@
 -- =========================================================================
--- EMLOXA WARE: KNIFE ABILITY TEST (KAT) V13 DISTANCE CORE
+-- EMLOXA WARE: KNIFE ABILITY TEST (KAT) V13 DISTANCE CORE (HUB FIX)
 -- =========================================================================
 local GameModule = {}
 
@@ -13,7 +13,7 @@ function GameModule:Init(Window)
     local LocalPlayer = Players.LocalPlayer
     local Mouse = LocalPlayer:GetMouse()
 
-    --// AYARLAR (Orijinal yapı korundu) //--
+    --// AYARLAR //--
     local Settings = {
         Combat = {
             Aimbot = false,
@@ -57,38 +57,40 @@ function GameModule:Init(Window)
     local Connections = {}
 
     -- ==========================================
-    -- 1. SEKMELER (RAYFIELD UI)
+    -- 1. SEKMELER (EMLOXA HUB FORMATI)
     -- ==========================================
     local CombatTab = Window:CreateTab("Combat")
     local VisualsTab = Window:CreateTab("Visuals")
     local MovementTab = Window:CreateTab("Movement")
     local MiscTab = Window:CreateTab("Misc")
 
-    -- COMBAT
-    CombatTab:CreateToggle({ Name = "RageBot (360°)", CurrentValue = false, Flag = "RageBot", Callback = function(v) Settings.Combat.RageBot = v end })
-    CombatTab:CreateSlider({ Name = "Mesafe (Range Limit)", Range = {50, 1000}, Increment = 10, CurrentValue = 500, Flag = "RageRange", Callback = function(v) Settings.Combat.RageRange = v end })
-    CombatTab:CreateToggle({ Name = "Wall Check (Rage & Legit)", CurrentValue = true, Flag = "WallCheck", Callback = function(v) Settings.Combat.WallCheck = v end })
-    CombatTab:CreateToggle({ Name = "Legit Aimbot (Sağ Tık)", CurrentValue = false, Flag = "Aimbot", Callback = function(v) Settings.Combat.Aimbot = v end })
-    CombatTab:CreateSlider({ Name = "Aimbot Smoothness", Range = {1, 20}, Increment = 1, CurrentValue = 5, Flag = "Smoothness", Callback = function(v) Settings.Combat.Smoothness = v end })
-    CombatTab:CreateToggle({ Name = "Silent Aim (Micro Flick)", CurrentValue = false, Flag = "SilentAim", Callback = function(v) Settings.Combat.SilentAim = v end })
-    CombatTab:CreateToggle({ Name = "TriggerBot", CurrentValue = false, Flag = "TriggerBot", Callback = function(v) Settings.Combat.TriggerBot = v end })
-    CombatTab:CreateToggle({ Name = "FF Protection (Spawn Koruma)", CurrentValue = true, Flag = "FFCheck", Callback = function(v) Settings.Combat.FFCheck = v end })
-    CombatTab:CreateToggle({ Name = "Show FOV", CurrentValue = true, Flag = "ShowFOV", Callback = function(v) Settings.Combat.ShowFOV = v end })
-    CombatTab:CreateSlider({ Name = "FOV Radius", Range = {50, 600}, Increment = 10, CurrentValue = 120, Flag = "FOV", Callback = function(v) Settings.Combat.FOV = v end })
+    -- COMBAT TAB
+    CombatTab:CreateToggle("RageBot (360°)", function(v) Settings.Combat.RageBot = v end)
+    CombatTab:CreateSlider("Mesafe (Range Limit)", 50, 1000, 500, function(v) Settings.Combat.RageRange = v end)
+    CombatTab:CreateToggle("Wall Check (Rage & Legit)", function(v) Settings.Combat.WallCheck = v end)
+    
+    CombatTab:CreateToggle("Legit Aimbot (Sağ Tık)", function(v) Settings.Combat.Aimbot = v end)
+    CombatTab:CreateSlider("Aimbot Smoothness", 1, 20, 5, function(v) Settings.Combat.Smoothness = v end)
+    CombatTab:CreateToggle("Silent Aim (Micro Flick)", function(v) Settings.Combat.SilentAim = v end)
+    
+    CombatTab:CreateToggle("TriggerBot", function(v) Settings.Combat.TriggerBot = v end)
+    CombatTab:CreateToggle("FF Protection (Spawn Koruma)", function(v) Settings.Combat.FFCheck = v end)
+    CombatTab:CreateToggle("Show FOV", function(v) Settings.Combat.ShowFOV = v end)
+    CombatTab:CreateSlider("FOV Radius", 50, 600, 120, function(v) Settings.Combat.FOV = v end)
 
-    -- VISUALS
-    VisualsTab:CreateToggle({ Name = "ESP (Force Refresh)", CurrentValue = false, Flag = "ESP", Callback = function(v) Settings.Visuals.ESP = v end })
-    VisualsTab:CreateToggle({ Name = "FullBright", CurrentValue = false, Flag = "FullBright", Callback = function(v) Settings.Visuals.FullBright = v end })
+    -- VISUALS TAB
+    VisualsTab:CreateToggle("ESP (Force Refresh)", function(v) Settings.Visuals.ESP = v end)
+    VisualsTab:CreateToggle("FullBright", function(v) Settings.Visuals.FullBright = v end)
 
-    -- MOVEMENT
-    MovementTab:CreateSlider({ Name = "Walk Speed", Range = {16, 250}, Increment = 1, CurrentValue = 16, Flag = "WalkSpeed", Callback = function(v) Settings.Movement.WalkSpeed = v end })
-    MovementTab:CreateSlider({ Name = "Jump Power", Range = {50, 300}, Increment = 1, CurrentValue = 50, Flag = "JumpPower", Callback = function(v) Settings.Movement.JumpPower = v end })
-    MovementTab:CreateToggle({ Name = "Infinite Jump", CurrentValue = false, Flag = "InfJump", Callback = function(v) Settings.Movement.InfJump = v end })
-    MovementTab:CreateToggle({ Name = "NoClip", CurrentValue = false, Flag = "NoClip", Callback = function(v) Settings.Movement.NoClip = v end })
+    -- MOVEMENT TAB
+    MovementTab:CreateSlider("Walk Speed", 16, 250, 16, function(v) Settings.Movement.WalkSpeed = v end)
+    MovementTab:CreateSlider("Jump Power", 50, 300, 50, function(v) Settings.Movement.JumpPower = v end)
+    MovementTab:CreateToggle("Infinite Jump", function(v) Settings.Movement.InfJump = v end)
+    MovementTab:CreateToggle("NoClip", function(v) Settings.Movement.NoClip = v end)
 
-    -- MISC
-    MiscTab:CreateToggle({ Name = "SpinBot", CurrentValue = false, Flag = "SpinBot", Callback = function(v) Settings.Misc.SpinBot = v end })
-    MiscTab:CreateSlider({ Name = "Spin Speed", Range = {10, 100}, Increment = 1, CurrentValue = 30, Flag = "SpinSpeed", Callback = function(v) Settings.Misc.SpinSpeed = v end })
+    -- MISC TAB
+    MiscTab:CreateToggle("SpinBot", function(v) Settings.Misc.SpinBot = v end)
+    MiscTab:CreateSlider("Spin Speed", 10, 100, 30, function(v) Settings.Misc.SpinSpeed = v end)
 
     -- ==========================================
     -- 2. HEDEF BULMA FONKSİYONLARI
@@ -273,33 +275,30 @@ function GameModule:Init(Window)
     -- ==========================================
     -- 4. UNLOAD / CLEANUP
     -- ==========================================
-    MiscTab:CreateButton({
-        Name = "Unload EMLOXA",
-        Callback = function()
-            -- Tüm döngüleri kapat
-            for _, conn in pairs(Connections) do conn:Disconnect() end
-            
-            -- FOV Dairesini Sil
-            FOVCircle:Remove()
-            
-            -- ESP'leri Temizle
-            for _, plr in pairs(Players:GetPlayers()) do
-                if plr.Character and plr.Character:FindFirstChild("EMLOXA_ESP") then 
-                    plr.Character.EMLOXA_ESP:Destroy() 
-                end
+    MiscTab:CreateButton("Unload EMLOXA", function()
+        -- Tüm döngüleri kapat
+        for _, conn in pairs(Connections) do conn:Disconnect() end
+        
+        -- FOV Dairesini Sil
+        FOVCircle:Remove()
+        
+        -- ESP'leri Temizle
+        for _, plr in pairs(Players:GetPlayers()) do
+            if plr.Character and plr.Character:FindFirstChild("EMLOXA_ESP") then 
+                plr.Character.EMLOXA_ESP:Destroy() 
             end
-            
-            -- Hızı ve Zıplamayı Normale Döndür
-            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-                LocalPlayer.Character.Humanoid.WalkSpeed = 16
-                LocalPlayer.Character.Humanoid.JumpPower = 50
-            end
-            
-            -- Menüyü Kapat
-            local ui = game:GetService("CoreGui"):FindFirstChild("EmloxaWareUI") or LocalPlayer.PlayerGui:FindFirstChild("EmloxaWareUI")
-            if ui then ui:Destroy() end
         end
-    })
+        
+        -- Hızı ve Zıplamayı Normale Döndür
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            LocalPlayer.Character.Humanoid.WalkSpeed = 16
+            LocalPlayer.Character.Humanoid.JumpPower = 50
+        end
+        
+        -- Menüyü Kapat
+        local ui = game:GetService("CoreGui"):FindFirstChild("EmloxaWareUI") or LocalPlayer.PlayerGui:FindFirstChild("EmloxaWareUI")
+        if ui then ui:Destroy() end
+    end)
 end
 
 return GameModule
