@@ -1,5 +1,5 @@
 -- =========================================================================
--- EMLOXA WARE: FUNKY FRIDAY AUTO-PLAYER v10 (ULTRA AGGRESSIVE PRIORITY CORE)
+-- EMLOXA WARE: FUNKY FRIDAY AUTO-PLAYER v11 (ULTIMATE HOLD-NORMAL FIX)
 -- =========================================================================
 local GameModule = {}
 
@@ -16,8 +16,7 @@ function GameModule:Init(Window)
     -- ==========================================
     local PlayerTab = Window:CreateTab("Local Player")
     local NoclipEnabled, FlyEnabled = false, false
-    local FlySpeed, CurrentSpeed, CurrentJump = 50, 16, 50
-
+    
     PlayerTab:CreateToggle("Noclip (Pass Through)", function(s) NoclipEnabled = s end)
     PlayerTab:CreateSlider("WalkSpeed", 16, 250, 16, function(v) 
         if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then LocalPlayer.Character.Humanoid.WalkSpeed = v end 
@@ -76,7 +75,7 @@ function GameModule:Init(Window)
     
     local AutoPlayerEnabled = false
     local ShowVisualizer = false
-    local Aggression = 20 -- Başlangıç: 20
+    local Aggression = 20
     
     local LaneKeys = {
         Lane1 = Enum.KeyCode.A,
@@ -91,12 +90,16 @@ function GameModule:Init(Window)
 
     local function ManageVisualizerDot(parentObj, dotName, size, color)
         local dot = parentObj:FindFirstChild(dotName)
-        if not ShowVisualizer then if dot then dot:Destroy() end return end
         if not dot then
             dot = Instance.new("Frame"); dot.Name = dotName; dot.Size = UDim2.new(0, size, 0, size); dot.Position = UDim2.new(0.5, -size/2, 0.5, -size/2)
             dot.BackgroundColor3 = color; dot.BorderSizePixel = 0; dot.ZIndex = 999999
-            Instance.new("UIStroke", dot).Thickness = 2; Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0); dot.Parent = parentObj
+            local stroke = Instance.new("UIStroke", dot); stroke.Thickness = 2
+            Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0); dot.Parent = parentObj
         end
+        -- GÖRÜNÜRLÜK AYARI (Her zaman var ama gizli/açık)
+        local transparency = ShowVisualizer and 0 or 1
+        dot.BackgroundTransparency = transparency
+        dot.UIStroke.Transparency = transparency
     end
 
     local TappedNotes = {}
@@ -122,7 +125,7 @@ function GameModule:Init(Window)
         
         local inner = ui.Game.Fields[mySide].Inner
 
-        -- KUSURSUZ ÖNCELİKLİ TARAMA (Her Lane kendi içinde en yakın notayı seçer)
+        -- HIZLI TARAMA
         for i = 1, 4 do
             local laneFrame = inner:FindFirstChild("Lane" .. i)
             if laneFrame then
@@ -135,7 +138,7 @@ function GameModule:Init(Window)
                     local closestNote = nil
                     local minDistance = 9999
                     
-                    -- ÖNCE SÜTUNUN EN YAKIN NOTASINI BUL
+                    -- ÖNCE SÜTUNUN EN YAKININI BUL
                     for _, note in pairs(notesFolder:GetChildren()) do
                         if note:IsA("GuiObject") then
                             ManageVisualizerDot(note, "EmloxaNoteDot", 14, Color3.fromRGB(50, 50, 50))
@@ -149,30 +152,39 @@ function GameModule:Init(Window)
                         end
                     end
                     
-                    -- SADECE EN YAKIN OLANA BAS
+                    -- AGRESİF TEPKİ (HİTBOX)
                     if closestNote and minDistance <= Aggression then
-                        local isHoldNote = #closestNote:GetChildren() > 1
+                        local isHoldNote = false
+                        local frameCount = 0
+                        for _, child in pairs(closestNote:GetChildren()) do
+                            if child:IsA("GuiObject") and child.Name ~= "EmloxaNoteDot" then 
+                                frameCount = frameCount + 1 
+                            end
+                        end
+                        if frameCount > 1 then isHoldNote = true end
                         
                         if isHoldNote then
                             if not ActiveHolds[closestNote] then
                                 ActiveHolds[closestNote] = laneKey
                                 VirtualInputManager:SendKeyEvent(true, laneKey, false, game)
                             end
-                        elseif not TappedNotes[closestNote] then
-                            TappedNotes[closestNote] = true
-                            -- HIZLI BAS-ÇEK
-                            VirtualInputManager:SendKeyEvent(true, laneKey, false, game)
-                            task.spawn(function()
-                                task.wait(0.01)
-                                VirtualInputManager:SendKeyEvent(false, laneKey, false, game)
-                            end)
+                        else
+                            -- NORMAL NOTA (Hız ve seri vuruş)
+                            if not TappedNotes[closestNote] then
+                                TappedNotes[closestNote] = true
+                                VirtualInputManager:SendKeyEvent(true, laneKey, false, game)
+                                task.spawn(function()
+                                    task.wait(0.01)
+                                    VirtualInputManager:SendKeyEvent(false, laneKey, false, game)
+                                end)
+                            end
                         end
                     end
                 end
             end
         end
         
-        -- Hold Notası temizliği
+        -- KUSURSUZ HOLD CLEANUP (Hold notasının bittiği anı anlık yakala)
         for holdNote, key in pairs(ActiveHolds) do
             if not holdNote.Parent or not holdNote:IsDescendantOf(game) then 
                 VirtualInputManager:SendKeyEvent(false, key, false, game)
