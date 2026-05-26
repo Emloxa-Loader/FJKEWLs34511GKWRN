@@ -1,5 +1,5 @@
 -- =========================================================================
--- EMLOXA WARE: BLADE BALL MAXIMUM PERFORMANCE MODULE
+-- EMLOXA WARE: BLADE BALL PREDICTIVE PARRY MODULE v2
 -- =========================================================================
 local GameModule = {}
 
@@ -8,6 +8,7 @@ function GameModule:Init(Window)
     local RunService = game:GetService("RunService")
     local UserInputService = game:GetService("UserInputService")
     local VirtualInputManager = game:GetService("VirtualInputManager")
+    local Stats = game:GetService("Stats")
     local Camera = workspace.CurrentCamera
     local LocalPlayer = Players.LocalPlayer
 
@@ -18,7 +19,7 @@ function GameModule:Init(Window)
     local NoclipEnabled, FlyEnabled = false, false
     local FlySpeed, CurrentSpeed, CurrentJump = 50, 16, 50
 
-    PlayerTab:CreateToggle("Noclip (Pass Through Walls)", function(state) NoclipEnabled = state end)
+    PlayerTab:CreateToggle("Noclip (Pass Through Walls)", function(s) NoclipEnabled = s end)
     PlayerTab:CreateSlider("WalkSpeed Force", 16, 250, 16, function(v)
         CurrentSpeed = v
         if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then LocalPlayer.Character.Humanoid.WalkSpeed = v end
@@ -30,13 +31,13 @@ function GameModule:Init(Window)
 
     PlayerTab:CreateToggle("Fly Hack (Camera Based)", function(state)
         FlyEnabled = state
-        local Character = LocalPlayer.Character
-        local Root = Character and Character:FindFirstChild("HumanoidRootPart")
-        local Humanoid = Character and Character:FindFirstChild("Humanoid")
-        if not Root or not Humanoid then return end
+        local Char = LocalPlayer.Character
+        local Root = Char and Char:FindFirstChild("HumanoidRootPart")
+        local Hum = Char and Char:FindFirstChild("Humanoid")
+        if not Root or not Hum then return end
         
         if FlyEnabled then
-            Humanoid.PlatformStand = true
+            Hum.PlatformStand = true
             local BodyVelocity = Instance.new("BodyVelocity", Root)
             BodyVelocity.Name = "EmloxaFly"; BodyVelocity.Velocity = Vector3.new(0, 0, 0); BodyVelocity.MaxForce = Vector3.new(10000, 10000, 10000)
             
@@ -60,7 +61,7 @@ function GameModule:Init(Window)
                 end
             end)
         else
-            Humanoid.PlatformStand = false
+            Hum.PlatformStand = false
             if Root:FindFirstChild("EmloxaFly") then Root.EmloxaFly:Destroy() end
             if Root:FindFirstChild("EmloxaGyro") then Root.EmloxaGyro:Destroy() end
         end
@@ -78,61 +79,67 @@ function GameModule:Init(Window)
 
 
     -- ==========================================
-    -- 2. BLADE BALL: COMBAT & AUTO PARRY
+    -- 2. BLADE BALL: PREDICTIVE AUTO PARRY
     -- ==========================================
     local CombatTab = Window:CreateTab("Combat (Blade Ball)")
     
-    local AutoParryEnabled = false
-    local LookAtBallEnabled = false
+    local AutoParryEnabled, CamLookAtBall, CharLookAtBall = false, false, false
     local SpinBotEnabled = false
     local SpinSpeed = 50
-    local DistanceThreshold = 25 -- Varsayılan vuruş mesafesi
-    local TimingOffset = 0.5 -- Topun hızına göre erken basma payı
+    local BaseDistance = 20
+    local VelocityMultiplier = 5 -- Topun hızına göre çapı büyüten çarpan (0.1 - 10 arası)
+    local VisualizeParry = false
 
-    CombatTab:CreateToggle("Auto Parry (Smart Block)", function(state) AutoParryEnabled = state end)
-    CombatTab:CreateSlider("Parry Distance Tolerance", 10, 100, 25, function(v) DistanceThreshold = v end)
-    CombatTab:CreateSlider("Ping/Timing Offset (ms)", 1, 10, 5, function(v) TimingOffset = v / 10 end)
+    -- Savunma Yarıçapını Gösteren Şeffaf Küre
+    local VisualizerSphere = Instance.new("Part")
+    VisualizerSphere.Shape = Enum.PartType.Ball
+    VisualizerSphere.Material = Enum.Material.ForceField
+    VisualizerSphere.Color = Color3.fromRGB(102, 85, 255)
+    VisualizerSphere.Transparency = 1 -- Başlangıçta görünmez
+    VisualizerSphere.Anchored = true
+    VisualizerSphere.CanCollide = false
+    VisualizerSphere.CastShadow = false
+    VisualizerSphere.Parent = workspace
 
-    CombatTab:CreateToggle("Look At Active Ball", function(state) LookAtBallEnabled = state end)
+    CombatTab:CreateToggle("Auto Parry (Predictive)", function(s) AutoParryEnabled = s end)
+    CombatTab:CreateToggle("Visualize Parry Range", function(s) VisualizeParry = s end)
+    CombatTab:CreateSlider("Base Distance", 10, 50, 20, function(v) BaseDistance = v end)
+    CombatTab:CreateSlider("Velocity Sensitivity (Prediction)", 1, 10, 5, function(v) VelocityMultiplier = v end)
+
+    CombatTab:CreateToggle("Camera Look At Ball", function(s) CamLookAtBall = s end)
+    CombatTab:CreateToggle("Character Look At Ball", function(s) CharLookAtBall = s end)
     
-    CombatTab:CreateToggle("Spin Bot", function(state) SpinBotEnabled = state end)
+    CombatTab:CreateToggle("Spin Bot", function(s) SpinBotEnabled = s end)
     CombatTab:CreateSlider("Spin Speed", 10, 100, 50, function(v) SpinSpeed = v end)
 
-    -- Topu Bulma Fonksiyonu
     local function GetActiveBall()
         local ballsFolder = workspace:FindFirstChild("Balls")
         if ballsFolder then
             for _, item in pairs(ballsFolder:GetChildren()) do
-                if item:IsA("BasePart") and item:FindFirstChildOfClass("Highlight") then
-                    return item
-                end
+                if item:IsA("BasePart") and item:FindFirstChildOfClass("Highlight") then return item end
             end
         end
         return nil
     end
 
-    -- Topun Rengini (Bize Gelip Gelmediğini) Kontrol Etme
     local function IsBallTargetingUs(ball)
         local highlight = ball:FindFirstChildOfClass("Highlight")
         if highlight then
-            -- Rengi 255,255,255 (Beyaz) değilse top bize veya başkasına odaklanmış demektir.
-            -- Blade Ball'da top bize dönünce kırmızı olur.
             local r, g, b = highlight.FillColor.R, highlight.FillColor.G, highlight.FillColor.B
-            if r ~= 1 or g ~= 1 or b ~= 1 then -- 1,1,1 beyaz demektir
-                return true
-            end
+            -- Renk 255, 255, 255 (tam beyaz) değilse bizi/birini hedeflenmiştir
+            if r ~= 1 or g ~= 1 or b ~= 1 then return true end
         end
         return false
     end
 
-    -- F Tuşuna Basma Simülatörü
     local function Parry()
         VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
-        task.wait(0.05)
+        task.wait(0.02)
         VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
     end
 
-    -- Combat Ana Döngüsü
+    local LastParryTime = 0
+
     RunService.RenderStepped:Connect(function()
         local Character = LocalPlayer.Character
         local Root = Character and Character:FindFirstChild("HumanoidRootPart")
@@ -146,37 +153,64 @@ function GameModule:Init(Window)
             end
 
             if activeBall then
-                -- Look At Ball
-                if LookAtBallEnabled and not SpinBotEnabled then
+                -- Camera Look At Ball
+                if CamLookAtBall and not SpinBotEnabled then
                     Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, activeBall.Position)
                 end
 
-                -- Dinamik Auto Parry Mantığı
+                -- Character Look At Ball (Sadece sağ/sol döner, eğilmez)
+                if CharLookAtBall and not SpinBotEnabled then
+                    local targetPos = Vector3.new(activeBall.Position.X, Root.Position.Y, activeBall.Position.Z)
+                    Root.CFrame = CFrame.new(Root.Position, targetPos)
+                end
+
+                -- Dinamik Auto Parry Matematiği
+                local velocity = activeBall.AssemblyLinearVelocity.Magnitude
+                -- Ping hesaplaması (Ping yüksekse daha önceden basması gerekir)
+                local ping = Stats.Network.ServerStatsItem["Data Ping"]:GetValue() / 1000
+                
+                -- Çap Hesaplama Formülü: (Temel Mesafe) + (Hız * Çarpan) + (Ping Gecikmesi Payı)
+                local dynamicDistance = BaseDistance + (velocity * (VelocityMultiplier / 10)) + (velocity * ping)
+                
+                -- Görselleştirici (Küre) Güncellemesi
+                if VisualizeParry then
+                    VisualizerSphere.Transparency = 0.7
+                    -- Çap (Size) yarıçapın 2 katı olduğu için çarpı 2 yapıyoruz
+                    VisualizerSphere.Size = Vector3.new(dynamicDistance * 2, dynamicDistance * 2, dynamicDistance * 2)
+                    VisualizerSphere.Position = Root.Position
+                else
+                    VisualizerSphere.Transparency = 1
+                end
+
+                -- Vuruş Kontrolü
                 if AutoParryEnabled and IsBallTargetingUs(activeBall) then
                     local distance = (activeBall.Position - Root.Position).Magnitude
-                    local velocity = activeBall.AssemblyLinearVelocity.Magnitude
                     
-                    -- Zaman ve Mesafe Formülü: Top ne kadar hızlıysa, o kadar uzaktan basmalıdır!
-                    local dynamicDistance = DistanceThreshold + (velocity * TimingOffset)
-                    
-                    if distance <= dynamicDistance then
+                    -- Eğer top hesaplanan alanın içindeyse ve son basışın üzerinden 0.3 saniye geçmişse VUR!
+                    if distance <= dynamicDistance and (tick() - LastParryTime > 0.3) then
                         Parry()
+                        LastParryTime = tick()
+                        -- Vurduğunda görseli kısa süreliğine kırmızı yap
+                        if VisualizeParry then VisualizerSphere.Color = Color3.fromRGB(255, 0, 0) end
+                    else
+                        if VisualizeParry then VisualizerSphere.Color = Color3.fromRGB(102, 85, 255) end
                     end
                 end
+            else
+                if VisualizeParry then VisualizerSphere.Transparency = 1 end
             end
         end
     end)
 
 
     -- ==========================================
-    -- 3. MACRO SİSTEMİ (Ekranda UI Göstergeli)
+    -- 3. MACRO (F SPAMMER) SİSTEMİ
     -- ==========================================
     local MacroTab = Window:CreateTab("Macro (F Spammer)")
     
     local MacroMasterToggle = false
     local IsMacroActive = false
 
-    -- Ekranda Gözükecek Macro UI'ı (Sadece bu oyuna özel)
     local MacroUI = Instance.new("ScreenGui")
     MacroUI.Name = "EmloxaMacroUI"
     local success = pcall(function() MacroUI.Parent = game:GetService("CoreGui") end)
@@ -184,12 +218,12 @@ function GameModule:Init(Window)
 
     local MacroLabel = Instance.new("TextLabel")
     MacroLabel.Size = UDim2.new(0, 200, 0, 40)
-    MacroLabel.Position = UDim2.new(0.5, -100, 1, -150) -- Alt Orta
+    MacroLabel.Position = UDim2.new(0.5, -100, 1, -150)
     MacroLabel.BackgroundTransparency = 1
     MacroLabel.Font = Enum.Font.GothamBold
     MacroLabel.TextSize = 20
     MacroLabel.Text = "MACRO: OFF"
-    MacroLabel.TextColor3 = Color3.fromRGB(255, 50, 50) -- Kırmızı
+    MacroLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
     MacroLabel.Visible = false
     MacroLabel.Parent = MacroUI
     Instance.new("UIStroke", MacroLabel).Color = Color3.fromRGB(0, 0, 0)
@@ -204,45 +238,37 @@ function GameModule:Init(Window)
         end
     end)
 
-    -- E Tuşu Algılayıcı (Macro Aç/Kapat)
     UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
-        
         if input.KeyCode == Enum.KeyCode.E and MacroMasterToggle then
             IsMacroActive = not IsMacroActive
-            
             if IsMacroActive then
                 MacroLabel.Text = "MACRO: ON (Spamming F)"
-                MacroLabel.TextColor3 = Color3.fromRGB(50, 255, 50) -- Yeşil
+                MacroLabel.TextColor3 = Color3.fromRGB(50, 255, 50)
             else
                 MacroLabel.Text = "MACRO: OFF"
-                MacroLabel.TextColor3 = Color3.fromRGB(255, 50, 50) -- Kırmızı
+                MacroLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
             end
         end
     end)
 
-    -- Macro F Spammer Döngüsü (Oyun motorunun max hızında çalışır)
     task.spawn(function()
         while true do
             if MacroMasterToggle and IsMacroActive then
                 VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
-                task.wait() -- Hız sınırı yok, oyunu çökertecek kadar değil ama en hızlı
+                task.wait()
                 VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
             end
             task.wait()
         end
     end)
 
-    -- Menü kapanınca Macro UI'ını da temizlemek için
     local MiscTab = Window:CreateTab("Misc")
     MiscTab:CreateButton("Unload EMLOXA WARE", function()
-        AutoParryEnabled = false
-        LookAtBallEnabled = false
-        SpinBotEnabled = false
-        MacroMasterToggle = false
-        IsMacroActive = false
+        AutoParryEnabled = false; CamLookAtBall = false; CharLookAtBall = false
+        SpinBotEnabled = false; MacroMasterToggle = false; IsMacroActive = false
+        VisualizerSphere:Destroy()
         MacroUI:Destroy()
-        -- Universal unload işlemlerine dahil olması için buraya eklendi.
     end)
 end
 
