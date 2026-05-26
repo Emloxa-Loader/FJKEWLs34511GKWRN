@@ -1,5 +1,5 @@
 -- =========================================================================
--- EMLOXA WARE: FUNKY FRIDAY AUTO-PLAYER v13 (ULTIMATE IMAGE & PRIORITY CORE)
+-- EMLOXA WARE: FUNKY FRIDAY AUTO-PLAYER v15 (ULTIMATE DEEP-SKIN CORE)
 -- =========================================================================
 local GameModule = {}
 
@@ -112,64 +112,47 @@ function GameModule:Init(Window)
     end)
 
     -- ==========================================
-    -- 3. CUSTOM ARROWS (LOOP & ROBUST SKINNING)
+    -- 3. CUSTOM ARROWS (DEEP-SCAN & LOOP)
     -- ==========================================
     local ArrowTab = Window:CreateTab("Custom Arrows")
     local activeSkinId = nil
     local targetSide = "Both"
 
-    local function ApplySkin(id)
-        activeSkinId = id
-        local ui = LocalPlayer.PlayerGui:FindFirstChild("Window")
-        if not ui then return end
-        
-        -- Hedeflenen tarafa göre filtrele (Left, Right, Both)
-        local fields = ui.Game.Fields
-        local sides = (targetSide == "Both") and {fields.Left, fields.Right} or {fields[targetSide]}
-        
-        for _, side in pairs(sides) do
-            for _, obj in pairs(side:GetDescendants()) do
-                -- ImageLabel veya ImageButton fark etmeksizin uygula
-                if obj:IsA("ImageLabel") or obj:IsA("ImageButton") then
-                    pcall(function() obj.Image = "rbxassetid://" .. id end)
-                end
+    local function ApplySkinDeep(target)
+        if not target or not activeSkinId then return end
+        for _, obj in pairs(target:GetDescendants()) do
+            if obj:IsA("ImageLabel") or obj:IsA("ImageButton") then
+                pcall(function() obj.Image = "rbxassetid://" .. activeSkinId end)
             end
         end
     end
 
-    ArrowTab:CreateButton("Style 1: 5721693146", function() ApplySkin(5721693146) end)
-    ArrowTab:CreateButton("Style 2: 10800748312", function() ApplySkin(10800748312) end)
-    ArrowTab:CreateButton("Style 3: 56481798", function() ApplySkin(56481798) end)
-    ArrowTab:CreateButton("Style 4: 14843658201", function() ApplySkin(14843658201) end)
-    ArrowTab:CreateButton("Default Arrows (Remove Skin)", function() activeSkinId = nil end)
+    ArrowTab:CreateButton("Style 1", function() activeSkinId = 5721693146 end)
+    ArrowTab:CreateButton("Style 2", function() activeSkinId = 10800748312 end)
+    ArrowTab:CreateButton("Style 3", function() activeSkinId = 56481798 end)
+    ArrowTab:CreateButton("Style 4", function() activeSkinId = 14843658201 end)
+    ArrowTab:CreateButton("Default (Remove)", function() activeSkinId = nil end)
     
-    local sideSelect = ArrowTab:CreateButton("Apply To: " .. targetSide, function()
+    local sideBtn = ArrowTab:CreateButton("Apply To: Both", function()
         if targetSide == "Both" then targetSide = "Left"
         elseif targetSide == "Left" then targetSide = "Right"
         else targetSide = "Both" end
+        sideBtn:UpdateText("Apply To: " .. targetSide)
     end)
 
-    -- Loop (Sürekli aktif güncelleme)
+    -- SÜREKLİ LOOP (Tüm objeleri derinlemesine tara)
     RunService.RenderStepped:Connect(function()
         if activeSkinId then
             local ui = LocalPlayer.PlayerGui:FindFirstChild("Window")
             if ui and ui:FindFirstChild("Game") then
                 local fields = ui.Game.Fields
-                local sides = (targetSide == "Both") and {fields.Left, fields.Right} or {fields[targetSide]}
-                for _, side in pairs(sides) do
-                    for _, obj in pairs(side:GetDescendants()) do
-                        if (obj:IsA("ImageLabel") or obj:IsA("ImageButton")) and obj.Image ~= "rbxassetid://" .. activeSkinId then
-                            pcall(function() obj.Image = "rbxassetid://" .. activeSkinId end)
-                        end
-                    end
+                local targets = (targetSide == "Both") and {fields.Left, fields.Right} or {fields[targetSide]}
+                for _, t in pairs(targets) do
+                    ApplySkinDeep(t, activeSkinId)
                 end
             end
         end
     end)
-    
-    -- Not etiketi
-    local Label = Instance.new("TextLabel", ArrowTab.Parent)
-    Label.Text = "Note: Changes are client-side and persistent."
 
     -- ==========================================
     -- 4. MISC & CLEANUP
@@ -181,6 +164,9 @@ function GameModule:Init(Window)
         local ui = game:GetService("CoreGui"):FindFirstChild("EmloxaWareUI") or LocalPlayer.PlayerGui:FindFirstChild("EmloxaWareUI")
         if ui then ui:Destroy() end
     end)
+    
+    local Label = Instance.new("TextLabel", ArrowTab.Parent)
+    Label.Text = "Note: Changes are client-side."
 end
 
 return GameModule
