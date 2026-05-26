@@ -286,4 +286,194 @@ function EmloxaLibrary:CreateWindow(hubName)
         local TabSetup = {}
         
         local TabBtn = Instance.new("TextButton")
-        TabBtn.Size = UDim2.new(0
+        TabBtn.Size = UDim2.new(0, 120, 1, 0)
+        TabBtn.Text = tabName
+        TabBtn.Font = Enum.Font.GothamSemibold
+        TabBtn.TextSize = 14
+        TabBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
+        TabBtn.BackgroundTransparency = 1
+        TabBtn.Parent = TabContainer
+
+        local Indicator = Instance.new("Frame")
+        Indicator.Size = UDim2.new(0, 0, 0, 2)
+        Indicator.Position = UDim2.new(0.5, 0, 1, -2)
+        Indicator.BackgroundColor3 = Color3.fromRGB(102, 85, 255)
+        Indicator.BorderSizePixel = 0
+        Indicator.Parent = TabBtn
+
+        local PageScroll = Instance.new("ScrollingFrame")
+        PageScroll.Size = UDim2.new(1, 0, 1, 0)
+        PageScroll.BackgroundTransparency = 1
+        PageScroll.BorderSizePixel = 0
+        PageScroll.ScrollBarThickness = 3
+        PageScroll.Visible = false
+        PageScroll.Parent = PageContainer
+
+        local PageLayout = Instance.new("UIListLayout")
+        PageLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        PageLayout.Padding = UDim.new(0, 10)
+        PageLayout.Parent = PageScroll
+        Instance.new("UIPadding", PageScroll).PaddingTop = UDim.new(0, 12)
+        Instance.new("UIPadding", PageScroll).PaddingLeft = UDim.new(0, 15)
+        Instance.new("UIPadding", PageScroll).PaddingRight = UDim.new(0, 15)
+
+        TabBtn.MouseButton1Click:Connect(function()
+            for _, p in pairs(Pages) do p.Visible = false end
+            for _, t in pairs(Tabs) do
+                TweenService:Create(t.Indicator, TweenInfo.new(0.3), {Size = UDim2.new(0,0,0,2), Position = UDim2.new(0.5,0,1,-2)}):Play()
+                TweenService:Create(t.Btn, TweenInfo.new(0.3), {TextColor3 = Color3.fromRGB(150, 150, 150)}):Play()
+            end
+            PageScroll.Visible = true
+            TweenService:Create(Indicator, TweenInfo.new(0.3), {Size = UDim2.new(1,0,0,2), Position = UDim2.new(0,0,1,-2)}):Play()
+            TweenService:Create(TabBtn, TweenInfo.new(0.3), {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+        end)
+
+        table.insert(Pages, PageScroll)
+        table.insert(Tabs, {Btn = TabBtn, Indicator = Indicator})
+
+        if #Pages == 1 then
+            PageScroll.Visible = true
+            Indicator.Size = UDim2.new(1,0,0,2); Indicator.Position = UDim2.new(0,0,1,-2)
+            TabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        end
+
+        function TabSetup:CreateToggle(name, callback)
+            local ToggleFrame = Instance.new("Frame")
+            ToggleFrame.Size = UDim2.new(1, -10, 0, 45)
+            ToggleFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+            ToggleFrame.Parent = PageScroll
+            Instance.new("UICorner", ToggleFrame).CornerRadius = UDim.new(0, 6)
+            Instance.new("UIStroke", ToggleFrame).Color = Color3.fromRGB(45, 45, 50)
+
+            local Label = Instance.new("TextLabel")
+            Label.Size = UDim2.new(1, -70, 1, 0)
+            Label.Position = UDim2.new(0, 15, 0, 0)
+            Label.Text = name
+            Label.Font = Enum.Font.Gotham
+            Label.TextSize = 14
+            Label.TextColor3 = Color3.fromRGB(220, 220, 220)
+            Label.TextXAlignment = Enum.TextXAlignment.Left
+            Label.BackgroundTransparency = 1
+            Label.Parent = ToggleFrame
+
+            local Btn = Instance.new("TextButton")
+            Btn.Size = UDim2.new(0, 46, 0, 24)
+            Btn.Position = UDim2.new(1, -60, 0.5, -12)
+            Btn.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
+            Btn.Text = ""
+            Btn.Parent = ToggleFrame
+            Instance.new("UICorner", Btn).CornerRadius = UDim.new(1, 0)
+
+            local Circle = Instance.new("Frame")
+            Circle.Size = UDim2.new(0, 18, 0, 18)
+            Circle.Position = UDim2.new(0, 3, 0.5, -9)
+            Circle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            Circle.Parent = Btn
+            Instance.new("UICorner", Circle).CornerRadius = UDim.new(1, 0)
+
+            local state = false
+            Btn.MouseButton1Click:Connect(function()
+                state = not state
+                local gPos = state and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9)
+                local gCol = state and Color3.fromRGB(102, 85, 255) or Color3.fromRGB(50, 50, 55)
+                TweenService:Create(Circle, TweenInfo.new(0.2), {Position = gPos}):Play()
+                TweenService:Create(Btn, TweenInfo.new(0.2), {BackgroundColor3 = gCol}):Play()
+                callback(state)
+            end)
+        end
+
+        function TabSetup:CreateSlider(name, min, max, default, callback)
+            local SliderFrame = Instance.new("Frame")
+            SliderFrame.Size = UDim2.new(1, -10, 0, 60)
+            SliderFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+            SliderFrame.Parent = PageScroll
+            Instance.new("UICorner", SliderFrame).CornerRadius = UDim.new(0, 6)
+            Instance.new("UIStroke", SliderFrame).Color = Color3.fromRGB(45, 45, 50)
+
+            local Label = Instance.new("TextLabel")
+            Label.Size = UDim2.new(1, -30, 0, 25)
+            Label.Position = UDim2.new(0, 15, 0, 5)
+            Label.Text = name
+            Label.Font = Enum.Font.Gotham
+            Label.TextSize = 14
+            Label.TextColor3 = Color3.fromRGB(220, 220, 220)
+            Label.TextXAlignment = Enum.TextXAlignment.Left
+            Label.BackgroundTransparency = 1
+            Label.Parent = SliderFrame
+
+            local ValueText = Instance.new("TextLabel")
+            ValueText.Size = UDim2.new(0, 40, 0, 25)
+            ValueText.Position = UDim2.new(1, -55, 0, 5)
+            ValueText.Text = tostring(default)
+            ValueText.Font = Enum.Font.GothamBold
+            ValueText.TextSize = 14
+            ValueText.TextColor3 = Color3.fromRGB(102, 85, 255)
+            ValueText.TextXAlignment = Enum.TextXAlignment.Right
+            ValueText.BackgroundTransparency = 1
+            ValueText.Parent = SliderFrame
+
+            local Bar = Instance.new("TextButton")
+            Bar.Size = UDim2.new(1, -30, 0, 6)
+            Bar.Position = UDim2.new(0, 15, 0, 40)
+            Bar.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
+            Bar.Text = ""
+            Bar.Parent = SliderFrame
+            Instance.new("UICorner", Bar).CornerRadius = UDim.new(1, 0)
+
+            local Fill = Instance.new("Frame")
+            local defaultPercent = (default - min) / (max - min)
+            Fill.Size = UDim2.new(defaultPercent, 0, 1, 0)
+            Fill.BackgroundColor3 = Color3.fromRGB(102, 85, 255)
+            Fill.Parent = Bar
+            Instance.new("UICorner", Fill).CornerRadius = UDim.new(1, 0)
+
+            local dragging = false
+            Bar.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true end
+            end)
+            UserInputService.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+            end)
+
+            UserInputService.InputChanged:Connect(function(input)
+                if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+                    local mousePos = input.Position.X
+                    local barPos = Bar.AbsolutePosition.X
+                    local barSize = Bar.AbsoluteSize.X
+                    local percent = math.clamp((mousePos - barPos) / barSize, 0, 1)
+                    
+                    Fill.Size = UDim2.new(percent, 0, 1, 0)
+                    local value = math.floor(min + ((max - min) * percent))
+                    ValueText.Text = tostring(value)
+                    callback(value)
+                end
+            end)
+        end
+
+        function TabSetup:CreateButton(name, callback)
+            local Btn = Instance.new("TextButton")
+            Btn.Size = UDim2.new(1, -10, 0, 40)
+            Btn.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+            Btn.Text = name
+            Btn.Font = Enum.Font.Gotham
+            Btn.TextSize = 14
+            Btn.TextColor3 = Color3.fromRGB(220, 220, 220)
+            Btn.Parent = PageScroll
+            Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
+            Instance.new("UIStroke", Btn).Color = Color3.fromRGB(45, 45, 50)
+
+            Btn.MouseButton1Click:Connect(function()
+                TweenService:Create(Btn, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(102, 85, 255)}):Play()
+                task.wait(0.1)
+                TweenService:Create(Btn, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(30, 30, 35)}):Play()
+                callback()
+            end)
+        end
+
+        return TabSetup
+    end
+
+    return WindowSetup
+end
+
+return EmloxaLibrary
