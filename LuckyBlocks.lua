@@ -1,5 +1,5 @@
 -- =========================================================================
--- EMLOXA WARE: LUCKY BLOCKS BATTLEGROUNDS MAXIMUM POWER MODULE v2
+-- EMLOXA WARE: LUCKY BLOCKS BATTLEGROUNDS MAXIMUM POWER MODULE v3
 -- =========================================================================
 local GameModule = {}
 
@@ -15,7 +15,6 @@ function GameModule:Init(Window)
     -- 1. LOCAL PLAYER SEKME SİSTEMİ
     -- ==========================================
     local PlayerTab = Window:CreateTab("Local Player")
-    
     local NoclipEnabled, FlyEnabled = false, false
     local FlySpeed, CurrentSpeed, CurrentJump = 50, 16, 50
 
@@ -38,9 +37,12 @@ function GameModule:Init(Window)
         
         if FlyEnabled then
             Humanoid.PlatformStand = true
-            local BodyVelocity = Instance.new("BodyVelocity")
-            BodyVelocity.Name = "EmloxaFly"; BodyVelocity.Velocity = Vector3.new(0, 0, 0)
-            BodyVelocity.MaxForce = Vector3.new(10000, 10000, 10000); BodyVelocity.Parent = Root
+            local BodyVelocity = Instance.new("BodyVelocity", Root)
+            BodyVelocity.Name = "EmloxaFly"; BodyVelocity.Velocity = Vector3.new(0, 0, 0); BodyVelocity.MaxForce = Vector3.new(10000, 10000, 10000)
+            
+            -- KAMERAYA BAKMA SİSTEMİ
+            local BodyGyro = Instance.new("BodyGyro", Root)
+            BodyGyro.Name = "EmloxaGyro"; BodyGyro.P = 9e4; BodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9); BodyGyro.CFrame = Root.CFrame
             
             task.spawn(function()
                 while FlyEnabled and Root and BodyVelocity.Parent do
@@ -54,13 +56,15 @@ function GameModule:Init(Window)
                     
                     BodyVelocity.Velocity = dir.Unit * FlySpeed
                     if dir == Vector3.new(0, 0, 0) then BodyVelocity.Velocity = Vector3.new(0, 0.1, 0) end
+                    
+                    BodyGyro.CFrame = Camera.CFrame -- Yönü kameraya kilitler
                     task.wait()
                 end
             end)
         else
             Humanoid.PlatformStand = false
-            local bv = Root:FindFirstChild("EmloxaFly")
-            if bv then bv:Destroy() end
+            if Root:FindFirstChild("EmloxaFly") then Root.EmloxaFly:Destroy() end
+            if Root:FindFirstChild("EmloxaGyro") then Root.EmloxaGyro:Destroy() end
         end
     end)
     PlayerTab:CreateSlider("Fly Speed", 20, 200, 50, function(v) FlySpeed = v end)
@@ -68,13 +72,9 @@ function GameModule:Init(Window)
     RunService.Stepped:Connect(function()
         local Char = LocalPlayer.Character
         if Char then
-            if NoclipEnabled then
-                for _, p in pairs(Char:GetDescendants()) do if p:IsA("BasePart") and p.CanCollide then p.CanCollide = false end end
-            end
+            if NoclipEnabled then for _, p in pairs(Char:GetDescendants()) do if p:IsA("BasePart") and p.CanCollide then p.CanCollide = false end end end
             local Hum = Char:FindFirstChild("Humanoid")
-            if Hum and not FlyEnabled then
-                Hum.WalkSpeed = CurrentSpeed; Hum.UseJumpPower = true; Hum.JumpPower = CurrentJump
-            end
+            if Hum and not FlyEnabled then Hum.WalkSpeed = CurrentSpeed; Hum.UseJumpPower = true; Hum.JumpPower = CurrentJump end
         end
     end)
 
@@ -82,31 +82,19 @@ function GameModule:Init(Window)
     -- 2. LUCKY BLOCKS SEKME SİSTEMİ
     -- ==========================================
     local LuckyTab = Window:CreateTab("Lucky Blocks")
-    local Blocks = {
-        {"Lucky Block", "SpawnLuckyBlock"}, {"Super Block", "SpawnSuperBlock"}, 
-        {"Diamond Block", "SpawnDiamondBlock"}, {"Rainbow Block", "SpawnRainbowBlock"}, {"Galaxy Block", "SpawnGalaxyBlock"}
-    }
+    local Blocks = {{"Lucky Block", "SpawnLuckyBlock"}, {"Super Block", "SpawnSuperBlock"}, {"Diamond Block", "SpawnDiamondBlock"}, {"Rainbow Block", "SpawnRainbowBlock"}, {"Galaxy Block", "SpawnGalaxyBlock"}}
     local LoopConnections = {}
 
     for _, b in pairs(Blocks) do
-        LuckyTab:CreateButton("Get " .. b[1], function()
-            local r = ReplicatedStorage:FindFirstChild(b[2])
-            if r then r:FireServer() end
-        end)
+        LuckyTab:CreateButton("Get " .. b[1], function() local r = ReplicatedStorage:FindFirstChild(b[2]); if r then r:FireServer() end end)
         LuckyTab:CreateToggle("Loop " .. b[1], function(state)
-            if state then
-                LoopConnections[b[1]] = RunService.RenderStepped:Connect(function()
-                    local r = ReplicatedStorage:FindFirstChild(b[2])
-                    if r then r:FireServer() end
-                end)
-            else
-                if LoopConnections[b[1]] then LoopConnections[b[1]]:Disconnect(); LoopConnections[b[1]] = nil end
-            end
+            if state then LoopConnections[b[1]] = RunService.RenderStepped:Connect(function() local r = ReplicatedStorage:FindFirstChild(b[2]); if r then r:FireServer() end end)
+            else if LoopConnections[b[1]] then LoopConnections[b[1]]:Disconnect(); LoopConnections[b[1]] = nil end end
         end)
     end
 
     -- ==========================================
-    -- 3. KUSURSUZ DUPE (AYNI ANDA ÇOKLU TUTMA)
+    -- 3. ULTRA HIZLI DUPE SİSTEMİ
     -- ==========================================
     local DupeTab = Window:CreateTab("Dupe Tool")
     local DupeTargetAmount = 10
@@ -118,49 +106,55 @@ function GameModule:Init(Window)
         if DupeInProgress then return end
         
         local Character = LocalPlayer.Character
-        local Humanoid = Character and Character:FindFirstChild("Humanoid")
         local HeldTool = Character and Character:FindFirstChildOfClass("Tool")
-        
         if not HeldTool then print("[EMLOXA WARE] Error: Eline tool almalısın!"); return end
+        
         local TargetItemName = HeldTool.Name
         DupeInProgress = true
+        print("[EMLOXA WARE] Ultra Fast Dupe Started for: " .. TargetItemName)
 
         task.spawn(function()
             local timeout = 0
-            while DupeInProgress and timeout < 150 do
+            local lastOwned = 0
+
+            -- task.wait() ile oyun motorunun izin verdiği MAKSİMUM hıza çıkıldı
+            while DupeInProgress do
                 local totalOwned = 0
                 for _, item in pairs(LocalPlayer.Backpack:GetChildren()) do if item.Name == TargetItemName then totalOwned = totalOwned + 1 end end
                 for _, item in pairs(Character:GetChildren()) do if item:IsA("Tool") and item.Name == TargetItemName then totalOwned = totalOwned + 1 end end
                 
                 if totalOwned >= DupeTargetAmount then break end
 
+                -- AKILLI TIMEOUT: Eşya sayısı artıyorsa zaman aşımını sıfırla! Asla gereksiz yere kapanmaz.
+                if totalOwned > lastOwned then
+                    timeout = 0
+                    lastOwned = totalOwned
+                end
+                
+                if timeout > 300 then 
+                    print("[EMLOXA WARE] Dupe stopped due to inactivity (timeout).")
+                    break 
+                end
+
                 local galaxy = ReplicatedStorage:FindFirstChild("SpawnGalaxyBlock")
                 if galaxy then galaxy:FireServer() end
 
-                -- Çantadaki eşyaları KONTROL ET VE AYNI ANDA ELE VER
                 for _, item in pairs(LocalPlayer.Backpack:GetChildren()) do
                     if item:IsA("Tool") then
-                        if item.Name == TargetItemName then
-                            -- Karakter hiyerarşisine ekleyerek hepsini aynı anda tutmayı zorlar
-                            item.Parent = Character 
-                        else
-                            item:Destroy() -- Çöpü sil
-                        end
+                        if item.Name == TargetItemName then item.Parent = Character 
+                        else item:Destroy() end
                     end
                 end
 
                 for _, item in pairs(workspace:GetChildren()) do
                     if item:IsA("Tool") and item:FindFirstChild("Handle") then
-                        if item.Name == TargetItemName then
-                            item.Handle.CFrame = Character.HumanoidRootPart.CFrame 
-                        else
-                            item:Destroy() 
-                        end
+                        if item.Name == TargetItemName then item.Handle.CFrame = Character.HumanoidRootPart.CFrame 
+                        else item:Destroy() end
                     end
                 end
 
                 timeout = timeout + 1
-                task.wait(0.1)
+                task.wait() -- HIZ LİMİTİ KALDIRILDI!
             end
             DupeInProgress = false
         end)
@@ -168,7 +162,7 @@ function GameModule:Init(Window)
     DupeTab:CreateButton("Stop Dupe Process", function() DupeInProgress = false end)
 
     -- ==========================================
-    -- 4. KILLER (ARKASI SANA DÖNÜK IŞINLANMA)
+    -- 4. KILLER SİSTEMİ
     -- ==========================================
     local KillerTab = Window:CreateTab("Killer")
     local KillerEnabled, IgnoreFriends = false, true
@@ -185,9 +179,6 @@ function GameModule:Init(Window)
                     for _, player in pairs(Players:GetPlayers()) do
                         if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
                             if IgnoreFriends and player:IsFriendsWith(LocalPlayer.UserId) then continue end
-                            
-                            -- Sadece Z ekseninde ileriye taşıyoruz, açı eklemiyoruz.
-                            -- Bu sayede seninle AYNI yöne bakarlar (sırtları sana dönük olur).
                             player.Character.HumanoidRootPart.CFrame = MyRoot.CFrame * CFrame.new(0, 0, -3.5)
                         end
                     end
