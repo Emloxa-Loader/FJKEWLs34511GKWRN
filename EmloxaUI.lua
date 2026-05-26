@@ -1,4 +1,4 @@
--- EMLOXA WARE UI LIBRARY v2 (Advanced)
+-- EMLOXA WARE UI LIBRARY v3 (Position & Size Fixes)
 local EmloxaLibrary = {}
 
 local TweenService = game:GetService("TweenService")
@@ -18,14 +18,14 @@ function EmloxaLibrary:CreateWindow(hubName)
     local success, _ = pcall(function() HubGui.Parent = game:GetService("CoreGui") end)
     if not success then HubGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 
-    -- Sol Üstteki Açma Logosu ("E")
+    -- Sol Üstteki Açma Logosu ("E") - BOYUT BÜYÜTÜLDÜ VE AŞAĞI KAYDIRILDI
     local OpenIcon = Instance.new("TextButton")
-    OpenIcon.Size = UDim2.new(0, 45, 0, 45)
-    OpenIcon.Position = UDim2.new(0, 20, 0, 20)
+    OpenIcon.Size = UDim2.new(0, 50, 0, 50) -- Büyütüldü
+    OpenIcon.Position = UDim2.new(0, 15, 0, 75) -- Roblox logosundan kurtarıldı
     OpenIcon.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
     OpenIcon.Text = "E"
     OpenIcon.Font = Enum.Font.GothamBold
-    OpenIcon.TextSize = 24
+    OpenIcon.TextSize = 28 -- Yazı boyutu büyütüldü
     OpenIcon.Visible = false
     OpenIcon.Parent = HubGui
     Instance.new("UICorner", OpenIcon).CornerRadius = UDim.new(0, 10)
@@ -96,7 +96,7 @@ function EmloxaLibrary:CreateWindow(hubName)
         Title.TextColor3 = Color3.fromHSV(tick() % 5 / 5, 1, 1)
     end)
 
-    -- Window Controls (Minimize & Close)
+    -- Window Controls
     local Controls = Instance.new("Frame")
     Controls.Size = UDim2.new(0, 80, 1, 0)
     Controls.Position = UDim2.new(1, -90, 0, 0)
@@ -138,7 +138,8 @@ function EmloxaLibrary:CreateWindow(hubName)
         MainFrame.Visible = false
         OpenIcon.Visible = true
         OpenIcon.Size = UDim2.new(0, 0, 0, 0)
-        TweenService:Create(OpenIcon, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 45, 0, 45)}):Play()
+        -- Logo Animasyon Boyutu 50x50'ye uyarlandı
+        TweenService:Create(OpenIcon, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 50, 0, 50)}):Play()
     end)
 
     OpenIcon.MouseButton1Click:Connect(function()
