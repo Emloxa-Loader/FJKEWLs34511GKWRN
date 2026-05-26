@@ -1,5 +1,5 @@
 -- =========================================================================
--- EMLOXA WARE: FUNKY FRIDAY AUTO-PLAYER MODULE v6 (PERFECT OVERLAP CORE)
+-- EMLOXA WARE: FUNKY FRIDAY AUTO-PLAYER MODULE v7 (PURE DOT OVERLAP CORE)
 -- =========================================================================
 local GameModule = {}
 
@@ -72,13 +72,13 @@ function GameModule:Init(Window)
     end)
 
     -- ==========================================
-    -- 2. FUNKY FRIDAY: KUSURSUZ (PERFECT OVERLAP) SİSTEMİ
+    -- 2. FUNKY FRIDAY: SAF MERKEZ (DOT) SİSTEMİ
     -- ==========================================
     local FunkyTab = Window:CreateTab("Auto Player")
     
     local AutoPlayerEnabled = false
     local ShowVisualizer = false
-    local HitOffset = 0 -- Sadece oyunun ping gecikmesi için
+    local HitOffset = 0 
     
     local LaneKeys = {
         Lane1 = Enum.KeyCode.A,
@@ -87,17 +87,18 @@ function GameModule:Init(Window)
         Lane4 = Enum.KeyCode.D
     }
 
-    FunkyTab:CreateToggle("Enable Auto Player (SICK! Mode)", function(s) AutoPlayerEnabled = s end)
-    FunkyTab:CreateToggle("Show Visualizer Dots", function(s) ShowVisualizer = s end)
+    FunkyTab:CreateToggle("Enable Auto Player (Extreme Speed)", function(s) AutoPlayerEnabled = s end)
+    FunkyTab:CreateToggle("Show Visualizer Dots (Centers)", function(s) ShowVisualizer = s end)
     FunkyTab:CreateSlider("Hit Offset (Ping Adjustment)", -50, 50, 0, function(v) HitOffset = v end)
 
-    local function AddVisualizerDot(parentObj, dotName, size, color)
+    local function ManageVisualizerDot(parentObj, dotName, size, color)
+        local dot = parentObj:FindFirstChild(dotName)
         if not ShowVisualizer then
-            if parentObj:FindFirstChild(dotName) then parentObj[dotName]:Destroy() end
+            if dot then dot:Destroy() end
             return
         end
-        if not parentObj:FindFirstChild(dotName) then
-            local dot = Instance.new("Frame")
+        if not dot then
+            dot = Instance.new("Frame")
             dot.Name = dotName
             dot.Size = UDim2.new(0, size, 0, size)
             dot.Position = UDim2.new(0.5, -size/2, 0.5, -size/2)
@@ -129,14 +130,12 @@ function GameModule:Init(Window)
         local gameUI = uiWindow:FindFirstChild("Game")
         if not gameUI then return end
         
+        -- Oyuncu Tarafını Bul (İsim araması)
         local mySide = nil
         local hud = gameUI:FindFirstChild("HUD")
         if hud then
             local scores = hud:FindFirstChild("Scores")
             if scores then
-                local leftScore = scores:FindFirstChild("Left")
-                local rightScore = scores:FindFirstChild("Right")
-                
                 local function CheckSide(sideFolder)
                     if not sideFolder then return false end
                     if sideFolder:FindFirstChild(LocalPlayer.Name) or sideFolder:FindFirstChild(LocalPlayer.DisplayName) then return true end
@@ -150,9 +149,8 @@ function GameModule:Init(Window)
                     end
                     return false
                 end
-                
-                if CheckSide(leftScore) then mySide = "Left" 
-                elseif CheckSide(rightScore) then mySide = "Right" end
+                if CheckSide(scores:FindFirstChild("Left")) then mySide = "Left" 
+                elseif CheckSide(scores:FindFirstChild("Right")) then mySide = "Right" end
             end
         end
 
@@ -160,21 +158,19 @@ function GameModule:Init(Window)
         
         local fields = gameUI:FindFirstChild("Fields")
         if not fields then return end
-        
         local targetField = fields:FindFirstChild(mySide)
         if not targetField then return end
-        
         local inner = targetField:FindFirstChild("Inner")
         if not inner then return end
 
+        -- KUSURSUZ MERKEZ ÇAKIŞMA MANTIĞI (EXTREME SPEED)
         for i = 1, 4 do
             local laneName = "Lane" .. i
             local laneFrame = inner:FindFirstChild(laneName)
             
             if laneFrame then
-                AddVisualizerDot(laneFrame, "EmloxaTargetDot", 20, Color3.fromRGB(0, 0, 0))
-                
-                -- Hedefin tam merkezini alıyoruz (Offset ile ince ayar yapılabilir)
+                -- Hedef Merkez (Matematiksel Nokta)
+                ManageVisualizerDot(laneFrame, "EmloxaTargetDot", 20, Color3.fromRGB(0, 0, 0))
                 local laneCenterY = laneFrame.AbsolutePosition.Y + (laneFrame.AbsoluteSize.Y / 2) + HitOffset
 
                 local notesFolder = laneFrame:FindFirstChild("Notes")
@@ -183,16 +179,16 @@ function GameModule:Init(Window)
                     
                     for _, note in pairs(notesFolder:GetChildren()) do
                         if note:IsA("GuiObject") then
-                            AddVisualizerDot(note, "EmloxaNoteDot", 14, Color3.fromRGB(50, 50, 50))
+                            -- Gelen Nota Merkez (Matematiksel Nokta)
+                            ManageVisualizerDot(note, "EmloxaNoteDot", 14, Color3.fromRGB(50, 50, 50))
                             
                             local noteCenterY = note.AbsolutePosition.Y + (note.AbsoluteSize.Y / 2)
-                            local distance = math.abs(noteCenterY - laneCenterY)
                             
-                            -- KUSURSUZ KESİŞME (PERFECT OVERLAP) MANTIĞI:
-                            -- Notalar saniyede 60 kare ışınlanarak indiği için "Mesafe == 0" demek imkansızdır.
-                            -- 12 piksel, ekranda görsel olarak notanın tam "üst üste bindiği" o milisaniyelik karedir. 
-                            -- Daha büyük tolerans aranmaz, direkt tam üstüne denk geldiği karede VURUR!
-                            if distance <= 12 then
+                            -- İki merkezin üst üste binme hesabı (Piksel farkı)
+                            local dotDistance = math.abs(noteCenterY - laneCenterY)
+                            
+                            -- Eğer iki merkez nokta görsel olarak birbiriyle temas halindeyse (8 piksel ve altı tamamen iç içedir)
+                            if dotDistance <= 10 then
                                 local isHoldNote = false
                                 local frameCount = 0
                                 for _, child in pairs(note:GetChildren()) do
@@ -203,17 +199,22 @@ function GameModule:Init(Window)
                                 if frameCount > 1 then isHoldNote = true end
                                 
                                 if isHoldNote then
+                                    -- BASILI TUTMA MANTIĞI
                                     if not ActiveHolds[note] then
                                         ActiveHolds[note] = laneKey
                                         VirtualInputManager:SendKeyEvent(true, laneKey, false, game)
                                     end
                                 else
+                                    -- NORMAL VURUŞ MANTIĞI (ULTRA HIZLI)
                                     if not TappedNotes[note] then
                                         TappedNotes[note] = true
                                         
-                                        VirtualInputManager:SendKeyEvent(true, laneKey, false, game)
-                                        task.delay(0.015, function()
-                                            VirtualInputManager:SendKeyEvent(false, laneKey, false, game)
+                                        -- Döngüyü kilitlemeden anında basıp çeker (0.01 saniye)
+                                        task.spawn(function()
+                                            VirtualInputManager:SendKeyEvent(true, laneKey, false, game)
+                                            task.delay(0.01, function()
+                                                VirtualInputManager:SendKeyEvent(false, laneKey, false, game)
+                                            end)
                                         end)
                                     end
                                 end
@@ -224,6 +225,7 @@ function GameModule:Init(Window)
             end
         end
         
+        -- Basılı tutulan notayı, oyun notayı sildiği an serbest bırak
         for holdNote, key in pairs(ActiveHolds) do
             if not holdNote.Parent or not holdNote:IsDescendantOf(game) then 
                 VirtualInputManager:SendKeyEvent(false, key, false, game)
