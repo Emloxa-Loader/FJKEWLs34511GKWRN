@@ -1,5 +1,5 @@
 -- =========================================================================
--- EMLOXA WARE: FUNKY FRIDAY AUTO-PLAYER MODULE v3 (DEBUGGER & CHORD FIX)
+-- EMLOXA WARE: FUNKY FRIDAY AUTO-PLAYER MODULE v4 (FIXED SIDE DETECTION)
 -- =========================================================================
 local GameModule = {}
 
@@ -91,7 +91,6 @@ function GameModule:Init(Window)
     FunkyTab:CreateToggle("Show Visualizer Dots & Debug", function(s) ShowVisualizer = s end)
     FunkyTab:CreateSlider("Hitbox Tolerance (Pixels)", 5, 100, 25, function(v) HitTolerance = v end)
 
-    -- DEBUG YAZDIRMA FONKSİYONU (SPAM KORUMALI)
     local lastDebugPrint = 0
     local function DebugLog(message)
         if ShowVisualizer and tick() - lastDebugPrint > 1 then
@@ -99,13 +98,11 @@ function GameModule:Init(Window)
         end
     end
 
-    -- GÖRSELLEŞTİRİCİ FONKSİYONU (Z-INDEX GÜNCELLENDİ)
     local function AddVisualizerDot(parentObj, dotName, size, color)
         if not ShowVisualizer then
             if parentObj:FindFirstChild(dotName) then parentObj[dotName]:Destroy() end
             return
         end
-        
         if not parentObj:FindFirstChild(dotName) then
             local dot = Instance.new("Frame")
             dot.Name = dotName
@@ -113,7 +110,7 @@ function GameModule:Init(Window)
             dot.Position = UDim2.new(0.5, -size/2, 0.5, -size/2)
             dot.BackgroundColor3 = color or Color3.fromRGB(0, 0, 0)
             dot.BorderSizePixel = 0
-            dot.ZIndex = 999999 -- En üstte durması için artırıldı
+            dot.ZIndex = 999999
             
             local stroke = Instance.new("UIStroke")
             stroke.Color = Color3.fromRGB(255, 255, 255)
@@ -123,7 +120,6 @@ function GameModule:Init(Window)
             local corner = Instance.new("UICorner")
             corner.CornerRadius = UDim.new(1, 0)
             corner.Parent = dot
-            
             dot.Parent = parentObj
         end
     end
@@ -131,33 +127,39 @@ function GameModule:Init(Window)
     local TappedNotes = {}
     local ActiveHolds = {}
 
-    -- OYUNCUNUN TARAFINI BULMA VE ADIM ADIM ARAMA
     RunService.RenderStepped:Connect(function()
         if not AutoPlayerEnabled then return end
         
-        -- ADIM 1: Window UI kontrolü
         local uiWindow = LocalPlayer.PlayerGui:FindFirstChild("Window")
         if not uiWindow then DebugLog("PlayerGui icinde 'Window' bulunamadi!"); return end
         
-        -- ADIM 2: Game UI kontrolü
         local gameUI = uiWindow:FindFirstChild("Game")
         if not gameUI then DebugLog("Window icinde 'Game' bulunamadi!"); return end
         
-        -- ADIM 3: HUD ve Scores kontrolü (Tarafımızı bulmak için)
+        -- YENİLENEN TARAF BULMA MANTIĞI (İSME GÖRE ARAMA)
         local mySide = nil
         local hud = gameUI:FindFirstChild("HUD")
         if hud then
             local scores = hud:FindFirstChild("Scores")
             if scores then
-                -- Oyuncu ismimizi arıyoruz
                 local leftScore = scores:FindFirstChild("Left")
                 local rightScore = scores:FindFirstChild("Right")
                 
                 local function CheckSide(sideFolder)
                     if not sideFolder then return false end
+                    
+                    -- 1. Objenin direkt kendi adı senin adınsa (örn: Scores.Left.Oyuncuadı)
+                    if sideFolder:FindFirstChild(LocalPlayer.Name) or sideFolder:FindFirstChild(LocalPlayer.DisplayName) then 
+                        return true 
+                    end
+                    
+                    -- 2. Alt objelerin isimlerinde veya Text değerlerinde varsa
                     for _, obj in pairs(sideFolder:GetDescendants()) do
-                        if obj:IsA("TextLabel") and (string.find(string.lower(obj.Text), string.lower(LocalPlayer.Name)) or string.find(string.lower(obj.Text), string.lower(LocalPlayer.DisplayName))) then
-                            return true
+                        if obj.Name == LocalPlayer.Name or obj.Name == LocalPlayer.DisplayName then return true end
+                        if obj:IsA("TextLabel") or obj:IsA("TextButton") then
+                            if string.find(string.lower(obj.Text), string.lower(LocalPlayer.Name)) or string.find(string.lower(obj.Text), string.lower(LocalPlayer.DisplayName)) then
+                                return true
+                            end
                         end
                     end
                     return false
@@ -174,7 +176,6 @@ function GameModule:Init(Window)
 
         if not mySide then DebugLog("Oyuncu tarafi (Left/Right) bulunamadi. Sarki basladi mi?"); return end
         
-        -- ADIM 4: Fields Kontrolü
         local fields = gameUI:FindFirstChild("Fields")
         if not fields then DebugLog("Game icinde 'Fields' bulunamadi!"); return end
         
@@ -184,19 +185,17 @@ function GameModule:Init(Window)
         local inner = targetField:FindFirstChild("Inner")
         if not inner then DebugLog(mySide .. " icinde 'Inner' bulunamadi!"); return end
 
-        -- EĞER BURAYA GELDİYSEK HER ŞEY BAŞARIYLA BULUNMUŞTUR
         if ShowVisualizer and tick() - lastDebugPrint > 1 then
             print("[EMLOXA DEBUG] SISTEM KUSURSUZ! Taraf: " .. mySide .. " - Notalar Okunuyor...")
-            lastDebugPrint = tick() -- Spamı sıfırla
+            lastDebugPrint = tick()
         end
 
-        -- ADIM 5: Dört Lane'i Aynı Anda Tarama (Çoklu Nota / Chord Desteği)
+        -- NOTALARI TARAMA VE VURMA
         for i = 1, 4 do
             local laneName = "Lane" .. i
             local laneFrame = inner:FindFirstChild(laneName)
             
             if laneFrame then
-                -- Lane Merkezine Büyük Siyah Nokta
                 AddVisualizerDot(laneFrame, "EmloxaTargetDot", 20, Color3.fromRGB(0, 0, 0))
                 local laneCenterY = laneFrame.AbsolutePosition.Y + (laneFrame.AbsoluteSize.Y / 2)
 
@@ -206,19 +205,18 @@ function GameModule:Init(Window)
                     
                     for _, note in pairs(notesFolder:GetChildren()) do
                         if note:IsA("GuiObject") then
-                            -- Nota Merkezine Küçük Siyah Nokta
                             AddVisualizerDot(note, "EmloxaNoteDot", 14, Color3.fromRGB(50, 50, 50))
                             
                             local noteCenterY = note.AbsolutePosition.Y + (note.AbsoluteSize.Y / 2)
                             local distance = math.abs(noteCenterY - laneCenterY)
                             
-                            -- HİTBOX KONTROLÜ (ÇARPIŞMA)
                             if distance <= HitTolerance then
-                                -- İÇİNDE 1'DEN FAZLA FRAME VARSA HOLD (BASILI TUTMA) NOTASIDIR
                                 local isHoldNote = false
                                 local frameCount = 0
                                 for _, child in pairs(note:GetChildren()) do
-                                    if child:IsA("GuiObject") then frameCount = frameCount + 1 end
+                                    if child:IsA("GuiObject") and child.Name ~= "EmloxaNoteDot" then 
+                                        frameCount = frameCount + 1 
+                                    end
                                 end
                                 if frameCount > 1 then isHoldNote = true end
                                 
@@ -228,7 +226,6 @@ function GameModule:Init(Window)
                                         VirtualInputManager:SendKeyEvent(true, laneKey, false, game)
                                     end
                                 else
-                                    -- NORMAL NOTA (Aynı anda birden fazla nota gelse bile task.spawn ile basar)
                                     if not TappedNotes[note] then
                                         TappedNotes[note] = true
                                         task.spawn(function()
@@ -241,15 +238,12 @@ function GameModule:Init(Window)
                             end
                         end
                     end
-                else
-                    -- Notes klasörü bazen şarkı başlayana kadar yüklenmez, normaldir.
                 end
             else
                 DebugLog("Inner icinde '" .. laneName .. "' bulunamadi!")
             end
         end
         
-        -- BASILI TUTULAN NOTALARIN KONTROLÜ
         for holdNote, key in pairs(ActiveHolds) do
             if not holdNote.Parent then 
                 VirtualInputManager:SendKeyEvent(false, key, false, game)
@@ -257,7 +251,6 @@ function GameModule:Init(Window)
             end
         end
     end)
-
 
     -- ==========================================
     -- 3. MISC & CLEANUP
