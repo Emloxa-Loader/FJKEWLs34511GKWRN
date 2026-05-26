@@ -75,164 +75,180 @@ function GameModule:Init(Window)
     -- 2. FUNKY FRIDAY: SAF MERKEZ (DOT) SİSTEMİ
     -- ==========================================
     local FunkyTab = Window:CreateTab("Auto Player")
-    
-    local AutoPlayerEnabled = false
-    local ShowVisualizer = false
-    local HitOffset = 0 
-    
-    local LaneKeys = {
-        Lane1 = Enum.KeyCode.A,
-        Lane2 = Enum.KeyCode.S,
-        Lane3 = Enum.KeyCode.W,
-        Lane4 = Enum.KeyCode.D
-    }
 
-    FunkyTab:CreateToggle("Enable Auto Player (Extreme Speed)", function(s) AutoPlayerEnabled = s end)
-    FunkyTab:CreateToggle("Show Visualizer Dots (Centers)", function(s) ShowVisualizer = s end)
-    FunkyTab:CreateSlider("Hit Offset (Ping Adjustment)", -50, 50, 0, function(v) HitOffset = v end)
+local AutoPlayerEnabled = false
+local ShowVisualizer = false
+local HitOffset = 0
 
-    local function ManageVisualizerDot(parentObj, dotName, size, color)
-        local dot = parentObj:FindFirstChild(dotName)
-        if not ShowVisualizer then
-            if dot then dot:Destroy() end
-            return
-        end
-        if not dot then
-            dot = Instance.new("Frame")
-            dot.Name = dotName
-            dot.Size = UDim2.new(0, size, 0, size)
-            dot.Position = UDim2.new(0.5, -size/2, 0.5, -size/2)
-            dot.BackgroundColor3 = color or Color3.fromRGB(0, 0, 0)
-            dot.BorderSizePixel = 0
-            dot.ZIndex = 999999
-            
-            local stroke = Instance.new("UIStroke")
-            stroke.Color = Color3.fromRGB(255, 255, 255)
-            stroke.Thickness = 2
-            stroke.Parent = dot
-            
-            local corner = Instance.new("UICorner")
-            corner.CornerRadius = UDim.new(1, 0)
-            corner.Parent = dot
-            dot.Parent = parentObj
+local LaneKeys = {
+    Lane1 = Enum.KeyCode.A,
+    Lane2 = Enum.KeyCode.S,
+    Lane3 = Enum.KeyCode.W,
+    Lane4 = Enum.KeyCode.D
+}
+
+FunkyTab:CreateToggle("Enable Auto Player (Extreme Speed)", function(s) AutoPlayerEnabled = s end)
+FunkyTab:CreateToggle("Show Visualizer Dots (Centers)", function(s) ShowVisualizer = s end)
+FunkyTab:CreateSlider("Hit Offset (Ping Adjustment)", -50, 50, 0, function(v) HitOffset = v end)
+
+-- Yardımcı görsel nokta
+local function ManageVisualizerDot(parentObj, dotName, size, color)
+    local dot = parentObj:FindFirstChild(dotName)
+    if not ShowVisualizer then
+        if dot then dot:Destroy() end
+        return
+    end
+    if not dot then
+        dot = Instance.new("Frame")
+        dot.Name = dotName
+        dot.Size = UDim2.new(0, size, 0, size)
+        dot.Position = UDim2.new(0.5, -size/2, 0.5, -size/2)
+        dot.BackgroundColor3 = color or Color3.fromRGB(0, 0, 0)
+        dot.BorderSizePixel = 0
+        dot.ZIndex = 999999
+
+        local stroke = Instance.new("UIStroke")
+        stroke.Color = Color3.fromRGB(255, 255, 255)
+        stroke.Thickness = 2
+        stroke.Parent = dot
+
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(1, 0)
+        corner.Parent = dot
+        dot.Parent = parentObj
+    end
+end
+
+local NotePrevY = {}       -- [note] = previous hit Y (center for tap, top for hold)
+local TappedNotes = {}     -- işlenmiş tap notalar
+local ActiveHolds = {}     -- { [note] = { key, startTime } }
+
+RunService.RenderStepped:Connect(function()
+    if not AutoPlayerEnabled then return end
+
+    local uiWindow = LocalPlayer.PlayerGui:FindFirstChild("Window")
+    if not uiWindow then return end
+
+    local gameUI = uiWindow:FindFirstChild("Game")
+    if not gameUI then return end
+
+    -- Oyuncu tarafı bulma
+    local mySide = nil
+    local hud = gameUI:FindFirstChild("HUD")
+    if hud then
+        local scores = hud:FindFirstChild("Scores")
+        if scores then
+            local function CheckSide(sideFolder)
+                if not sideFolder then return false end
+                if sideFolder:FindFirstChild(LocalPlayer.Name) or sideFolder:FindFirstChild(LocalPlayer.DisplayName) then return true end
+                for _, obj in pairs(sideFolder:GetDescendants()) do
+                    if obj.Name == LocalPlayer.Name or obj.Name == LocalPlayer.DisplayName then return true end
+                    if obj:IsA("TextLabel") or obj:IsA("TextButton") then
+                        if string.find(string.lower(obj.Text), string.lower(LocalPlayer.Name)) or string.find(string.lower(obj.Text), string.lower(LocalPlayer.DisplayName)) then
+                            return true
+                        end
+                    end
+                end
+                return false
+            end
+            if CheckSide(scores:FindFirstChild("Left")) then mySide = "Left"
+            elseif CheckSide(scores:FindFirstChild("Right")) then mySide = "Right" end
         end
     end
 
-    local TappedNotes = {}
-    local ActiveHolds = {}
+    if not mySide then return end
 
-    RunService.RenderStepped:Connect(function()
-        if not AutoPlayerEnabled then return end
-        
-        local uiWindow = LocalPlayer.PlayerGui:FindFirstChild("Window")
-        if not uiWindow then return end
-        
-        local gameUI = uiWindow:FindFirstChild("Game")
-        if not gameUI then return end
-        
-        -- Oyuncu Tarafını Bul (İsim araması)
-        local mySide = nil
-        local hud = gameUI:FindFirstChild("HUD")
-        if hud then
-            local scores = hud:FindFirstChild("Scores")
-            if scores then
-                local function CheckSide(sideFolder)
-                    if not sideFolder then return false end
-                    if sideFolder:FindFirstChild(LocalPlayer.Name) or sideFolder:FindFirstChild(LocalPlayer.DisplayName) then return true end
-                    for _, obj in pairs(sideFolder:GetDescendants()) do
-                        if obj.Name == LocalPlayer.Name or obj.Name == LocalPlayer.DisplayName then return true end
-                        if obj:IsA("TextLabel") or obj:IsA("TextButton") then
-                            if string.find(string.lower(obj.Text), string.lower(LocalPlayer.Name)) or string.find(string.lower(obj.Text), string.lower(LocalPlayer.DisplayName)) then
-                                return true
-                            end
+    local fields = gameUI:FindFirstChild("Fields")
+    if not fields then return end
+    local targetField = fields:FindFirstChild(mySide)
+    if not targetField then return end
+    local inner = targetField:FindFirstChild("Inner")
+    if not inner then return end
+
+    -- Lane'leri tara
+    for i = 1, 4 do
+        local laneName = "Lane" .. i
+        local laneFrame = inner:FindFirstChild(laneName)
+        if laneFrame then
+            -- Vuruş noktası (lane ortası) + offset
+            local laneCenterY = laneFrame.AbsolutePosition.Y + (laneFrame.AbsoluteSize.Y / 2) + HitOffset
+            ManageVisualizerDot(laneFrame, "EmloxaTargetDot", 20, Color3.fromRGB(0, 0, 0))
+
+            local notesFolder = laneFrame:FindFirstChild("Notes")
+            if notesFolder then
+                local laneKey = LaneKeys[laneName]
+
+                for _, note in pairs(notesFolder:GetChildren()) do
+                    if note:IsA("GuiObject") then
+                        -- Nota boyutuna göre hold olup olmadığını belirle (uzun dikdörtgen)
+                        local absSize = note.AbsoluteSize
+                        local isHold = (absSize.Y > absSize.X * 1.3)  -- boyu eninden belirgin büyükse hold
+
+                        local hitY
+                        if isHold then
+                            hitY = note.AbsolutePosition.Y  -- üst kenar (başlangıç)
+                        else
+                            hitY = note.AbsolutePosition.Y + (absSize.Y / 2)  -- merkez
                         end
-                    end
-                    return false
-                end
-                if CheckSide(scores:FindFirstChild("Left")) then mySide = "Left" 
-                elseif CheckSide(scores:FindFirstChild("Right")) then mySide = "Right" end
-            end
-        end
 
-        if not mySide then return end
-        
-        local fields = gameUI:FindFirstChild("Fields")
-        if not fields then return end
-        local targetField = fields:FindFirstChild(mySide)
-        if not targetField then return end
-        local inner = targetField:FindFirstChild("Inner")
-        if not inner then return end
+                        -- Görsel nokta (merkez gösterimi)
+                        ManageVisualizerDot(note, "EmloxaNoteDot", 14, Color3.fromRGB(50, 50, 50))
 
-        -- KUSURSUZ MERKEZ ÇAKIŞMA MANTIĞI (EXTREME SPEED)
-        for i = 1, 4 do
-            local laneName = "Lane" .. i
-            local laneFrame = inner:FindFirstChild(laneName)
-            
-            if laneFrame then
-                -- Hedef Merkez (Matematiksel Nokta)
-                ManageVisualizerDot(laneFrame, "EmloxaTargetDot", 20, Color3.fromRGB(0, 0, 0))
-                local laneCenterY = laneFrame.AbsolutePosition.Y + (laneFrame.AbsoluteSize.Y / 2) + HitOffset
+                        local prevY = NotePrevY[note]
 
-                local notesFolder = laneFrame:FindFirstChild("Notes")
-                if notesFolder then
-                    local laneKey = LaneKeys[laneName]
-                    
-                    for _, note in pairs(notesFolder:GetChildren()) do
-                        if note:IsA("GuiObject") then
-                            -- Gelen Nota Merkez (Matematiksel Nokta)
-                            ManageVisualizerDot(note, "EmloxaNoteDot", 14, Color3.fromRGB(50, 50, 50))
-                            
-                            local noteCenterY = note.AbsolutePosition.Y + (note.AbsoluteSize.Y / 2)
-                            
-                            -- İki merkezin üst üste binme hesabı (Piksel farkı)
-                            local dotDistance = math.abs(noteCenterY - laneCenterY)
-                            
-                            -- Eğer iki merkez nokta görsel olarak birbiriyle temas halindeyse (8 piksel ve altı tamamen iç içedir)
-                            if dotDistance <= 10 then
-                                local isHoldNote = false
-                                local frameCount = 0
-                                for _, child in pairs(note:GetChildren()) do
-                                    if child:IsA("GuiObject") and child.Name ~= "EmloxaNoteDot" then 
-                                        frameCount = frameCount + 1 
-                                    end
-                                end
-                                if frameCount > 1 then isHoldNote = true end
-                                
-                                if isHoldNote then
-                                    -- BASILI TUTMA MANTIĞI
-                                    if not ActiveHolds[note] then
-                                        ActiveHolds[note] = laneKey
+                        if not isHold then
+                            -- TAP NOTA: merkez çizgiyi geçti mi?
+                            if prevY and not TappedNotes[note] then
+                                if prevY < laneCenterY and hitY >= laneCenterY then
+                                    TappedNotes[note] = true
+                                    -- Anında bas-çek
+                                    task.spawn(function()
                                         VirtualInputManager:SendKeyEvent(true, laneKey, false, game)
-                                    end
-                                else
-                                    -- NORMAL VURUŞ MANTIĞI (ULTRA HIZLI)
-                                    if not TappedNotes[note] then
-                                        TappedNotes[note] = true
-                                        
-                                        -- Döngüyü kilitlemeden anında basıp çeker (0.01 saniye)
-                                        task.spawn(function()
-                                            VirtualInputManager:SendKeyEvent(true, laneKey, false, game)
-                                            task.delay(0.01, function()
-                                                VirtualInputManager:SendKeyEvent(false, laneKey, false, game)
-                                            end)
+                                        task.delay(0.01, function()
+                                            VirtualInputManager:SendKeyEvent(false, laneKey, false, game)
                                         end)
-                                    end
+                                    end)
+                                end
+                            end
+                        else
+                            -- HOLD NOTA: üst kenar çizgiyi geçince bas, alt kenar geçince bırak
+                            local bottomY = note.AbsolutePosition.Y + absSize.Y
+                            if prevY and not ActiveHolds[note] then
+                                if prevY < laneCenterY and hitY >= laneCenterY then
+                                    -- HOLD BAŞLANGICI
+                                    ActiveHolds[note] = { key = laneKey }
+                                    VirtualInputManager:SendKeyEvent(true, laneKey, false, game)
+                                end
+                            end
+                            if ActiveHolds[note] then
+                                -- HOLD BİTİŞ KONTROLÜ
+                                if bottomY >= laneCenterY then
+                                    VirtualInputManager:SendKeyEvent(false, laneKey, false, game)
+                                    ActiveHolds[note] = nil
                                 end
                             end
                         end
+
+                        -- Güncel konumu sakla
+                        NotePrevY[note] = hitY
                     end
                 end
             end
         end
-        
-        -- Basılı tutulan notayı, oyun notayı sildiği an serbest bırak
-        for holdNote, key in pairs(ActiveHolds) do
-            if not holdNote.Parent or not holdNote:IsDescendantOf(game) then 
-                VirtualInputManager:SendKeyEvent(false, key, false, game)
-                ActiveHolds[holdNote] = nil
+    end
+
+    -- Geçersiz notaları temizle
+    for note, _ in pairs(NotePrevY) do
+        if not note.Parent or not note:IsDescendantOf(gameUI) then
+            NotePrevY[note] = nil
+            if TappedNotes[note] then TappedNotes[note] = nil end
+            if ActiveHolds[note] then
+                VirtualInputManager:SendKeyEvent(false, ActiveHolds[note].key, false, game)
+                ActiveHolds[note] = nil
             end
         end
-    end)
+    end
+end)
 
     -- ==========================================
     -- 3. MISC & CLEANUP
