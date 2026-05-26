@@ -1,5 +1,5 @@
 -- =========================================================================
--- EMLOXA WARE: BLADE BALL MAXIMUM PERFORMANCE MODULE v6 (SMART PREDICTION)
+-- EMLOXA WARE: BLADE BALL MAXIMUM PERFORMANCE MODULE v7 (LIMITLESS PARRY & STATS)
 -- =========================================================================
 local GameModule = {}
 
@@ -14,13 +14,14 @@ function GameModule:Init(Window)
     local LocalPlayer = Players.LocalPlayer
 
     -- ==========================================
-    -- 0. HEDEF BELİRLEYİCİ ARAYÜZ (TARGET UI)
+    -- 0. EKRAN ARAYÜZLERİ (TARGET & STATS UI)
     -- ==========================================
-    local TargetUI = Instance.new("ScreenGui")
-    TargetUI.Name = "EmloxaTargetUI"
-    local success = pcall(function() TargetUI.Parent = game:GetService("CoreGui") end)
-    if not success then TargetUI.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+    local ScreenUI = Instance.new("ScreenGui")
+    ScreenUI.Name = "EmloxaScreenUI"
+    local success = pcall(function() ScreenUI.Parent = game:GetService("CoreGui") end)
+    if not success then ScreenUI.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 
+    -- Hedef Yazısı (Sol Orta)
     local TargetLabel = Instance.new("TextLabel")
     TargetLabel.Size = UDim2.new(0, 200, 0, 50)
     TargetLabel.Position = UDim2.new(0, 20, 0.5, -25)
@@ -31,9 +32,27 @@ function GameModule:Init(Window)
     TargetLabel.TextColor3 = Color3.fromRGB(255, 30, 30)
     TargetLabel.TextXAlignment = Enum.TextXAlignment.Left
     TargetLabel.Visible = false
-    TargetLabel.Parent = TargetUI
+    TargetLabel.Parent = ScreenUI
     Instance.new("UIStroke", TargetLabel).Color = Color3.fromRGB(0, 0, 0)
     Instance.new("UIStroke", TargetLabel).Thickness = 2
+
+    -- FPS ve PING Göstergesi (Sol Alt)
+    local StatsLabel = Instance.new("TextLabel")
+    StatsLabel.Size = UDim2.new(0, 150, 0, 20)
+    StatsLabel.Position = UDim2.new(0, 10, 1, -30)
+    StatsLabel.BackgroundTransparency = 1
+    StatsLabel.Font = Enum.Font.GothamSemibold
+    StatsLabel.TextSize = 12
+    StatsLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    StatsLabel.TextXAlignment = Enum.TextXAlignment.Left
+    StatsLabel.Text = "FPS: ... | PING: ..."
+    StatsLabel.Parent = ScreenUI
+    Instance.new("UIStroke", StatsLabel).Color = Color3.fromRGB(0, 0, 0)
+    Instance.new("UIStroke", StatsLabel).Thickness = 1
+
+    -- FPS Hesaplama Değişkenleri
+    local frameCount = 0
+    local lastStatsUpdate = tick()
 
     -- ==========================================
     -- 1. LOCAL PLAYER SEKME SİSTEMİ
@@ -101,14 +120,15 @@ function GameModule:Init(Window)
     end)
 
     -- ==========================================
-    -- 2. BLADE BALL: AKILLI AUTO PARRY & VISUALIZER
+    -- 2. BLADE BALL: LİMİTSİZ AUTO PARRY & VISUALIZER
     -- ==========================================
     local CombatTab = Window:CreateTab("Combat (Blade Ball)")
     
     local AutoParryEnabled, CamLookAtBall, CharLookAtBall = false, false, false
     local SpinBotEnabled, VisualizeParry = false, false
     local SpinSpeed = 50
-    local PredictionMultiplier = 3.5 -- Otomatik mesafe büyütme çarpanı
+    local BaseDistance = 15
+    local PredictionMultiplier = 5 
 
     local VisualizerSphere = Instance.new("Part")
     VisualizerSphere.Shape = Enum.PartType.Ball
@@ -120,9 +140,10 @@ function GameModule:Init(Window)
     VisualizerSphere.CastShadow = false
     VisualizerSphere.Parent = workspace
 
-    CombatTab:CreateToggle("Auto Parry (Smart Velocity Math)", function(s) AutoParryEnabled = s end)
+    CombatTab:CreateToggle("Auto Parry (Limitless Prediction)", function(s) AutoParryEnabled = s end)
     CombatTab:CreateToggle("Visualize Parry Range", function(s) VisualizeParry = s end)
-    CombatTab:CreateSlider("Prediction Sensitivity (1-10)", 1, 10, 4, function(v) PredictionMultiplier = v end)
+    CombatTab:CreateSlider("Base Hit Distance", 10, 50, 15, function(v) BaseDistance = v end)
+    CombatTab:CreateSlider("Prediction Offset (Reaction Time)", 1, 10, 5, function(v) PredictionMultiplier = v end)
 
     CombatTab:CreateToggle("Camera Look At Ball", function(s) CamLookAtBall = s end)
     CombatTab:CreateToggle("Character Look At Ball", function(s) CharLookAtBall = s end)
@@ -174,6 +195,26 @@ function GameModule:Init(Window)
     local LastParryTime = 0
 
     RunService.RenderStepped:Connect(function()
+        -- FPS HESAPLAYICI DÖNGÜSÜ
+        frameCount = frameCount + 1
+        local currentTime = tick()
+        if currentTime - lastStatsUpdate >= 1 then
+            local fps = math.floor(frameCount / (currentTime - lastStatsUpdate))
+            local currentPing = 0
+            pcall(function() currentPing = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue()) end)
+            
+            -- Ping rengi ayarlama (100 üstü sarı, 200 üstü kırmızı)
+            local pingColor = "<font color='#55FF55'>" .. currentPing .. "ms</font>"
+            if currentPing > 100 then pingColor = "<font color='#FFFF55'>" .. currentPing .. "ms</font>" end
+            if currentPing > 200 then pingColor = "<font color='#FF5555'>" .. currentPing .. "ms</font>" end
+            
+            StatsLabel.RichText = true
+            StatsLabel.Text = string.format("FPS: %d | PING: %s", fps, pingColor)
+            
+            frameCount = 0
+            lastStatsUpdate = currentTime
+        end
+
         local Character = LocalPlayer.Character
         local Root = Character and Character:FindFirstChild("HumanoidRootPart")
         
@@ -194,23 +235,27 @@ function GameModule:Init(Window)
                 end
 
                 -- ==========================================
-                -- ZEKİ HESAPLAMA (AKILLI VURUŞ MESAFESİ)
+                -- ZEKİ HESAPLAMA (PING VE FİZİK UYARLAMASI)
                 -- ==========================================
                 local velocity = activeBall.AssemblyLinearVelocity.Magnitude
-                local ping = 0.1
-                pcall(function() ping = Stats.Network.ServerStatsItem["Data Ping"]:GetValue() / 1000 end)
                 
-                -- Sabit bir Base Distance YOK. Mesafe tamamen topun hızına (Velocity) ve Gecikmeye (Ping) bağlı!
-                -- Top yavaşsa (örn: 20 hız) çap minimum 12-15 civarı kalır. Top hızlıysa (örn: 200) çap deşhet büyür.
-                local calculatedDistance = 12 + (velocity * ping * PredictionMultiplier)
+                -- Anlık pingi saniye cinsinden alıyoruz. (örn: 50ms = 0.05 sn)
+                local pingSec = 0.1
+                pcall(function() pingSec = Stats.Network.ServerStatsItem["Data Ping"]:GetValue() / 1000 end)
                 
-                -- Oyun çökmesin veya çok uzaktan vurup buga girmesin diye max sınır 120 yapıldı
-                local dynamicDistance = math.clamp(calculatedDistance, 12, 120)
+                -- GERÇEK FİZİK: Mesafe = Hız * Zaman. Zaman = Ping + Gecikme Çarpanı.
+                -- Topun sana ping yüzünden geç yansımasını engeller.
+                local totalReactionTime = pingSec + (PredictionMultiplier / 20)
+                local calculatedDistance = BaseDistance + (velocity * totalReactionTime)
+                
+                -- LİMİT KALDIRILDI! Sadece alt sınır var (BaseDistance'dan küçük olamaz).
+                -- Top 1000 hızla gelirse küre devasa olacak ve daha top sana yaklaşamadan vuracak.
+                local dynamicDistance = math.max(BaseDistance, calculatedDistance)
 
                 if VisualizeParry then
                     VisualizerSphere.Transparency = 0.6
                     local targetSize = Vector3.new(dynamicDistance * 2, dynamicDistance * 2, dynamicDistance * 2)
-                    VisualizerSphere.Size = VisualizerSphere.Size:Lerp(targetSize, 0.2)
+                    VisualizerSphere.Size = VisualizerSphere.Size:Lerp(targetSize, 0.3)
                     VisualizerSphere.Position = Root.Position
                     VisualizerSphere.Color = isTargetingMe and Color3.fromRGB(255, 30, 30) or Color3.fromRGB(102, 85, 255)
                 else
@@ -220,7 +265,7 @@ function GameModule:Init(Window)
                 if AutoParryEnabled and isTargetingMe then
                     local distance = (activeBall.Position - Root.Position).Magnitude
                     
-                    -- Top akıllıca hesaplanan alanın içine girdiği milisaniyede vurur!
+                    -- Sınırsız çapa göre vur!
                     if distance <= dynamicDistance and (tick() - LastParryTime > 0.15) then
                         Parry()
                         LastParryTime = tick()
@@ -322,13 +367,10 @@ function GameModule:Init(Window)
     end)
 
     RunService.RenderStepped:Connect(function()
-        -- RGB Ball Effect
         if RGBBallEnabled and LockedBall and LockedBall.Parent then
             LockedBall.Material = Enum.Material.Neon
             LockedBall.Color = Color3.fromHSV((tick() * 2) % 1, 1, 1)
         end
-
-        -- RGB Character Effect
         if RGBCharEnabled and LocalPlayer.Character then
             local color = Color3.fromHSV((tick() * RGBCharSpeed * 0.1) % 1, 1, 1)
             for _, part in pairs(LocalPlayer.Character:GetChildren()) do
@@ -338,8 +380,6 @@ function GameModule:Init(Window)
                 end
             end
         end
-        
-        -- Disco Mode Effect
         if DiscoEnabled then
             local col = Color3.fromHSV((tick() * 0.5) % 1, 1, 1)
             Lighting.Ambient = col
@@ -355,6 +395,7 @@ function GameModule:Init(Window)
         VisualizerSphere:Destroy()
         MacroUI:Destroy()
         TargetUI:Destroy()
+        ScreenUI:Destroy()
         Lighting.Ambient = origAmb; Lighting.OutdoorAmbient = origOut; Lighting.FogColor = origFog
     end)
 end
