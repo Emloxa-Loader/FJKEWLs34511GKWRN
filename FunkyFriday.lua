@@ -1,5 +1,5 @@
 -- =========================================================================
--- EMLOXA WARE: FUNKY FRIDAY AUTO-PLAYER v15 (ULTIMATE DEEP-SKIN CORE)
+-- EMLOXA WARE: FUNKY FRIDAY AUTO-PLAYER v16 (ULTIMATE OVERLAY SKINNING)
 -- =========================================================================
 local GameModule = {}
 
@@ -112,17 +112,31 @@ function GameModule:Init(Window)
     end)
 
     -- ==========================================
-    -- 3. CUSTOM ARROWS (DEEP-SCAN & LOOP)
+    -- 3. CUSTOM ARROWS (OVERLAY SKINNING)
     -- ==========================================
     local ArrowTab = Window:CreateTab("Custom Arrows")
     local activeSkinId = nil
     local targetSide = "Both"
 
-    local function ApplySkinDeep(target)
-        if not target or not activeSkinId then return end
-        for _, obj in pairs(target:GetDescendants()) do
-            if obj:IsA("ImageLabel") or obj:IsA("ImageButton") then
-                pcall(function() obj.Image = "rbxassetid://" .. activeSkinId end)
+    local function ApplyOverlay(parent)
+        for _, obj in pairs(parent:GetDescendants()) do
+            if (obj:IsA("ImageLabel") or obj:IsA("ImageButton")) and obj.Name ~= "EmloxaSkin" then
+                -- Orijinali gizle
+                if obj.ImageTransparency < 1 then obj.ImageTransparency = 1 end
+                
+                -- Overlay oluştur/güncelle
+                local overlay = obj:FindFirstChild("EmloxaSkin")
+                if not overlay then
+                    overlay = Instance.new("ImageLabel")
+                    overlay.Name = "EmloxaSkin"
+                    overlay.Size = UDim2.new(1, 0, 1, 0)
+                    overlay.BackgroundTransparency = 1
+                    overlay.ZIndex = obj.ZIndex + 1
+                    overlay.Parent = obj
+                end
+                if overlay.Image ~= "rbxassetid://" .. activeSkinId then
+                    overlay.Image = "rbxassetid://" .. activeSkinId
+                end
             end
         end
     end
@@ -140,16 +154,14 @@ function GameModule:Init(Window)
         sideBtn:UpdateText("Apply To: " .. targetSide)
     end)
 
-    -- SÜREKLİ LOOP (Tüm objeleri derinlemesine tara)
+    -- Loop
     RunService.RenderStepped:Connect(function()
         if activeSkinId then
             local ui = LocalPlayer.PlayerGui:FindFirstChild("Window")
             if ui and ui:FindFirstChild("Game") then
                 local fields = ui.Game.Fields
                 local targets = (targetSide == "Both") and {fields.Left, fields.Right} or {fields[targetSide]}
-                for _, t in pairs(targets) do
-                    ApplySkinDeep(t, activeSkinId)
-                end
+                for _, t in pairs(targets) do ApplyOverlay(t) end
             end
         end
     end)
