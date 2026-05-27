@@ -1,5 +1,5 @@
 -- ==========================================
--- EMLOXA WARE PREMIUM UI (v7) - Full English Edition
+-- EMLOXA WARE PREMIUM UI (v8) - Fixed & Fallback
 -- ==========================================
 local EmloxaLibrary = {}
 
@@ -36,7 +36,6 @@ local function createShadow(parent, size, offset, trans)
 	s.BackgroundTransparency = 1; s.ImageTransparency = trans or 0.7; s.ImageColor3 = Color3.new(0,0,0); s.Parent = parent
 end
 local function playClickSound()
-	-- haptic feedback simulation
 	local f = Instance.new("Frame",CoreGui); f.Size=UDim2.new(0,0,0,0)
 	TweenService:Create(f,TweenInfo.new(0.05,Enum.EasingStyle.Quad,Enum.EasingDirection.In),{Size=UDim2.new(0,1,0,1)}):Play()
 	task.wait(0.05); f:Destroy()
@@ -52,20 +51,37 @@ function EmloxaLibrary:CreateWindow(hubName)
 	pcall(function() HubGui.Parent = CoreGui end)
 	if not HubGui.Parent then HubGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 
-	-- Open Icon (ImageButton with the specified asset ID)
+	-- ====== OPEN ICON (ImageButton with fallback "E") ======
+	local OpenIconFrame = Instance.new("Frame")
+	OpenIconFrame.Size = UDim2.new(0, 55, 0, 55)
+	OpenIconFrame.Position = UDim2.new(0, 15, 0, 75)
+	OpenIconFrame.BackgroundColor3 = Theme.Panel
+	OpenIconFrame.Visible = false
+	OpenIconFrame.Active = true
+	OpenIconFrame.Parent = HubGui
+	createCorner(OpenIconFrame, 14)
+	local iconStroke = createStroke(OpenIconFrame, Theme.Primary, 2)
+
+	-- Fallback "E"
+	local IconFallback = Instance.new("TextLabel")
+	IconFallback.Size = UDim2.new(1,0,1,0)
+	IconFallback.BackgroundTransparency = 1
+	IconFallback.Text = "E"
+	IconFallback.Font = Enum.Font.GothamBlack
+	IconFallback.TextScaled = true
+	IconFallback.TextColor3 = Theme.Primary
+	IconFallback.Parent = OpenIconFrame
+
+	-- Actual image on top
 	local OpenIcon = Instance.new("ImageButton")
-	OpenIcon.Size = UDim2.new(0, 55, 0, 55)
-	OpenIcon.Position = UDim2.new(0, 15, 0, 75)
-	OpenIcon.BackgroundColor3 = Theme.Panel
+	OpenIcon.Size = UDim2.new(1,0,1,0)
+	OpenIcon.BackgroundTransparency = 1
 	OpenIcon.Image = "rbxassetid://76693493960487"
 	OpenIcon.ScaleType = Enum.ScaleType.Fit
-	OpenIcon.Visible = false
 	OpenIcon.Active = true
-	OpenIcon.Parent = HubGui
-	createCorner(OpenIcon, 14)
-	local iconStroke = createStroke(OpenIcon, Theme.Primary, 2)
+	OpenIcon.Parent = OpenIconFrame
+	createCorner(OpenIcon, 14)  -- clip image
 
-	-- Animate icon stroke color
 	RunService.RenderStepped:Connect(function()
 		iconStroke.Color = Color3.fromHSV(tick()*0.3 % 1, 0.9, 1)
 	end)
@@ -77,7 +93,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 	LoadingFrame.Active = true
 	LoadingFrame.Parent = HubGui
 
-	-- Gradient background for loading
+	-- Gradient background
 	local bgGradient = Instance.new("UIGradient")
 	bgGradient.Color = ColorSequence.new{
 		ColorSequenceKeypoint.new(0, Color3.fromRGB(10,10,16)),
@@ -86,15 +102,32 @@ function EmloxaLibrary:CreateWindow(hubName)
 	bgGradient.Rotation = 45
 	bgGradient.Parent = LoadingFrame
 
-	-- Logo image
+	-- Logo container
+	local LoadLogoContainer = Instance.new("Frame")
+	LoadLogoContainer.Size = UDim2.new(0, 120, 0, 120)
+	LoadLogoContainer.Position = UDim2.new(0.5, -60, 0.4, -60)
+	LoadLogoContainer.BackgroundTransparency = 1
+	LoadLogoContainer.Parent = LoadingFrame
+
+	-- Fallback "E"
+	local LoadFallback = Instance.new("TextLabel")
+	LoadFallback.Size = UDim2.new(1,0,1,0)
+	LoadFallback.BackgroundTransparency = 1
+	LoadFallback.Text = "E"
+	LoadFallback.Font = Enum.Font.GothamBlack
+	LoadFallback.TextScaled = true
+	LoadFallback.TextColor3 = Theme.Primary
+	LoadFallback.Parent = LoadLogoContainer
+
+	-- Actual image on top
 	local LoadLogo = Instance.new("ImageLabel")
-	LoadLogo.Size = UDim2.new(0, 120, 0, 120)
-	LoadLogo.Position = UDim2.new(0.5, -60, 0.4, -60)
+	LoadLogo.Size = UDim2.new(1,0,1,0)
 	LoadLogo.BackgroundTransparency = 1
 	LoadLogo.Image = "rbxassetid://76693493960487"
 	LoadLogo.ScaleType = Enum.ScaleType.Fit
-	LoadLogo.Parent = LoadingFrame
-	-- Glow pulse
+	LoadLogo.Parent = LoadLogoContainer
+
+	-- Pulse effect on logo
 	RunService.RenderStepped:Connect(function()
 		LoadLogo.ImageTransparency = 0.2 + math.sin(tick()*3)*0.1
 	end)
@@ -138,6 +171,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 	TweenService:Create(LoadingFrame, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
 	for _,v in ipairs(Spinner:GetChildren()) do if v:IsA("Frame") then TweenService:Create(v, TweenInfo.new(0.4), {BackgroundTransparency = 1}):Play() end end
 	TweenService:Create(LoadLogo, TweenInfo.new(0.5), {ImageTransparency = 1}):Play()
+	TweenService:Create(LoadFallback, TweenInfo.new(0.5), {TextTransparency = 1}):Play()
 	TweenService:Create(LoadText, TweenInfo.new(0.5), {TextTransparency = 1}):Play()
 	task.wait(0.6)
 	LoadingFrame:Destroy()
@@ -154,7 +188,6 @@ function EmloxaLibrary:CreateWindow(hubName)
 	createStroke(MainFrame, Theme.Primary, 2)
 	createShadow(MainFrame, UDim2.new(1,24,1,24), -12, 0.6)
 
-	-- Gradient background for main frame
 	local mainGradient = Instance.new("UIGradient")
 	mainGradient.Color = ColorSequence.new{
 		ColorSequenceKeypoint.new(0, Color3.fromRGB(16,16,24)),
@@ -171,7 +204,6 @@ function EmloxaLibrary:CreateWindow(hubName)
 	TopBar.Active = true
 	TopBar.Parent = MainFrame
 	createCorner(TopBar, 14)
-	-- Top only rounding
 	local topCover = Instance.new("Frame", TopBar)
 	topCover.Size = UDim2.new(1,0,0.5,0)
 	topCover.Position = UDim2.new(0,0,0.5,0)
@@ -184,7 +216,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 	Title.Font = Enum.Font.GothamBlack
 	Title.TextSize = 18
 	Title.TextXAlignment = Enum.TextXAlignment.Left
-	Title.Size = UDim2.new(1, -220, 1, 0)  -- leave space for credits + controls
+	Title.Size = UDim2.new(1, -220, 1, 0)
 	Title.Position = UDim2.new(0, 20, 0, 0)
 	Title.BackgroundTransparency = 1
 	Title.Parent = TopBar
@@ -192,7 +224,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 		Title.TextColor3 = Color3.fromHSV(tick()%5/5,0.9,1)
 	end)
 
-	-- Credits (fixed position, not under buttons)
+	-- Credits
 	local CreditsText = Instance.new("TextLabel")
 	CreditsText.Text = "Made by Emloxa"
 	CreditsText.Font = Enum.Font.GothamSemibold
@@ -200,11 +232,11 @@ function EmloxaLibrary:CreateWindow(hubName)
 	CreditsText.TextColor3 = Theme.SubTextColor
 	CreditsText.TextXAlignment = Enum.TextXAlignment.Right
 	CreditsText.Size = UDim2.new(0, 100, 1, 0)
-	CreditsText.Position = UDim2.new(1, -210, 0, 0)  -- 210 from right
+	CreditsText.Position = UDim2.new(1, -210, 0, 0)
 	CreditsText.BackgroundTransparency = 1
 	CreditsText.Parent = TopBar
 
-	-- Controls (minimize, close)
+	-- Controls
 	local Controls = Instance.new("Frame")
 	Controls.Size = UDim2.new(0, 90, 1, 0)
 	Controls.Position = UDim2.new(1, -100, 0, 0)
@@ -225,7 +257,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 	local CloseBtn = Instance.new("TextButton")
 	CloseBtn.Size = UDim2.new(0,32,0,32)
 	CloseBtn.Position = UDim2.new(0,50,0.5,-16)
-	CloseBtn.Text = "X"                     -- clear capital X
+	CloseBtn.Text = "X"
 	CloseBtn.Font = Enum.Font.GothamBlack
 	CloseBtn.TextSize = 18
 	CloseBtn.TextColor3 = Theme.Accent
@@ -264,29 +296,27 @@ function EmloxaLibrary:CreateWindow(hubName)
 		TweenService:Create(MainFrame, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Size = UDim2.new(0,0,0,0)}):Play()
 		task.wait(0.35)
 		MainFrame.Visible = false
-		OpenIcon.Visible = true
-		OpenIcon.Size = UDim2.new(0,0,0,0)
-		TweenService:Create(OpenIcon, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0,55,0,55)}):Play()
+		OpenIconFrame.Visible = true
+		OpenIconFrame.Size = UDim2.new(0,0,0,0)
+		TweenService:Create(OpenIconFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0,55,0,55)}):Play()
 	end)
 
 	OpenIcon.MouseButton1Click:Connect(function()
 		playClickSound()
-		TweenService:Create(OpenIcon, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {Size = UDim2.new(0,0,0,0)}):Play()
+		TweenService:Create(OpenIconFrame, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {Size = UDim2.new(0,0,0,0)}):Play()
 		task.wait(0.25)
-		OpenIcon.Visible = false
+		OpenIconFrame.Visible = false
 		MainFrame.Visible = true
 		animateWindow(isMinimized and UDim2.new(0,650,0,50) or UDim2.new(0,650,0,460))
 	end)
 
-	-- ====== SMOOTH DRAGGING (FIXED) ======
+	-- ====== DRAGGING (FIXED & SMOOTH) ======
 	local dragging, dragStart, startPos = false, nil, nil
-	local currentDelta = Vector2.new(0,0)  -- smoothed delta
 	TopBar.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			dragging = true
 			dragStart = input.Position
-			startPos = MainFrame.Position  -- UDim2 with Scale & Offset
-			currentDelta = Vector2.new(0,0)
+			startPos = MainFrame.Position
 		end
 	end)
 	TopBar.InputEnded:Connect(function(input)
@@ -295,16 +325,16 @@ function EmloxaLibrary:CreateWindow(hubName)
 		end
 	end)
 	UserInputService.InputChanged:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
-			local rawDelta = input.Position - dragStart
-			-- smooth lerp
-			currentDelta = currentDelta:Lerp(rawDelta, 0.25)
-			MainFrame.Position = UDim2.new(
+		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+			local delta = input.Position - dragStart
+			local targetPos = UDim2.new(
 				startPos.X.Scale,
-				startPos.X.Offset + currentDelta.X,
+				startPos.X.Offset + delta.X,
 				startPos.Y.Scale,
-				startPos.Y.Offset + currentDelta.Y
+				startPos.Y.Offset + delta.Y
 			)
+			-- Smooth interpolation for buttery movement
+			MainFrame.Position = MainFrame.Position:Lerp(targetPos, 0.35)
 		end
 	end)
 
@@ -316,7 +346,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 	TabContainer.BorderSizePixel = 0
 	TabContainer.Active = true
 	TabContainer.Parent = MainFrame
-	-- Gradient on tab bar
+
 	local tabGradient = Instance.new("UIGradient")
 	tabGradient.Color = ColorSequence.new{
 		ColorSequenceKeypoint.new(0, Color3.fromRGB(20,20,28)),
@@ -341,7 +371,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 	local Pages = {}
 	local Tabs = {}
 
-	-- ====== DISCORD PROMPT (ENGLISH) ======
+	-- ====== DISCORD PROMPT (English) ======
 	function WindowSetup:ShowDiscordPrompt()
 		local PromptFrame = Instance.new("Frame")
 		PromptFrame.Size = UDim2.new(0, 350, 0, 140)
@@ -445,7 +475,6 @@ function EmloxaLibrary:CreateWindow(hubName)
 			end
 		end)
 
-		-- Hover effect for tab
 		TabBtn.MouseEnter:Connect(function()
 			if PageScroll.Visible ~= true then
 				TweenService:Create(TabBtn, TweenInfo.new(0.2), {TextColor3 = Color3.new(1,1,1)}):Play()
@@ -702,7 +731,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 			end)
 		end
 
-		-- Notification system (English)
+		-- Notification system
 		function TabSetup:CreateNotification(title, message, duration)
 			duration = duration or 2
 			local Notif = Instance.new("Frame")
