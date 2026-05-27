@@ -1,5 +1,5 @@
 -- =========================================================================
--- EMLOXA WARE: FUNKY FRIDAY V24 (ZERO-EARLY PERFECT SICK CORE)
+-- EMLOXA WARE: FUNKY FRIDAY V25 (FLAWLESS MATHEMATICS & AUTO-RESET)
 -- =========================================================================
 local GameModule = {}
 
@@ -39,11 +39,11 @@ function GameModule:Init(Window)
     local AdvancedTab = Window:CreateTab("Advanced")
     
     local AutoPlayerEnabled = false
-    local Aggression = 5 -- Artık varsayılan olarak en hassas ayarda
     local AutoplayMethod = "Hybrid"
     
     local LaneKeys = { Lane1 = Enum.KeyCode.A, Lane2 = Enum.KeyCode.S, Lane3 = Enum.KeyCode.W, Lane4 = Enum.KeyCode.D }
     
+    -- Şerit İstatistikleri
     local LaneStats = {
         Lane1 = {Seen = 0, Taps = 0}, Lane2 = {Seen = 0, Taps = 0},
         Lane3 = {Seen = 0, Taps = 0}, Lane4 = {Seen = 0, Taps = 0}
@@ -53,9 +53,9 @@ function GameModule:Init(Window)
     local TappedNotes = {}
     local CountedNotes = {} 
     local LastYPositions = {} 
+    local LastNoteSeenTime = tick() -- Otomatik sıfırlama için zamanlayıcı
 
-    FunkyTab:CreateToggle("Enable God Mode (Perfect Center)", function(s) AutoPlayerEnabled = s end)
-    FunkyTab:CreateSlider("Sick Hitbox Range", 1, 30, 5, function(v) Aggression = v end)
+    FunkyTab:CreateToggle("Enable God Mode (Flawless AI)", function(s) AutoPlayerEnabled = s end)
     AdvancedTab:CreateDropdown("Autoplay Method", {"Calculate", "Rapid checks", "Hybrid"}, "Hybrid", function(val) AutoplayMethod = val end)
 
     local function UpdateLaneStats(laneFrame, laneName)
@@ -97,16 +97,10 @@ function GameModule:Init(Window)
     end
 
     -- ==========================================
-    -- MİLİSANİYELİK KUSURSUZ DÖNGÜ (SICK GARANTİSİ)
+    -- MİLİSANİYELİK KUSURSUZ DÖNGÜ
     -- ==========================================
     RunService.RenderStepped:Connect(function(deltaTime)
-        if not AutoPlayerEnabled then
-            for holdNote, key in pairs(ActiveHolds) do
-                VirtualInputManager:SendKeyEvent(false, key, false, game)
-                ActiveHolds[holdNote] = nil
-            end
-            return 
-        end
+        if not AutoPlayerEnabled then return end
         
         local ui = LocalPlayer.PlayerGui:FindFirstChild("Window")
         if not ui or not ui:FindFirstChild("Game") or not ui.Game:FindFirstChild("Fields") then return end
@@ -121,6 +115,7 @@ function GameModule:Init(Window)
         if not mySide then return end
         
         local fields = ui.Game.Fields[mySide].Inner
+        local anyNoteSeenThisFrame = false
 
         for i = 1, 4 do
             local laneName = "Lane" .. i
@@ -136,88 +131,77 @@ function GameModule:Init(Window)
                 if notesFolder then
                     for _, note in pairs(notesFolder:GetChildren()) do
                         if note:IsA("GuiObject") then
+                            anyNoteSeenThisFrame = true
+                            LastNoteSeenTime = tick() -- Nota gördük, zamanlayıcıyı sıfırla
+
                             local noteTop = note.AbsolutePosition.Y
                             local noteBottom = noteTop + note.AbsoluteSize.Y
                             local noteCenterY = noteTop + (note.AbsoluteSize.Y / 2)
                             local dist = math.abs(noteCenterY - laneCenterY)
                             
-                            -- Object Pooling Sıfırlaması
+                            -- Object Pooling Koruması
                             if LastYPositions[note] and math.abs(noteCenterY - LastYPositions[note]) > 100 then
                                 CountedNotes[note] = nil
                                 TappedNotes[note] = nil
                             end
                             
-                            -- Hız (Velocity) Yön Kontrolü (Aşağı mı iniyor, Yukarı mı çıkıyor?)
+                            -- Hız Hesaplama
                             local noteVelocity = 0
                             if LastYPositions[note] then
                                 noteVelocity = math.abs(noteCenterY - LastYPositions[note]) / deltaTime
                             end
                             LastYPositions[note] = noteCenterY
 
-                            if dist < 400 and not CountedNotes[note] then
+                            -- SEEN SAYACI (Mesafe beklemeden doğduğu an sayar)
+                            if not CountedNotes[note] then
                                 CountedNotes[note] = true
                                 LaneStats[laneName].Seen = LaneStats[laneName].Seen + 1
                             end
 
                             ManageDynamicDot(note, dist)
 
+                            -- HOLD NOTA DÜZELTMESİ: Sadece child sayısına değil, AbsoluteSize Yüksekliğine de bak!
+                            -- Eğer nota uzunsa (kuyruğu henüz renderlanmamış olsa bile) Hold olarak algıla.
                             local childCount = 0
                             for _, c in ipairs(note:GetChildren()) do
                                 if c.Name ~= "EmloxaDynamicDot" then childCount = childCount + 1 end
                             end
-                            local isHoldNote = childCount > 1
+                            local isHoldNote = (childCount > 1) or (note.AbsoluteSize.Y > note.AbsoluteSize.X * 1.5)
 
-                            -- ===============================================
-                            -- YENİ SİSTEM: ERKEN BASMAYI ÖNLEYEN MATEMATİK
-                            -- ===============================================
+                            -- KUSURSUZ MERKEZ MATEMATİĞİ (SICK GARANTİSİ)
                             local shouldHit = false
                             
+                            -- Notanın bu karede (frame) kat edeceği piksel mesafesi
+                            local frameTravel = noteVelocity * deltaTime
+                            
                             if AutoplayMethod == "Rapid checks" then
-                                -- Sadece Hitbox'a girdiğinde değil, tam merkeze ÇOK yakınsa (2 piksel tolerans) bas. Erken vurmayı engeller.
-                                shouldHit = (dist <= math.clamp(Aggression, 1, 3))
-                                
+                                shouldHit = (dist <= 3) -- Çok agresif dar alan
                             elseif AutoplayMethod == "Calculate" then
-                                -- Nereye kadar yolum kaldı / Hızım ne = Ne zaman hedefe varırım?
-                                if noteVelocity > 0 and dist < 150 then
-                                    local timeToCenter = dist / noteVelocity
-                                    -- deltaTime * 0.8 yaparak bir önceki frame'in son anında mükemmel yakalar
-                                    shouldHit = (timeToCenter <= (deltaTime * 0.8)) 
-                                end
-                                
+                                -- Erken vurmayı tamamen engeller, sadece merkeze en yakın olduğu anı kilitler
+                                shouldHit = (dist <= math.max(2, frameTravel / 1.5))
                             elseif AutoplayMethod == "Hybrid" then
-                                -- Hem mesafeyi hem de ulaşma süresini kontrol eder. Hız ve mesafe 0'a en yakın olduğunda sıkar!
-                                if noteVelocity > 0 and dist < 150 then
-                                    local timeToCenter = dist / noteVelocity
-                                    shouldHit = (dist <= Aggression) and (timeToCenter <= deltaTime)
-                                else
-                                    shouldHit = (dist <= 3)
-                                end
+                                -- Hızlıysa matematiğe, yavaşsa sabit piksele güvenir
+                                shouldHit = (dist <= math.max(3, frameTravel / 1.2))
                             end
 
-                            -- VURUŞ İŞLEMLERİ (AŞIRI HIZLI TASK.SPAWN)
-                            if isHoldNote then
-                                -- Hold notası için de toleransı düşürdüm ki erken basıp Good almasın
-                                if (noteTop <= laneCenterY + 5) and (noteBottom >= laneCenterY - 5) then
-                                    if not ActiveHolds[note] then
-                                        ActiveHolds[note] = laneKey
-                                        LaneStats[laneName].Taps = LaneStats[laneName].Taps + 1
-                                        task.spawn(function()
-                                            VirtualInputManager:SendKeyEvent(true, laneKey, false, game)
-                                        end)
-                                    end
-                                end
-                            else
-                                if shouldHit and not TappedNotes[note] then
-                                    TappedNotes[note] = true
-                                    LaneStats[laneName].Taps = LaneStats[laneName].Taps + 1
-                                    
-                                    -- Tuş basma işlemini ana döngüden koparıp ayrı thread'e aldık. 0 kasma garantisi.
+                            -- VURUŞ İŞLEMLERİ (Şoklama)
+                            if shouldHit and not TappedNotes[note] then
+                                TappedNotes[note] = true
+                                LaneStats[laneName].Taps = LaneStats[laneName].Taps + 1
+                                
+                                if isHoldNote then
+                                    ActiveHolds[note] = laneKey
+                                    task.spawn(function()
+                                        VirtualInputManager:SendKeyEvent(true, laneKey, false, game)
+                                    end)
+                                else
                                     task.spawn(function()
                                         VirtualInputManager:SendKeyEvent(false, laneKey, false, game)
                                         VirtualInputManager:SendKeyEvent(true, laneKey, false, game)
                                         
-                                        task.wait(0.01)
+                                        task.wait(0.01) -- Anında geri çek
                                         
+                                        -- Eğer o sırada bir hold çalışmıyorsa tuşu bırak
                                         local isHolding = false
                                         for hNote, k in pairs(ActiveHolds) do
                                             if k == laneKey and hNote.Parent then isHolding = true break end
@@ -228,11 +212,23 @@ function GameModule:Init(Window)
                                     end)
                                 end
                             end
+                            
+                            -- Hold notası bitince (Kuyruk merkezi geçince) zorla bırak
+                            if isHoldNote and TappedNotes[note] then
+                                if noteBottom < laneCenterY - 10 then -- Kuyruk geçti
+                                    if ActiveHolds[note] then
+                                        task.spawn(function()
+                                            VirtualInputManager:SendKeyEvent(false, laneKey, false, game)
+                                        end)
+                                        ActiveHolds[note] = nil
+                                    end
+                                end
+                            end
                         end
                     end
                 end
                 
-                -- Şeritteki biten Hold notalarını bırak
+                -- Hata Payı Temizliği: Eğer obje tamamen silindiyse
                 for holdNote, key in pairs(ActiveHolds) do
                     if key == laneKey and not holdNote.Parent then 
                         task.spawn(function()
@@ -243,20 +239,29 @@ function GameModule:Init(Window)
                 end
             end
         end
+
+        -- ==========================================
+        -- OTOMATİK SIFIRLAMA SİSTEMİ (Yeni Maç)
+        -- ==========================================
+        if not anyNoteSeenThisFrame and (tick() - LastNoteSeenTime > 2.5) then
+            -- 2.5 saniyedir hiçbir nota görülmediyse şarkı bitmiş/başlıyordur. Her şeyi sıfırla.
+            for i=1,4 do LaneStats["Lane"..i] = {Seen=0, Taps=0} end
+            TappedNotes = {}
+            CountedNotes = {}
+            LastYPositions = {}
+            
+            for holdNote, key in pairs(ActiveHolds) do
+                VirtualInputManager:SendKeyEvent(false, key, false, game)
+            end
+            ActiveHolds = {}
+            LastNoteSeenTime = tick() -- Spam yapmaması için sıfırla
+        end
     end)
 
     -- ==========================================
     -- 3. MISC & OPTIMIZATION
     -- ==========================================
     local MiscTab = Window:CreateTab("Misc")
-    
-    MiscTab:CreateButton("Clear Cache (Reset Stats)", function() 
-        TappedNotes = {} 
-        ActiveHolds = {} 
-        CountedNotes = {}
-        LastYPositions = {}
-        for i=1,4 do LaneStats["Lane"..i] = {Seen=0, Taps=0} end
-    end)
 
     MiscTab:CreateButton("Optimize Graphics (MAX FPS)", function()
         for _, v in pairs(workspace:GetDescendants()) do
