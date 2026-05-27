@@ -1,6 +1,5 @@
 -- ==========================================
--- EMLOXA WARE PREMIUM UI v9 (Mega Edition)
--- Tabs Auto-Fit | 10 Themes | Config System | Slider Knobs | Default Menu Tab
+-- EMLOXA WARE PREMIUM UI v10 (Fixed & Optimized)
 -- ==========================================
 local EmloxaLibrary = {}
 
@@ -118,10 +117,9 @@ local Themes = {
 	},
 }
 
--- Active theme (initial)
 local CurrentTheme = Themes["Default"]
 
--- Utility
+-- Utility functions
 local function createCorner(frame, radius)
 	local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0, radius or 8); c.Parent = frame
 	return c
@@ -144,23 +142,24 @@ local function playClickSound()
 end
 
 -- ══════════════════════════════════════
---  THEME MANAGER
+--  THEME MANAGER (Fixed - No custom properties)
 -- ══════════════════════════════════════
+local ThemeObjects = {}  -- list of {object = obj, props = {PropertyName = "ThemeKey", ...}}
+
 local function registerThemeable(obj, propertyMap)
-	-- propertyMap: e.g. {BackgroundColor3 = "Panel"}
-	obj._themeProps = propertyMap
-	table.insert(AllThemeObjects, obj)
+	table.insert(ThemeObjects, {object = obj, props = propertyMap})
 end
-local AllThemeObjects = {}
 
 local function applyTheme(theme)
 	CurrentTheme = theme
-	for _, obj in ipairs(AllThemeObjects) do
+	for _, entry in ipairs(ThemeObjects) do
+		local obj = entry.object
+		local props = entry.props
 		if obj and obj.Parent then
-			for prop, themeKey in pairs(obj._themeProps) do
+			for propName, themeKey in pairs(props) do
 				local color = theme[themeKey]
 				if color then
-					TweenService:Create(obj, TweenInfo.new(0.3), {[prop] = color}):Play()
+					TweenService:Create(obj, TweenInfo.new(0.3), {[propName] = color}):Play()
 				end
 			end
 		end
@@ -183,8 +182,8 @@ end
 -- ══════════════════════════════════════
 --  CONFIG SYSTEM
 -- ══════════════════════════════════════
-local ConfigValues = {}  -- stores latest values for each element
-local ConfigCallbacks = {}  -- stores callbacks for each element to set value
+local ConfigValues = {}
+local ConfigCallbacks = {}
 
 local function registerConfig(id, setValue)
 	table.insert(ConfigCallbacks, {id = id, set = setValue})
@@ -219,8 +218,7 @@ local function loadConfig(json)
 end
 
 local function exportConfig()
-	local json = HttpService:JSONEncode(ConfigValues)
-	return json
+	return HttpService:JSONEncode(ConfigValues)
 end
 
 -- ══════════════════════════════════════
@@ -236,7 +234,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 	pcall(function() HubGui.Parent = CoreGui end)
 	if not HubGui.Parent then HubGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 
-	-- ====== OPEN ICON (Fallback "E") ======
+	-- Open Icon
 	local OpenIconFrame = Instance.new("Frame")
 	OpenIconFrame.Size = UDim2.new(0, 55, 0, 55)
 	OpenIconFrame.Position = UDim2.new(0, 15, 0, 75)
@@ -271,7 +269,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 		iconStroke.Color = Color3.fromHSV(tick()*0.3 % 1, 0.9, 1)
 	end)
 
-	-- ====== LOADING SCREEN (with disconnect fix) ======
+	-- Loading Screen
 	local LoadingFrame = Instance.new("Frame")
 	LoadingFrame.Size = UDim2.new(1,0,1,0)
 	LoadingFrame.BackgroundColor3 = CurrentTheme.Background
@@ -345,9 +343,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 	end)
 
 	task.wait(2)
-	-- Disconnect spinner connections
 	for _, conn in ipairs(loadingConnections) do conn:Disconnect() end
-	-- Fade out
 	TweenService:Create(LoadingFrame, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
 	TweenService:Create(LoadLogo, TweenInfo.new(0.5), {ImageTransparency = 1}):Play()
 	TweenService:Create(LoadFallback, TweenInfo.new(0.5), {TextTransparency = 1}):Play()
@@ -355,7 +351,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 	task.wait(0.6)
 	LoadingFrame:Destroy()
 
-	-- ====== MAIN FRAME ======
+	-- Main Frame
 	local MainFrame = Instance.new("Frame")
 	MainFrame.Size = UDim2.new(0, 650, 0, 460)
 	MainFrame.Position = UDim2.new(0.5, -325, 0.5, -230)
@@ -366,8 +362,8 @@ function EmloxaLibrary:CreateWindow(hubName)
 	createCorner(MainFrame, 14)
 	createStroke(MainFrame, CurrentTheme.Primary, 2)
 	createShadow(MainFrame, UDim2.new(1,24,1,24), -12, 0.6)
-	registerThemeable(MainFrame, {BackgroundColor3 = "Background"})
 	MainFrame.BackgroundColor3 = CurrentTheme.Background
+	registerThemeable(MainFrame, {BackgroundColor3 = "Background"})
 
 	local mainGradient = Instance.new("UIGradient")
 	mainGradient.Color = ColorSequence.new{
@@ -377,7 +373,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 	mainGradient.Rotation = 135
 	mainGradient.Parent = MainFrame
 
-	-- ====== TOP BAR ======
+	-- Top Bar
 	local TopBar = Instance.new("Frame")
 	TopBar.Size = UDim2.new(1,0,0,50)
 	TopBar.BackgroundColor3 = CurrentTheme.Panel
@@ -490,7 +486,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 		animateWindow(isMinimized and UDim2.new(0,650,0,50) or UDim2.new(0,650,0,460))
 	end)
 
-	-- ====== DRAGGING ======
+	-- Dragging
 	local dragging, dragStart, startPos = false, nil, nil
 	TopBar.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -517,7 +513,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 		end
 	end)
 
-	-- ====== TAB CONTAINER (Auto-Resize) ======
+	-- Tab Container
 	local TabContainer = Instance.new("Frame")
 	TabContainer.Size = UDim2.new(1,0,0,44)
 	TabContainer.Position = UDim2.new(0,0,0,50)
@@ -551,114 +547,29 @@ function EmloxaLibrary:CreateWindow(hubName)
 
 	local Pages = {}
 	local Tabs = {}
-	local TabCount = 0
 
-	-- ====== CREATE MENU TAB (Always rightmost) ======
-	local function createMenuTab()
-		local MenuTabBtn = Instance.new("TextButton")
-		MenuTabBtn.Text = "Menu"
-		MenuTabBtn.Font = Enum.Font.GothamBold
-		MenuTabBtn.TextSize = 15
-		MenuTabBtn.TextColor3 = CurrentTheme.SubTextColor
-		MenuTabBtn.BackgroundTransparency = 1
-		MenuTabBtn.LayoutOrder = 9999  -- always last
-		MenuTabBtn.Parent = TabContainer
-		registerThemeable(MenuTabBtn, {TextColor3 = "SubTextColor"})
-
-		local MenuIndicator = Instance.new("Frame")
-		MenuIndicator.Size = UDim2.new(0,0,0,3)
-		MenuIndicator.Position = UDim2.new(0.5,0,1,-3)
-		MenuIndicator.BackgroundColor3 = CurrentTheme.Primary
-		MenuIndicator.BorderSizePixel = 0
-		MenuIndicator.Parent = MenuTabBtn
-		registerThemeable(MenuIndicator, {BackgroundColor3 = "Primary"})
-
-		local MenuPage = Instance.new("ScrollingFrame")
-		MenuPage.Size = UDim2.new(1,0,1,0)
-		MenuPage.BackgroundTransparency = 1
-		MenuPage.BorderSizePixel = 0
-		MenuPage.ScrollBarThickness = 4
-		MenuPage.ScrollBarImageColor3 = CurrentTheme.Primary
-		MenuPage.Active = true
-		MenuPage.Visible = false
-		MenuPage.CanvasSize = UDim2.new(0,0,0,0)
-		MenuPage.Parent = PageContainer
-
-		local MenuLayout = Instance.new("UIListLayout")
-		MenuLayout.SortOrder = Enum.SortOrder.LayoutOrder
-		MenuLayout.Padding = UDim.new(0,12)
-		MenuLayout.Parent = MenuPage
-		Instance.new("UIPadding", MenuPage).PaddingTop = UDim.new(0,12)
-		Instance.new("UIPadding", MenuPage).PaddingLeft = UDim.new(0,15)
-		Instance.new("UIPadding", MenuPage).PaddingRight = UDim.new(0,15)
-
-		MenuPage.ChildAdded:Connect(function(child)
-			if child:IsA("GuiObject") then
-				task.wait()
-				MenuPage.CanvasSize = UDim2.new(0,0,0,MenuLayout.AbsoluteContentSize.Y + 20)
-			end
-		end)
-
-		-- Theme buttons
-		local ThemeDropdown = {Name = "Theme", Options = {}}
-		for name,_ in pairs(Themes) do table.insert(ThemeDropdown.Options, name) end
-		WindowSetup:CreateDropdown("Theme", ThemeDropdown.Options, "Default", function(val)
-			EmloxaLibrary:SetTheme(val)
-		end)
-		-- Config buttons
-		WindowSetup:CreateButton("Save Config", function()
-			local success, msg = saveConfig()
-			WindowSetup:CreateNotification("Config", msg, 2)
-		end)
-		WindowSetup:CreateButton("Load Config (from clipboard)", function()
-			local clip = getclipboard and getclipboard() or ""
-			local success, msg = loadConfig(clip)
-			WindowSetup:CreateNotification("Config", msg, 2)
-		end)
-		WindowSetup:CreateButton("Export Config", function()
-			local json = exportConfig()
-			if setclipboard then
-				setclipboard(json)
-				WindowSetup:CreateNotification("Config", "Exported to clipboard!", 2)
-			end
-		end)
-
-		return {
-			Btn = MenuTabBtn,
-			Indicator = MenuIndicator,
-			Page = MenuPage,
-		}
-	end
-
-	local MenuTab = createMenuTab()
-	table.insert(Tabs, MenuTab)
-	table.insert(Pages, MenuTab.Page)
-	TabCount = TabCount + 1
-
-	-- ====== RESIZE TABS FUNCTION ======
+	-- Resize tabs function
 	local function resizeTabs()
-		local availableWidth = 650 - 10  -- minus some padding
+		local availableWidth = 650 - 10
 		local totalTabs = #Tabs
 		local tabWidth = math.min(130, math.floor(availableWidth / totalTabs))
-		-- Apply
 		for _, tab in ipairs(Tabs) do
 			tab.Btn.Size = UDim2.new(0, tabWidth, 1, 0)
 		end
 	end
 
-	-- ====== CREATE TAB FUNCTION ======
-	function WindowSetup:CreateTab(tabName)
+	-- Create Tab Function (also used for Menu)
+	local function CreateTabInternal(tabName, layoutOrder)
 		local TabSetup = {}
 
-		TabCount = TabCount + 1
 		local TabBtn = Instance.new("TextButton")
-		TabBtn.Size = UDim2.new(0, 130, 1, 0)  -- initial, will be resized
+		TabBtn.Size = UDim2.new(0, 130, 1, 0)
 		TabBtn.Text = tabName
 		TabBtn.Font = Enum.Font.GothamBold
 		TabBtn.TextSize = 15
 		TabBtn.TextColor3 = CurrentTheme.SubTextColor
 		TabBtn.BackgroundTransparency = 1
-		TabBtn.LayoutOrder = #Tabs  -- place before Menu tab
+		TabBtn.LayoutOrder = layoutOrder or #Tabs
 		TabBtn.Parent = TabContainer
 		registerThemeable(TabBtn, {TextColor3 = "SubTextColor"})
 
@@ -723,15 +634,15 @@ function EmloxaLibrary:CreateWindow(hubName)
 		table.insert(Tabs, {Btn = TabBtn, Indicator = Indicator})
 		resizeTabs()
 
-		-- If first user tab, make it active (Menu is default visible)
-		if #Pages == 2 then  -- Menu + first tab
+		-- Auto-select first tab if none visible
+		if #Pages == 1 then
 			PageScroll.Visible = true
 			Indicator.Size = UDim2.new(1,0,0,3)
 			Indicator.Position = UDim2.new(0,0,1,-3)
 			TabBtn.TextColor3 = Color3.new(1,1,1)
 		end
 
-		-- ====== ELEMENT FACTORIES ======
+		-- Element Factories
 		local elementCounter = 0
 		local function generateId(baseName)
 			elementCounter = elementCounter + 1
@@ -879,7 +790,13 @@ function EmloxaLibrary:CreateWindow(hubName)
 			Btn.MouseButton1Click:Connect(function()
 				state = not state
 				ConfigValues[id] = state
-				registerConfig(id).set(state)  -- will call the set function
+				-- trigger config setter
+				for _, entry in ipairs(ConfigCallbacks) do
+					if entry.id == id then
+						entry.set(state)
+						break
+					end
+				end
 				playClickSound()
 			end)
 		end
@@ -936,7 +853,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 			createCorner(Fill,4)
 			registerThemeable(Fill, {BackgroundColor3 = "Primary"})
 
-			-- Slider Knob (round handle)
+			-- Slider Knob
 			local Knob = Instance.new("Frame")
 			Knob.Size = UDim2.new(0,14,0,14)
 			Knob.Position = UDim2.new(defaultPercent, -7, 0.5, -7)
@@ -1058,6 +975,33 @@ function EmloxaLibrary:CreateWindow(hubName)
 		end
 
 		return TabSetup
+	end
+
+	-- Create Menu tab (always rightmost, default active)
+	local MenuTab = CreateTabInternal("Menu", 9999)
+	MenuTab:CreateDropdown("Theme", EmloxaLibrary:GetThemeNames(), "Default", function(val)
+		EmloxaLibrary:SetTheme(val)
+	end)
+	MenuTab:CreateButton("Save Config", function()
+		local success, msg = saveConfig()
+		MenuTab:CreateNotification("Config", msg, 2)
+	end)
+	MenuTab:CreateButton("Load Config (from clipboard)", function()
+		local clip = getclipboard and getclipboard() or ""
+		local success, msg = loadConfig(clip)
+		MenuTab:CreateNotification("Config", msg, 2)
+	end)
+	MenuTab:CreateButton("Export Config", function()
+		local json = exportConfig()
+		if setclipboard then
+			setclipboard(json)
+			MenuTab:CreateNotification("Config", "Exported to clipboard!", 2)
+		end
+	end)
+
+	-- Public method to create user tabs
+	function WindowSetup:CreateTab(tabName)
+		return CreateTabInternal(tabName, #Tabs + 1)
 	end
 
 	-- Discord Prompt
