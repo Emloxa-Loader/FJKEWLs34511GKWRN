@@ -286,6 +286,79 @@ function EmloxaLibrary:CreateWindow(hubName)
         table.insert(Pages, PageScroll); table.insert(Tabs, {Btn = TabBtn, Indicator = Indicator})
         if #Pages == 1 then PageScroll.Visible = true; Indicator.Size = UDim2.new(1,0,0,2); Indicator.Position = UDim2.new(0,0,1,-2); TabBtn.TextColor3 = Color3.fromRGB(255, 255, 255) end
 
+function TabSetup:CreateDropdown(name, options, default, callback)
+            local DropdownFrame = Instance.new("Frame")
+            DropdownFrame.Size = UDim2.new(1, -10, 0, 45)
+            DropdownFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+            DropdownFrame.Active = true
+            DropdownFrame.ClipsDescendants = true
+            DropdownFrame.Parent = PageScroll
+            Instance.new("UICorner", DropdownFrame).CornerRadius = UDim.new(0, 6)
+            Instance.new("UIStroke", DropdownFrame).Color = Color3.fromRGB(45, 45, 50)
+
+            local Label = Instance.new("TextLabel")
+            Label.Size = UDim2.new(1, -30, 0, 45)
+            Label.Position = UDim2.new(0, 15, 0, 0)
+            Label.Text = name .. " : " .. tostring(default)
+            Label.Font = Enum.Font.Gotham
+            Label.TextSize = 14
+            Label.TextColor3 = Color3.fromRGB(220, 220, 220)
+            Label.TextXAlignment = Enum.TextXAlignment.Left
+            Label.BackgroundTransparency = 1
+            Label.Parent = DropdownFrame
+
+            local ToggleBtn = Instance.new("TextButton")
+            ToggleBtn.Size = UDim2.new(1, 0, 0, 45)
+            ToggleBtn.BackgroundTransparency = 1
+            ToggleBtn.Text = ""
+            ToggleBtn.Parent = DropdownFrame
+
+            local OptionContainer = Instance.new("Frame")
+            OptionContainer.Size = UDim2.new(1, 0, 1, -45)
+            OptionContainer.Position = UDim2.new(0, 0, 0, 45)
+            OptionContainer.BackgroundTransparency = 1
+            OptionContainer.Parent = DropdownFrame
+
+            local UIListLayout = Instance.new("UIListLayout")
+            UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+            UIListLayout.Parent = OptionContainer
+
+            local isDropped = false
+            local selectedValue = default
+
+            ToggleBtn.MouseButton1Click:Connect(function()
+                isDropped = not isDropped
+                local targetHeight = isDropped and (45 + (#options * 35)) or 45
+                TweenService:Create(DropdownFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = UDim2.new(1, -10, 0, targetHeight)}):Play()
+                TweenService:Create(Label, TweenInfo.new(0.2), {TextColor3 = isDropped and Color3.fromRGB(102, 85, 255) or Color3.fromRGB(220, 220, 220)}):Play()
+            end)
+
+            for _, option in ipairs(options) do
+                local OptBtn = Instance.new("TextButton")
+                OptBtn.Size = UDim2.new(1, 0, 0, 35)
+                OptBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+                OptBtn.Text = "  " .. option
+                OptBtn.Font = Enum.Font.Gotham
+                OptBtn.TextSize = 13
+                OptBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+                OptBtn.TextXAlignment = Enum.TextXAlignment.Left
+                OptBtn.Parent = OptionContainer
+
+                OptBtn.MouseButton1Click:Connect(function()
+                    selectedValue = option
+                    Label.Text = name .. " : " .. option
+                    isDropped = false
+                    TweenService:Create(DropdownFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = UDim2.new(1, -10, 0, 45)}):Play()
+                    TweenService:Create(Label, TweenInfo.new(0.2), {TextColor3 = Color3.fromRGB(220, 220, 220)}):Play()
+                    callback(selectedValue)
+                end)
+            end
+        end
+
+
+
+
+        
         function TabSetup:CreateToggle(name, callback)
             local ToggleFrame = Instance.new("Frame")
             ToggleFrame.Size = UDim2.new(1, -10, 0, 45); ToggleFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
