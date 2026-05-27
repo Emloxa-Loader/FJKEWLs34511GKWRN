@@ -1,5 +1,5 @@
 -- =========================================================================
--- EMLOXA WARE: FUNKY FRIDAY AUTO-PLAYER v19 (FLAWLESS SICK-STRIKE CORE)
+-- EMLOXA WARE: FUNKY FRIDAY AUTO-PLAYER v20 (HYBRID FLAWLESS CORE)
 -- =========================================================================
 local GameModule = {}
 
@@ -8,7 +8,6 @@ function GameModule:Init(Window)
     local RunService = game:GetService("RunService")
     local VirtualInputManager = game:GetService("VirtualInputManager")
     local LocalPlayer = Players.LocalPlayer
-    local Camera = workspace.CurrentCamera
 
     -- ==========================================
     -- 1. LOCAL PLAYER SEKME
@@ -25,18 +24,26 @@ function GameModule:Init(Window)
     end)
 
     -- ==========================================
-    -- 2. AUTO PLAYER (SICK-STRIKE CORE - FLAWLESS)
+    -- 2. AUTO PLAYER (ADVANCED HYBRID CORE)
     -- ==========================================
     local FunkyTab = Window:CreateTab("Auto Player")
+    local AdvancedTab = Window:CreateTab("Advanced") -- İSTEDİĞİN ADVANCED SEKMESİ EKLENDİ
+    
     local AutoPlayerEnabled = false
     local ShowVisualizer = false
-    local Aggression = 15 -- "Sick" için varsayılanı düşürdük, tam üstündeyken vuracak.
+    local SickRange = 5
+    local AutoplayMethod = "Hybrid" -- Varsayılan metod
     
     local LaneKeys = { Lane1 = Enum.KeyCode.A, Lane2 = Enum.KeyCode.S, Lane3 = Enum.KeyCode.W, Lane4 = Enum.KeyCode.D }
 
-    FunkyTab:CreateToggle("Enable Auto Player (Flawless Mode)", function(s) AutoPlayerEnabled = s end)
+    FunkyTab:CreateToggle("Enable Auto Player", function(s) AutoPlayerEnabled = s end)
     FunkyTab:CreateToggle("Show Visualizer Dots", function(s) ShowVisualizer = s end)
-    FunkyTab:CreateSlider("Sick Range (Tetikleme)", 5, 50, 15, function(v) Aggression = v end)
+    
+    -- ADVANCED TAB AYARLARI
+    AdvancedTab:CreateDropdown("Autoplay Method", {"Calculate", "Rapid checks", "Hybrid"}, "Hybrid", function(val)
+        AutoplayMethod = val
+    end)
+    AdvancedTab:CreateSlider("Sick Hitbox Range", 1, 30, 5, function(v) SickRange = v end)
 
     local function ManageVisualizerDot(parentObj, dotName, size, color)
         local dot = parentObj:FindFirstChild(dotName)
@@ -49,18 +56,18 @@ function GameModule:Init(Window)
         dot.BackgroundTransparency = transparency; dot.UIStroke.Transparency = transparency
     end
 
-    -- Hafıza ve Tuş Takip Sistemi (Tuşların takılı kalmasını engeller)
     local TappedNotes = {}
     local CurrentlyPressed = {
-        [Enum.KeyCode.A] = false,
-        [Enum.KeyCode.S] = false,
-        [Enum.KeyCode.W] = false,
-        [Enum.KeyCode.D] = false
+        [Enum.KeyCode.A] = false, [Enum.KeyCode.S] = false,
+        [Enum.KeyCode.W] = false, [Enum.KeyCode.D] = false
     }
+    
+    -- Calculate metodu için önceki frame pozisyonlarını tutarız (Hız hesaplamak için)
+    local NoteLastPositions = {}
 
-    RunService.RenderStepped:Connect(function()
+    -- FPS'e bağımlı olmayan, oyunun fizik motoruyla senkronize çalışan Heartbeat kullanıyoruz (Rapid Checks için altın kural)
+    RunService.Heartbeat:Connect(function(deltaTime)
         if not AutoPlayerEnabled then
-            -- Kapatıldığında güvenli çıkış: Eğer takılı tuş varsa hemen bırak!
             for _, key in pairs(LaneKeys) do
                 if CurrentlyPressed[key] then
                     VirtualInputManager:SendKeyEvent(false, key, false, game)
@@ -83,12 +90,9 @@ function GameModule:Init(Window)
         if not mySide then return end
         
         local inner = ui.Game.Fields[mySide].Inner
-
-        -- Bu karede(frame) basılması gereken tuşları hazırlıyoruz
         local KeysToPressThisFrame = {}
         local KeysToHoldThisFrame = {}
 
-        -- Notaları Tarama Mantığı
         for i = 1, 4 do
             local laneFrame = inner:FindFirstChild("Lane" .. i)
             if laneFrame then
@@ -103,26 +107,57 @@ function GameModule:Init(Window)
                         if note:IsA("GuiObject") then
                             ManageVisualizerDot(note, "EmloxaNoteDot", 14, Color3.fromRGB(50, 50, 50))
                             
-                            -- Notanın Geometrik Sınırları
                             local noteTop = note.AbsolutePosition.Y
                             local noteBottom = noteTop + note.AbsoluteSize.Y
                             local noteCenterY = noteTop + (note.AbsoluteSize.Y / 2)
-                            
                             local isHoldNote = #note:GetChildren() > 1
-                            
+                            local distanceToCenter = math.abs(noteCenterY - laneCenterY)
+
+                            -- HIZ HESAPLAMA (Calculate Metodu için)
+                            local noteVelocity = 0
+                            if NoteLastPositions[note] then
+                                noteVelocity = (noteCenterY - NoteLastPositions[note]) / deltaTime
+                            end
+                            NoteLastPositions[note] = noteCenterY
+
                             if isHoldNote then
-                                -- HOLD NOTASI: Notanın oku merkeze ulaştıysa ve kuyruğu henüz geçmediyse kesişim vardır.
-                                if (noteTop <= laneCenterY + Aggression) and (noteBottom >= laneCenterY - Aggression) then
+                                -- HOLD (Basılı Tutma) Notaları için Kusursuz Matematik
+                                if (noteTop <= laneCenterY + SickRange) and (noteBottom >= laneCenterY - SickRange) then
                                     KeysToHoldThisFrame[laneKey] = true
                                 end
                             else
-                                -- NORMAL NOTA: Sadece tam hedefin ortasındayken tetikle (Kusursuz Sick)
-                                local dist = math.abs(noteCenterY - laneCenterY)
-                                if dist <= Aggression then
-                                    -- Object Pooling Koruması: Oyun aynı çerçeveyi (frame) yeniden kullanıyorsa atlama! (1 saniye zaman kuralı)
-                                    if not TappedNotes[note] or (tick() - TappedNotes[note] > 1.0) then
-                                        TappedNotes[note] = tick()
-                                        KeysToPressThisFrame[laneKey] = true
+                                -- NORMAL NOTALAR: Seçilen Metoda Göre Algoritma
+                                if not TappedNotes[note] or (tick() - TappedNotes[note] > 1.5) then
+                                    
+                                    if AutoplayMethod == "Rapid checks" then
+                                        -- Sadece görsel mesafeye göre acımasız ve hızlı tarama (Senin orijinal mantığının çok hızlısı)
+                                        if distanceToCenter <= SickRange then
+                                            TappedNotes[note] = tick()
+                                            KeysToPressThisFrame[laneKey] = true
+                                        end
+
+                                    elseif AutoplayMethod == "Calculate" then
+                                        -- Hız (V) = Yol (X) / Zaman (T) denklemi. Notanın merkeze varmasına ne kadar süre kaldığını bul.
+                                        if noteVelocity > 0 and distanceToCenter < 150 then -- Sadece yaklaşıyorsa hesapla
+                                            local timeToHit = distanceToCenter / noteVelocity
+                                            if timeToHit <= (deltaTime * 2) then -- Önümüzdeki 1-2 frame içinde çarpacaksa bas!
+                                                TappedNotes[note] = tick()
+                                                KeysToPressThisFrame[laneKey] = true
+                                            end
+                                        end
+
+                                    elseif AutoplayMethod == "Hybrid" then
+                                        -- Hem mesafeyi (Rapid) hem hızı (Calculate) birleştirir. En hatasız metod.
+                                        local dynamicRange = SickRange
+                                        if noteVelocity > 0 then
+                                            -- Hız arttıkça hedef kutusunu (SickRange) milisaniyelik gecikmeyi tolere etmesi için dinamik esnet.
+                                            dynamicRange = SickRange + (noteVelocity * 0.01)
+                                        end
+                                        
+                                        if distanceToCenter <= dynamicRange then
+                                            TappedNotes[note] = tick()
+                                            KeysToPressThisFrame[laneKey] = true
+                                        end
                                     end
                                 end
                             end
@@ -132,32 +167,26 @@ function GameModule:Init(Window)
             end
         end
 
-        -- ADIM 3: FİZİKSEL EYLEMLERİ UYGULAMA (GÜVENLİ YÖNETİM)
+        -- TUŞ GÖNDERİMİ (Sanal Klavye)
         for _, laneKey in pairs(LaneKeys) do
-            local shouldTap = KeysToPressThisFrame[laneKey]
-            local shouldHold = KeysToHoldThisFrame[laneKey]
-
-            if shouldTap then
-                -- Şoklama Vuruşu: Tuşu tetikle
+            if KeysToPressThisFrame[laneKey] then
                 VirtualInputManager:SendKeyEvent(false, laneKey, false, game)
                 VirtualInputManager:SendKeyEvent(true, laneKey, false, game)
                 CurrentlyPressed[laneKey] = true
 
-                -- Normal nota çok hızlı olduğu için hemen geri çekilmeli (Hold notası gelmiyorsa)
-                task.delay(0.015, function()
+                -- Tuşu anında bırak (Kusursuz tıklama hissiyatı)
+                task.delay(0.01, function()
                     if not KeysToHoldThisFrame[laneKey] then
                         VirtualInputManager:SendKeyEvent(false, laneKey, false, game)
                         CurrentlyPressed[laneKey] = false
                     end
                 end)
-            elseif shouldHold then
-                -- Sadece basılı değilse basılı tut komutu yolla
+            elseif KeysToHoldThisFrame[laneKey] then
                 if not CurrentlyPressed[laneKey] then
                     VirtualInputManager:SendKeyEvent(true, laneKey, false, game)
                     CurrentlyPressed[laneKey] = true
                 end
             else
-                -- EĞER EKRANDA O ŞERİTTE (LANE) BASILACAK HİÇBİR ŞEY YOKSA VE TUŞ BASILI KALMIŞSA -> ZORLA BIRAK
                 if CurrentlyPressed[laneKey] then
                     VirtualInputManager:SendKeyEvent(false, laneKey, false, game)
                     CurrentlyPressed[laneKey] = false
@@ -170,12 +199,14 @@ function GameModule:Init(Window)
     -- 3. MISC & CLEANUP
     -- ==========================================
     local MiscTab = Window:CreateTab("Misc")
-    MiscTab:CreateButton("Clear Cache (Fix Memory)", function() TappedNotes = {} end)
+    MiscTab:CreateButton("Clear Cache (Fix Memory)", function() 
+        TappedNotes = {} 
+        NoteLastPositions = {}
+    end)
     MiscTab:CreateButton("Unload EMLOXA", function()
         AutoPlayerEnabled = false
-        task.wait(0.1) -- Tuşların sıfırlanması için kısa süre ver
+        task.wait(0.1)
         for _, key in pairs(LaneKeys) do VirtualInputManager:SendKeyEvent(false, key, false, game) end
-        
         local ui = game:GetService("CoreGui"):FindFirstChild("EmloxaWareUI") or LocalPlayer.PlayerGui:FindFirstChild("EmloxaWareUI")
         if ui then ui:Destroy() end
     end)
