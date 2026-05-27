@@ -196,4 +196,130 @@ function GameModule:Init(Window)
                     if not highlight then
                         highlight = Instance.new("Highlight", character)
                         highlight.Name = "EmloxaESP"
-                        highlight.FillColor
+                        highlight.FillColor = Color3.fromRGB(102, 85, 255)
+                        highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                        highlight.FillTransparency = 0.5
+                    end
+                end
+
+                -- Tracers
+                if not Tracers[character] then
+                    local line = Drawing.new("Line")
+                    line.Thickness = 1.5; line.Color = Settings.Visuals.TracerColor
+                    Tracers[character] = line
+                end
+                
+                local tracer = Tracers[character]
+                local rootPart = character:FindFirstChild("HumanoidRootPart")
+
+                if Settings.Visuals.ESP_Tracers and rootPart then
+                    local pos, onScreen = Camera:WorldToViewportPoint(rootPart.Position)
+                    if onScreen then
+                        tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                        tracer.To = Vector2.new(pos.X, pos.Y)
+                        tracer.Visible = true
+                    else
+                        tracer.Visible = false
+                    end
+                else
+                    tracer.Visible = false
+                end
+            end
+        end
+
+        -- Kapanan/Ölen hedeflerin Tracer'larını temizle
+        for character, tracer in pairs(Tracers) do
+            if not character or not character.Parent or not character:FindFirstChild("Humanoid") or character.Humanoid.Health <= 0 or not Settings.Visuals.ESP_Tracers then
+                tracer.Visible = false
+            end
+        end
+
+        -- Aimbot & RageBot Çalıştırma
+        if (Settings.Combat.LegitAimbot and IsAiming) or Settings.Combat.RageBot then
+            local target = GetBestTarget()
+            
+            if target then
+                local targetVelocity = target.AssemblyLinearVelocity or Vector3.new(0,0,0)
+                local predictedPosition = target.Position + (targetVelocity * Settings.Combat.Prediction)
+                
+                -- CFrame.lookAt daha güvenli ve stabil çalışır
+                local lookAtCFrame = CFrame.lookAt(Camera.CFrame.Position, predictedPosition)
+                
+                if Settings.Combat.RageBot then
+                    Camera.CFrame = lookAtCFrame
+                    if Settings.Combat.TriggerBot then
+                        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+                        task.wait(0.01)
+                        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+                    end
+                else
+                    Camera.CFrame = Camera.CFrame:Lerp(lookAtCFrame, 1 / Settings.Combat.Smoothness)
+                end
+            end
+        end
+
+        -- TriggerBot (FPS Odaklı Merkez Işını)
+        if Settings.Combat.TriggerBot and not Settings.Combat.RageBot then
+            local ray = Camera:ViewportPointToRay(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+            local params = RaycastParams.new()
+            params.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
+            params.FilterType = Enum.RaycastFilterType.Exclude
+            
+            local result = workspace:Raycast(ray.Origin, ray.Direction * 1000, params)
+            if result and result.Instance and result.Instance.Parent:FindFirstChild("Humanoid") then
+                local hum = result.Instance.Parent.Humanoid
+                if hum.Health > 0 then
+                    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+                    task.wait(0.015)
+                    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+                end
+            end
+        end
+    end))
+
+    -- Fizik Döngüsü (Hız, Zıplama, Spinbot)
+    table.insert(Connections, RunService.Heartbeat:Connect(function()
+        local character = LocalPlayer.Character
+        if character then
+            local humanoid = character:FindFirstChild("Humanoid")
+            local rootPart = character:FindFirstChild("HumanoidRootPart")
+
+            if humanoid then
+                if Settings.Local.SpeedEnabled then humanoid.WalkSpeed = Settings.Local.WalkSpeed end
+                if Settings.Local.JumpEnabled then 
+                    humanoid.UseJumpPower = true
+                    humanoid.JumpPower = Settings.Local.JumpPower 
+                end
+            end
+
+            if Settings.Misc.SpinBot and rootPart then
+                rootPart.CFrame *= CFrame.Angles(0, math.rad(Settings.Misc.SpinSpeed), 0)
+            end
+        end
+    end))
+
+    -- ==========================================
+    -- 5. UNLOAD VE TEMİZLİK
+    -- ==========================================
+    local MiscTab = Window:CreateTab("Misc / Unload")
+    MiscTab:CreateButton("Unload EMLOXA WARE", function()
+        for _, conn in pairs(Connections) do conn:Disconnect() end
+        FOVCircle:Remove()
+        for _, tracer in pairs(Tracers) do tracer:Remove() end
+        
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj:IsA("Highlight") and obj.Name == "EmloxaESP" then obj:Destroy() end
+        end
+        
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            LocalPlayer.Character.Humanoid.WalkSpeed = 16
+            LocalPlayer.Character.Humanoid.JumpPower = 50
+        end
+        Camera.FieldOfView = 70
+        
+        local ui = game:GetService("CoreGui"):FindFirstChild("EmloxaWareUI") or LocalPlayer.PlayerGui:FindFirstChild("EmloxaWareUI")
+        if ui then ui:Destroy() end
+    end)
+end
+
+return GameModule
