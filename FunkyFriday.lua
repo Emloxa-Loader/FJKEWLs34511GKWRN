@@ -1,5 +1,5 @@
 -- =========================================================================
--- EMLOXA WARE: FUNKY FRIDAY AUTO-PLAYER v19 (HYBRID ENGINE & ADVANCED UI)
+-- EMLOXA WARE: FUNKY FRIDAY AUTO-PLAYER v20 (HYBRID CORE & UI FIX)
 -- =========================================================================
 local GameModule = {}
 
@@ -10,16 +10,18 @@ function GameModule:Init(Window)
     local LocalPlayer = Players.LocalPlayer
 
     -- ==========================================
-    -- AYARLAR (ADVANCED & CHANCES)
+    -- AYARLAR TABLOSU
     -- ==========================================
     local Settings = {
         AutoPlay = {
             Enabled = false,
+            SideOverride = "Auto", -- Auto, Left, Right
             SickChance = 100,
             GoodChance = 0,
             OkChance = 0,
             BadChance = 0,
-            MissChance = 0
+            MissChance = 0,
+            ShowVisualizer = false
         },
         Advanced = {
             NoteHoldDuration = 0,
@@ -27,59 +29,80 @@ function GameModule:Init(Window)
             AccuracyBuffer = 50,
             CalculateMethodTime = 5,
             RapidCheckDelay = 1,
-            Method = "Hybrid" -- Rapid, Calculate, Hybrid
+            Method = "Hybrid [ Calculate + Rapid; The most accurate with FPS price ]"
         }
     }
 
     local LaneKeys = { Lane1 = Enum.KeyCode.A, Lane2 = Enum.KeyCode.S, Lane3 = Enum.KeyCode.W, Lane4 = Enum.KeyCode.D }
-    local LaneStates = { Lane1 = false, Lane2 = false, Lane3 = false, Lane4 = false }
 
     -- ==========================================
     -- 1. LOCAL PLAYER SEKME
     -- ==========================================
     local PlayerTab = Window:CreateTab("Local Player")
-    local NoclipEnabled, FlyEnabled = false, false
     
-    PlayerTab:CreateToggle("Noclip (Pass Through)", function(s) NoclipEnabled = s end)
-    PlayerTab:CreateSlider("WalkSpeed", 16, 250, 16, function(v) 
+    PlayerTab:CreateToggle({ Name = "Noclip (Pass Through)", CurrentValue = false, Flag = "FFNoclip", Callback = function(s) 
+        RunService.Stepped:Connect(function()
+            if s and LocalPlayer.Character then
+                for _, p in pairs(LocalPlayer.Character:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end
+            end
+        end)
+    end})
+    PlayerTab:CreateSlider({ Name = "WalkSpeed", Range = {16, 250}, Increment = 1, CurrentValue = 16, Flag = "FFWS", Callback = function(v) 
         if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then LocalPlayer.Character.Humanoid.WalkSpeed = v end 
-    end)
-    PlayerTab:CreateSlider("JumpPower", 50, 350, 50, function(v) 
+    end})
+    PlayerTab:CreateSlider({ Name = "JumpPower", Range = {50, 350}, Increment = 1, CurrentValue = 50, Flag = "FFJP", Callback = function(v) 
         if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then LocalPlayer.Character.Humanoid.UseJumpPower = true; LocalPlayer.Character.Humanoid.JumpPower = v end 
-    end)
+    end})
 
     -- ==========================================
-    -- 2. AUTO PLAY SEKME (CHANCES)
+    -- 2. AUTO PLAY SEKME
     -- ==========================================
     local FunkyTab = Window:CreateTab("Auto play")
     
-    FunkyTab:CreateToggle("Enable Auto Player", function(s) Settings.AutoPlay.Enabled = s end)
+    FunkyTab:CreateToggle({ Name = "Enable Auto Player", CurrentValue = false, Flag = "FFAE", Callback = function(s) Settings.AutoPlay.Enabled = s end })
     
-    FunkyTab:CreateSlider("Sick chance", 0, 100, 100, function(v) Settings.AutoPlay.SickChance = v end)
-    FunkyTab:CreateSlider("Good chance", 0, 100, 0, function(v) Settings.AutoPlay.GoodChance = v end)
-    FunkyTab:CreateSlider("Ok chance", 0, 100, 0, function(v) Settings.AutoPlay.OkChance = v end)
-    FunkyTab:CreateSlider("Bad chance", 0, 100, 0, function(v) Settings.AutoPlay.BadChance = v end)
-    FunkyTab:CreateSlider("Miss chance", 0, 100, 0, function(v) Settings.AutoPlay.MissChance = v end)
+    -- EĞER BOT TARAFINI BULAMAZSA DİYE ZORUNLU SEÇİM
+    FunkyTab:CreateDropdown({
+        Name = "Player Side Override (If bot doesn't work)",
+        Options = {"Auto", "Left", "Right"},
+        CurrentOption = {"Auto"},
+        MultipleOptions = false,
+        Flag = "FFSideOverride",
+        Callback = function(opt) Settings.AutoPlay.SideOverride = opt[1] end
+    })
+
+    FunkyTab:CreateToggle({ Name = "Show Visualizer Dots", CurrentValue = false, Flag = "FFVis", Callback = function(s) Settings.AutoPlay.ShowVisualizer = s end })
+
+    FunkyTab:CreateSlider({ Name = "Sick chance", Range = {0, 100}, Increment = 1, CurrentValue = 100, Flag = "FFSick", Callback = function(v) Settings.AutoPlay.SickChance = v end })
+    FunkyTab:CreateSlider({ Name = "Good chance", Range = {0, 100}, Increment = 1, CurrentValue = 0, Flag = "FFGood", Callback = function(v) Settings.AutoPlay.GoodChance = v end })
+    FunkyTab:CreateSlider({ Name = "Ok chance", Range = {0, 100}, Increment = 1, CurrentValue = 0, Flag = "FFOk", Callback = function(v) Settings.AutoPlay.OkChance = v end })
+    FunkyTab:CreateSlider({ Name = "Bad chance", Range = {0, 100}, Increment = 1, CurrentValue = 0, Flag = "FFBad", Callback = function(v) Settings.AutoPlay.BadChance = v end })
+    FunkyTab:CreateSlider({ Name = "Miss chance", Range = {0, 100}, Increment = 1, CurrentValue = 0, Flag = "FFMiss", Callback = function(v) Settings.AutoPlay.MissChance = v end })
 
     -- ==========================================
     -- 3. ADVANCED SEKME (ALGORITHM TUNING)
     -- ==========================================
     local AdvancedTab = Window:CreateTab("Advanced")
     
-    AdvancedTab:CreateSlider("Note hold duration (ms)", 0, 1000, 0, function(v) Settings.Advanced.NoteHoldDuration = v end)
-    AdvancedTab:CreateToggle("Random note hold duration", function(s) Settings.Advanced.RandomHoldDuration = s end)
-    AdvancedTab:CreateSlider("Scroll speed accuracy buffer", 1, 100, 50, function(v) Settings.Advanced.AccuracyBuffer = v end)
-    AdvancedTab:CreateSlider("Calculate method time (frames)", 1, 10, 5, function(v) Settings.Advanced.CalculateMethodTime = v end)
-    AdvancedTab:CreateSlider("Rapid check delay (frames)", 1, 5, 1, function(v) Settings.Advanced.RapidCheckDelay = v end)
+    AdvancedTab:CreateSlider({ Name = "Note hold duration (ms)", Range = {0, 1000}, Increment = 10, CurrentValue = 0, Flag = "FFHoldDur", Callback = function(v) Settings.Advanced.NoteHoldDuration = v end })
+    AdvancedTab:CreateToggle({ Name = "Random note hold duration", CurrentValue = false, Flag = "FFRndHold", Callback = function(s) Settings.Advanced.RandomHoldDuration = s end })
+    AdvancedTab:CreateSlider({ Name = "Scroll speed accuracy buffer", Range = {1, 100}, Increment = 1, CurrentValue = 50, Flag = "FFAccBuff", Callback = function(v) Settings.Advanced.AccuracyBuffer = v end })
+    AdvancedTab:CreateSlider({ Name = "Calculate method time (frames)", Range = {1, 10}, Increment = 1, CurrentValue = 5, Flag = "FFCalcTime", Callback = function(v) Settings.Advanced.CalculateMethodTime = v end })
+    AdvancedTab:CreateSlider({ Name = "Rapid check delay (frames)", Range = {1, 5}, Increment = 1, CurrentValue = 1, Flag = "FFRapidDelay", Callback = function(v) Settings.Advanced.RapidCheckDelay = v end })
     
-    -- Dropdown yerine şimdilik butonla döngüsel seçim (Rayfield yapısına uyması için)
-    local methodBtn = AdvancedTab:CreateButton("Autoplay method: Hybrid", function() end)
-    methodBtn.Callback = function()
-        if Settings.Advanced.Method == "Hybrid" then Settings.Advanced.Method = "Rapid checks"
-        elseif Settings.Advanced.Method == "Rapid checks" then Settings.Advanced.Method = "Calculate"
-        else Settings.Advanced.Method = "Hybrid" end
-        methodBtn:UpdateText("Autoplay method: " .. Settings.Advanced.Method)
-    end
+    -- KUSURSUZ DROPDOWN EKLENTİSİ
+    AdvancedTab:CreateDropdown({
+        Name = "Autoplay method",
+        Options = {
+            "Calculate [ Least laggy + Only accurate at 2+ scroll speed ]",
+            "Rapid checks [ The golden middle ]",
+            "Hybrid [ Calculate + Rapid; The most accurate with FPS price ]"
+        },
+        CurrentOption = {"Hybrid [ Calculate + Rapid; The most accurate with FPS price ]"},
+        MultipleOptions = false,
+        Flag = "FFMethod",
+        Callback = function(opt) Settings.Advanced.Method = opt[1] end
+    })
 
     -- ==========================================
     -- GÖRÜNMEZ MATEMATİKSEL NOKTA (DOT) SİSTEMİ
@@ -89,97 +112,88 @@ function GameModule:Init(Window)
         if not dot then
             dot = Instance.new("Frame")
             dot.Name = dotName
-            dot.Size = UDim2.new(0, 10, 0, 10)
-            dot.Position = UDim2.new(0.5, -5, 0.5, -5)
+            dot.Size = UDim2.new(0, 14, 0, 14)
+            dot.Position = UDim2.new(0.5, -7, 0.5, -7)
             dot.BackgroundColor3 = Color3.new(1,0,0)
             dot.BorderSizePixel = 0
             dot.ZIndex = 999999
+            local corner = Instance.new("UICorner", dot); corner.CornerRadius = UDim.new(1,0)
             dot.Parent = parentObj
         end
-        -- DİKKAT: Artık her zaman görünmez (Tüm hesaplama arka planda yapılıyor)
-        dot.BackgroundTransparency = 1 
+        -- Visualizer Toggle'ına bağlı olarak görünürlük
+        dot.BackgroundTransparency = Settings.AutoPlay.ShowVisualizer and 0.5 or 1 
         return dot
     end
 
     -- ==========================================
-    -- HİBRİT ÇEKİRDEK (10.000x İYİLEŞTİRİLMİŞ MANTIK)
+    -- HİBRİT ÇEKİRDEK (RACE CONDITION FIX)
     -- ==========================================
     local TappedNotes = {}
     local ActiveHolds = {}
 
-    -- İhtimal Hesaplayıcı (Zar Atma)
-    local function GetHitOffset()
+    local function RollHitAccuracy()
         local roll = math.random(1, 100)
-        local total = 0
+        local s = Settings.AutoPlay.SickChance
+        local g = s + Settings.AutoPlay.GoodChance
+        local o = g + Settings.AutoPlay.OkChance
+        local b = o + Settings.AutoPlay.BadChance
         
-        total = total + Settings.AutoPlay.SickChance
-        if roll <= total then return math.random(-5, 5) end -- Kusursuz merkez
-        
-        total = total + Settings.AutoPlay.GoodChance
-        if roll <= total then return math.random(15, 25) end -- Biraz erken/geç
-        
-        total = total + Settings.AutoPlay.OkChance
-        if roll <= total then return math.random(30, 40) end 
-        
-        total = total + Settings.AutoPlay.BadChance
-        if roll <= total then return math.random(45, 55) end
-        
-        return "MISS" -- Miss chance alanına girdiyse
+        if roll <= s then return "Sick" end
+        if roll <= g then return "Good" end
+        if roll <= o then return "Ok" end
+        if roll <= b then return "Bad" end
+        return "Miss"
     end
 
-    -- Güvenli Tuş Yöneticisi (Input State Manager)
-    local function PressKey(laneKey)
-        VirtualInputManager:SendKeyEvent(true, laneKey, false, game)
+    local function GetHitOffset()
+        local acc = RollHitAccuracy()
+        if acc == "Sick" then return math.random(-5, 5)
+        elseif acc == "Good" then return math.random(15, 25)
+        elseif acc == "Ok" then return math.random(30, 45)
+        elseif acc == "Bad" then return math.random(50, 65)
+        else return "MISS" end
     end
 
-    local function ReleaseKey(laneKey)
-        VirtualInputManager:SendKeyEvent(false, laneKey, false, game)
-    end
-
-    local function SmartRetap(laneKey)
-        -- Eğer tuş zaten basılıysa (Hold notasından kalma vb.), motorun kafası karışmasın diye 1 frame bekleyerek tetikle.
-        task.spawn(function()
-            ReleaseKey(laneKey)
-            RunService.RenderStepped:Wait() -- Motorun bırakma işlemini algılaması için altın kural
-            PressKey(laneKey)
-        end)
-    end
-
-    -- Ana Döngü
     RunService.RenderStepped:Connect(function()
         if not Settings.AutoPlay.Enabled then return end
         
         local ui = LocalPlayer.PlayerGui:FindFirstChild("Window")
         if not ui or not ui:FindFirstChild("Game") or not ui.Game:FindFirstChild("Fields") then return end
         
-        -- Zeki Taraf Bulucu (Debug hatasını çözen kısım)
+        -- ZEKİ TARAF BULUCU & OVERRIDE
         local mySide = nil
-        local scores = ui.Game:FindFirstChild("HUD") and ui.Game.HUD:FindFirstChild("Scores")
-        if scores then
-            for _, side in pairs({scores:FindFirstChild("Left"), scores:FindFirstChild("Right")}) do
-                if side then
-                    for _, obj in pairs(side:GetDescendants()) do
-                        if obj:IsA("TextLabel") and (string.find(string.lower(obj.Text), string.lower(LocalPlayer.Name)) or string.find(string.lower(obj.Text), string.lower(LocalPlayer.DisplayName))) then
-                            mySide = side.Name
-                            break
+        if Settings.AutoPlay.SideOverride ~= "Auto" then
+            mySide = Settings.AutoPlay.SideOverride
+        else
+            local scores = ui.Game:FindFirstChild("HUD") and ui.Game.HUD:FindFirstChild("Scores")
+            if scores then
+                for _, sideName in pairs({"Left", "Right"}) do
+                    local sideUI = scores:FindFirstChild(sideName)
+                    if sideUI then
+                        for _, obj in pairs(sideUI:GetDescendants()) do
+                            if obj:IsA("TextLabel") and (string.find(string.lower(obj.Text), string.lower(LocalPlayer.Name)) or string.find(string.lower(obj.Text), string.lower(LocalPlayer.DisplayName))) then
+                                mySide = sideName
+                                break
+                            end
                         end
                     end
                 end
             end
         end
-        if not mySide then return end -- Şarkı henüz tam başlamamış demektir, sessizce bekle.
+        if not mySide then return end
         
-        local inner = ui.Game.Fields[mySide].Inner
+        local inner = ui.Game.Fields[mySide]:FindFirstChild("Inner")
+        if not inner then return end
 
-        -- 1. ADIM: HOLD NOTALARININ BİTİŞ KONTROLÜ
-        for holdNote, keyData in pairs(ActiveHolds) do
+        -- // FAZ 1: TEMİZLİK (RACE CONDITION ÖNLEMEK İÇİN ÖNCE BIRAK) //
+        for holdNote, key in pairs(ActiveHolds) do
             if not holdNote.Parent or not holdNote:IsDescendantOf(game) or holdNote.AbsoluteSize.Y < 5 then 
-                ReleaseKey(keyData.Key)
+                VirtualInputManager:SendKeyEvent(false, key, false, game)
                 ActiveHolds[holdNote] = nil
             end
         end
 
-        -- 2. ADIM: YENİ NOTALARI TARAMA (Hybrid Yöntemi)
+        -- // FAZ 2: VURUŞ (HYBRID/CALCULATE/RAPID) //
         for i = 1, 4 do
             local laneName = "Lane" .. i
             local laneFrame = inner:FindFirstChild(laneName)
@@ -196,62 +210,45 @@ function GameModule:Init(Window)
                             local noteDot = GetOrMakeDot(note, "EmloxaNoteDot")
                             local noteCenterY = note.AbsolutePosition.Y + (note.AbsoluteSize.Y / 2)
                             
-                            -- İhtimal zarını at
-                            if not note:GetAttribute("HitOffset") then
-                                note:SetAttribute("HitOffset", GetHitOffset())
-                            end
+                            if not note:GetAttribute("HitOffset") then note:SetAttribute("HitOffset", GetHitOffset()) end
                             local offset = note:GetAttribute("HitOffset")
                             
                             if offset == "MISS" then
-                                -- Bota kasıtlı olarak kaçırma emri verildiyse notayı yok say
                                 if math.abs(noteCenterY - laneCenterY) < 10 then TappedNotes[note] = true end
                                 continue
                             end
 
-                            -- HYBRID/RAPID METODU MATEMATİĞİ
-                            -- Notanın konumu (offset dahil) hedefe ulaştı mı?
                             local distance = math.abs((noteCenterY + offset) - laneCenterY)
                             
-                            -- Accuracy buffer ayarını tolerans olarak kullanıyoruz
-                            local tolerance = (Settings.Advanced.Method == "Calculate") and 5 or Settings.Advanced.AccuracyBuffer / 2
+                            -- Method Toleransı (Accuracy Buffer'a göre)
+                            local tolerance = Settings.Advanced.AccuracyBuffer
+                            if string.find(Settings.Advanced.Method, "Calculate") then tolerance = tolerance / 2 end
+                            if string.find(Settings.Advanced.Method, "Hybrid") then tolerance = tolerance * 0.8 end
                             
                             if distance <= tolerance then
-                                local isHoldNote = #note:GetChildren() > 1 -- Orijinal görsel objeler birden fazlaysa Hold'dur
+                                local isHoldNote = #note:GetChildren() > 1
+                                TappedNotes[note] = true
                                 
                                 if isHoldNote then
                                     if not ActiveHolds[note] then
-                                        ActiveHolds[note] = {Key = laneKey}
-                                        SmartRetap(laneKey) -- Hold başlarken önceki tuş buglarını ez
+                                        ActiveHolds[note] = laneKey
+                                        VirtualInputManager:SendKeyEvent(true, laneKey, false, game)
                                     end
                                 else
-                                    -- NORMAL NOTA (En Kritik Kısım)
-                                    TappedNotes[note] = true
-                                    
+                                    -- Kusursuz Çift Vuruş (Sanal olarak bas-çek)
                                     task.spawn(function()
-                                        SmartRetap(laneKey) -- Şoklama Vuruşu (Bırak ve 1 frame sonra bas)
+                                        VirtualInputManager:SendKeyEvent(true, laneKey, false, game)
                                         
-                                        -- Basılı tutma süresi (Gelişmiş sekmedeki ayar)
                                         local holdMs = Settings.Advanced.NoteHoldDuration
-                                        if Settings.Advanced.RandomHoldDuration then
-                                            holdMs = math.random(10, 50)
-                                        end
-                                        local holdWait = (holdMs > 0) and (holdMs / 1000) or 0.015
+                                        if Settings.Advanced.RandomHoldDuration then holdMs = math.random(10, 50) end
+                                        task.wait((holdMs > 0) and (holdMs / 1000) or 0.015)
                                         
-                                        task.wait(holdWait)
-                                        
-                                        -- Bırakmadan önce ŞU AN çalışan başka bir hold notası var mı diye ZEKİCE kontrol et
-                                        local conflict = false
-                                        for activeHoldNote, keyData in pairs(ActiveHolds) do
-                                            if keyData.Key == laneKey and activeHoldNote.Parent then
-                                                conflict = true
-                                                break
-                                            end
+                                        -- Başka bir Hold notası bu tuşu KULLANMIYORSA bırak
+                                        local isHeld = false
+                                        for activeHoldNote, k in pairs(ActiveHolds) do
+                                            if k == laneKey and activeHoldNote.Parent then isHeld = true; break end
                                         end
-                                        
-                                        -- Eğer çatışma yoksa tuşu güvenle bırak
-                                        if not conflict then
-                                            ReleaseKey(laneKey)
-                                        end
+                                        if not isHeld then VirtualInputManager:SendKeyEvent(false, laneKey, false, game) end
                                     end)
                                 end
                             end
@@ -266,12 +263,12 @@ function GameModule:Init(Window)
     -- 4. MISC & CLEANUP
     -- ==========================================
     local MiscTab = Window:CreateTab("Misc")
-    MiscTab:CreateButton("Clear Note Cache", function() TappedNotes = {}; ActiveHolds = {} end)
-    MiscTab:CreateButton("Unload EMLOXA", function()
-        for _, keyData in pairs(ActiveHolds) do VirtualInputManager:SendKeyEvent(false, keyData.Key, false, game) end
+    MiscTab:CreateButton({ Name = "Clear Note Cache", Callback = function() TappedNotes = {}; ActiveHolds = {} end })
+    MiscTab:CreateButton({ Name = "Unload EMLOXA", Callback = function()
+        for _, key in pairs(ActiveHolds) do VirtualInputManager:SendKeyEvent(false, key, false, game) end
         local ui = game:GetService("CoreGui"):FindFirstChild("EmloxaWareUI") or LocalPlayer.PlayerGui:FindFirstChild("EmloxaWareUI")
         if ui then ui:Destroy() end
-    end)
+    end})
 end
 
 return GameModule
