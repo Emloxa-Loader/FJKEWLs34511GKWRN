@@ -301,7 +301,7 @@ function TabSetup:CreateDropdown(name, options, default, callback)
             Label.Position = UDim2.new(0, 15, 0, 0)
             Label.Text = name .. " : " .. tostring(default)
             Label.Font = Enum.Font.Gotham
-            Label.TextSize = 14
+            Label.TextSize = 13
             Label.TextColor3 = Color3.fromRGB(220, 220, 220)
             Label.TextXAlignment = Enum.TextXAlignment.Left
             Label.BackgroundTransparency = 1
@@ -328,18 +328,18 @@ function TabSetup:CreateDropdown(name, options, default, callback)
 
             ToggleBtn.MouseButton1Click:Connect(function()
                 isDropped = not isDropped
-                local targetHeight = isDropped and (45 + (#options * 35)) or 45
+                local targetHeight = isDropped and (45 + (#options * 30)) or 45
                 TweenService:Create(DropdownFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = UDim2.new(1, -10, 0, targetHeight)}):Play()
                 TweenService:Create(Label, TweenInfo.new(0.2), {TextColor3 = isDropped and Color3.fromRGB(102, 85, 255) or Color3.fromRGB(220, 220, 220)}):Play()
             end)
 
             for _, option in ipairs(options) do
                 local OptBtn = Instance.new("TextButton")
-                OptBtn.Size = UDim2.new(1, 0, 0, 35)
+                OptBtn.Size = UDim2.new(1, 0, 0, 30)
                 OptBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
                 OptBtn.Text = "  " .. option
                 OptBtn.Font = Enum.Font.Gotham
-                OptBtn.TextSize = 13
+                OptBtn.TextSize = 12
                 OptBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
                 OptBtn.TextXAlignment = Enum.TextXAlignment.Left
                 OptBtn.Parent = OptionContainer
