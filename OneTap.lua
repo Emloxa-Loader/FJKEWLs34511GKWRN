@@ -1,5 +1,5 @@
 -- =========================================================================
--- EMLOXA WARE: ONE TAP ULTIMATE MODULE (RAGE & LEGIT CORE)
+-- EMLOXA WARE: ONE TAP V2 (ULTIMATE NPC & PLAYER HYBRID CORE)
 -- =========================================================================
 local GameModule = {}
 
@@ -10,7 +10,6 @@ function GameModule:Init(Window)
     local VirtualInputManager = game:GetService("VirtualInputManager")
     local Camera = workspace.CurrentCamera
     local LocalPlayer = Players.LocalPlayer
-    local Mouse = LocalPlayer:GetMouse()
 
     -- ==========================================
     -- 1. GELİŞMİŞ AYARLAR (STATE)
@@ -20,13 +19,21 @@ function GameModule:Init(Window)
             LegitAimbot = false,
             RageBot = false,
             TriggerBot = false,
+            RealPlayersOnly = true, -- YENİ: Sadece gerçek oyuncular
             TargetPart = "Head",
             Smoothness = 5,
             Prediction = 0.13,
             WallCheck = true,
-            TeamCheck = true,
+            TeamCheck = false,
             ShowFOV = true,
             FOVRadius = 150
+        },
+        Local = {
+            WalkSpeed = 16,
+            JumpPower = 50,
+            CameraFOV = 70,
+            SpeedEnabled = false,
+            JumpEnabled = false
         },
         Visuals = {
             ESP_Highlight = false,
@@ -34,7 +41,6 @@ function GameModule:Init(Window)
             TracerColor = Color3.fromRGB(255, 50, 50)
         },
         Misc = {
-            NoRecoil = false,
             SpinBot = false,
             SpinSpeed = 50
         }
@@ -51,7 +57,7 @@ function GameModule:Init(Window)
     local Connections = {}
     local IsAiming = false
 
-    -- Mouse Kontrolleri
+    -- Mouse Kontrolleri (Sağ Tık)
     table.insert(Connections, UserInputService.InputBegan:Connect(function(input) 
         if input.UserInputType == Enum.UserInputType.MouseButton2 then IsAiming = true end 
     end))
@@ -62,29 +68,56 @@ function GameModule:Init(Window)
     -- ==========================================
     -- 2. UI SEKMELERİ
     -- ==========================================
-    local CombatTab = Window:CreateTab("Legit Combat")
-    CombatTab:CreateToggle("Enable Legit Aimbot (Right Click)", function(s) Settings.Combat.LegitAimbot = s end)
-    CombatTab:CreateDropdown("Target Part", {"Head", "HumanoidRootPart", "UpperTorso"}, "Head", function(v) Settings.Combat.TargetPart = v end)
-    CombatTab:CreateSlider("Smoothness", 1, 20, 5, function(v) Settings.Combat.Smoothness = v end)
-    CombatTab:CreateSlider("Prediction (Ping Ayarı)", 0, 50, 13, function(v) Settings.Combat.Prediction = v / 100 end)
+    local CombatTab = Window:CreateTab("Combat (Aim)")
+    CombatTab:CreateToggle("Legit Aimbot (Right Click)", function(s) Settings.Combat.LegitAimbot = s end)
+    CombatTab:CreateToggle("RageBot (Auto Lock)", function(s) Settings.Combat.RageBot = s end)
+    CombatTab:CreateToggle("TriggerBot (Auto Shoot on Crosshair)", function(s) Settings.Combat.TriggerBot = s end)
+    
+    CombatTab:CreateToggle("Only Lock Real Players", function(s) Settings.Combat.RealPlayersOnly = s end)
     CombatTab:CreateToggle("Wall Check (Duvar Arkası Vurma)", function(s) Settings.Combat.WallCheck = s end)
     
-    local RageTab = Window:CreateTab("RageBot")
-    RageTab:CreateToggle("Enable RageBot (Auto Aim & Shoot)", function(s) Settings.Combat.RageBot = s end)
-    RageTab:CreateToggle("TriggerBot (Oto Sıkma)", function(s) Settings.Combat.TriggerBot = s end)
-    RageTab:CreateToggle("SpinBot (Mevlana)", function(s) Settings.Misc.SpinBot = s end)
+    CombatTab:CreateDropdown("Target Part", {"Head", "HumanoidRootPart", "UpperTorso"}, "Head", function(v) Settings.Combat.TargetPart = v end)
+    CombatTab:CreateSlider("Smoothness", 1, 20, 5, function(v) Settings.Combat.Smoothness = v end)
+    CombatTab:CreateSlider("Prediction (Gelecek Tahmini)", 0, 50, 13, function(v) Settings.Combat.Prediction = v / 100 end)
     
-    local FOVTab = Window:CreateTab("FOV Settings")
-    FOVTab:CreateToggle("Show FOV Circle", function(s) Settings.Combat.ShowFOV = s end)
-    FOVTab:CreateSlider("FOV Radius", 50, 600, 150, function(v) Settings.Combat.FOVRadius = v end)
+    local LocalTab = Window:CreateTab("Local Player")
+    LocalTab:CreateToggle("Enable Custom WalkSpeed", function(s) Settings.Local.SpeedEnabled = s end)
+    LocalTab:CreateSlider("WalkSpeed", 16, 250, 16, function(v) Settings.Local.WalkSpeed = v end)
+    LocalTab:CreateToggle("Enable Custom JumpPower", function(s) Settings.Local.JumpEnabled = s end)
+    LocalTab:CreateSlider("JumpPower", 50, 300, 50, function(v) Settings.Local.JumpPower = v end)
+    LocalTab:CreateSlider("Camera FOV (Görüş Açısı)", 70, 120, 70, function(v) Settings.Local.CameraFOV = v; Camera.FieldOfView = v end)
+    LocalTab:CreateToggle("SpinBot (Mevlana)", function(s) Settings.Misc.SpinBot = s end)
 
-    local VisualsTab = Window:CreateTab("Visuals")
+    local VisualsTab = Window:CreateTab("Visuals & FOV")
+    VisualsTab:CreateToggle("Show FOV Circle", function(s) Settings.Combat.ShowFOV = s end)
+    VisualsTab:CreateSlider("FOV Radius", 50, 600, 150, function(v) Settings.Combat.FOVRadius = v end)
     VisualsTab:CreateToggle("Player Highlight ESP", function(s) Settings.Visuals.ESP_Highlight = s end)
     VisualsTab:CreateToggle("Tracer Lines ESP", function(s) Settings.Visuals.ESP_Tracers = s end)
 
     -- ==========================================
-    -- 3. HEDEF BULMA VE MATEMATİK
+    -- 3. HEDEF BULMA (NPC VE PLAYER DESTEKLİ)
     -- ==========================================
+    local function GetValidTargets()
+        local targets = {}
+        if Settings.Combat.RealPlayersOnly then
+            -- SADECE GERÇEK OYUNCULAR
+            for _, player in pairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer and player.Character then
+                    if Settings.Combat.TeamCheck and player.Team == LocalPlayer.Team then continue end
+                    table.insert(targets, player.Character)
+                end
+            end
+        else
+            -- TÜM HUMANOID'LER (NPC, Bot, Zombi, Oyuncu her şey)
+            for _, obj in pairs(workspace:GetDescendants()) do
+                if obj:IsA("Model") and obj ~= LocalPlayer.Character and obj:FindFirstChild("Humanoid") and obj:FindFirstChild("HumanoidRootPart") then
+                    table.insert(targets, obj)
+                end
+            end
+        end
+        return targets
+    end
+
     local function IsVisible(targetPart)
         if not Settings.Combat.WallCheck then return true end
         local origin = Camera.CFrame.Position
@@ -102,33 +135,31 @@ function GameModule:Init(Window)
     local function GetBestTarget()
         local bestTarget = nil
         local shortestDistance = Settings.Combat.RageBot and math.huge or Settings.Combat.FOVRadius
-        local mousePos = Vector2.new(Mouse.X, Mouse.Y)
+        -- FPS oyunlarında mouse merkeze kilitlendiği için ekranın tam ortasını baz alıyoruz
+        local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 
-        for _, player in pairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild(Settings.Combat.TargetPart) then
-                local humanoid = player.Character:FindFirstChild("Humanoid")
-                if humanoid and humanoid.Health > 0 then
-                    if Settings.Combat.TeamCheck and player.Team == LocalPlayer.Team then continue end
+        local potentialTargets = GetValidTargets()
+
+        for _, character in pairs(potentialTargets) do
+            local humanoid = character:FindFirstChild("Humanoid")
+            local targetPart = character:FindFirstChild(Settings.Combat.TargetPart) or character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Head")
+            
+            if humanoid and humanoid.Health > 0 and targetPart then
+                local pos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+                
+                if onScreen or Settings.Combat.RageBot then
+                    local dist = (Vector2.new(pos.X, pos.Y) - screenCenter).Magnitude
                     
-                    local targetPart = player.Character[Settings.Combat.TargetPart]
-                    local pos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
-                    
-                    if onScreen or Settings.Combat.RageBot then
-                        local dist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
-                        
-                        if Settings.Combat.RageBot then
-                            -- Ragebot ekrandan bağımsız en yakına kilitlenir
-                            local realDist = (LocalPlayer.Character.HumanoidRootPart.Position - targetPart.Position).Magnitude
-                            if realDist < shortestDistance and IsVisible(targetPart) then
-                                shortestDistance = realDist
-                                bestTarget = targetPart
-                            end
-                        else
-                            -- Legit Aimbot FOV içinde arar
-                            if dist < shortestDistance and IsVisible(targetPart) then
-                                shortestDistance = dist
-                                bestTarget = targetPart
-                            end
+                    if Settings.Combat.RageBot then
+                        local realDist = (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and (LocalPlayer.Character.HumanoidRootPart.Position - targetPart.Position).Magnitude) or math.huge
+                        if realDist < shortestDistance and IsVisible(targetPart) then
+                            shortestDistance = realDist
+                            bestTarget = targetPart
+                        end
+                    else
+                        if dist < shortestDistance and IsVisible(targetPart) then
+                            shortestDistance = dist
+                            bestTarget = targetPart
                         end
                     end
                 end
@@ -141,132 +172,28 @@ function GameModule:Init(Window)
     -- 4. ANA DÖNGÜ (RENDER & HEARTBEAT)
     -- ==========================================
     table.insert(Connections, RunService.RenderStepped:Connect(function()
-        -- FOV Güncellemesi
-        FOVCircle.Position = Vector2.new(Mouse.X, Mouse.Y + 36) -- Roblox üst bar offseti
+        -- FOV Ekranın Tam Ortasına
+        FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
         FOVCircle.Radius = Settings.Combat.FOVRadius
         FOVCircle.Visible = Settings.Combat.ShowFOV
 
-        -- ESP Sistemi (Highlight & Tracers)
-        for _, player in pairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character then
-                -- Highlight ESP
-                local highlight = player.Character:FindFirstChild("EmloxaESP")
+        -- ESP Sistemi
+        local targets = GetValidTargets()
+        
+        -- Önce tüm highlightları temizle (Görünmez olanlar kalmasın diye)
+        if not Settings.Visuals.ESP_Highlight then
+            for _, obj in pairs(workspace:GetDescendants()) do
+                if obj:IsA("Highlight") and obj.Name == "EmloxaESP" then obj:Destroy() end
+            end
+        end
+
+        for _, character in pairs(targets) do
+            local humanoid = character:FindFirstChild("Humanoid")
+            if humanoid and humanoid.Health > 0 then
+                -- Highlight
                 if Settings.Visuals.ESP_Highlight then
+                    local highlight = character:FindFirstChild("EmloxaESP")
                     if not highlight then
-                        highlight = Instance.new("Highlight", player.Character)
+                        highlight = Instance.new("Highlight", character)
                         highlight.Name = "EmloxaESP"
-                        highlight.FillColor = Color3.fromRGB(102, 85, 255)
-                        highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-                        highlight.FillTransparency = 0.5
-                    end
-                elseif highlight then
-                    highlight:Destroy()
-                end
-
-                -- Tracers
-                if not Tracers[player] then
-                    Tracers[player] = Drawing.new("Line")
-                    Tracers[player].Thickness = 1.5
-                    Tracers[player].Color = Settings.Visuals.TracerColor
-                end
-                
-                local tracer = Tracers[player]
-                local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
-                local humanoid = player.Character:FindFirstChild("Humanoid")
-
-                if Settings.Visuals.ESP_Tracers and rootPart and humanoid and humanoid.Health > 0 then
-                    local pos, onScreen = Camera:WorldToViewportPoint(rootPart.Position)
-                    if onScreen then
-                        tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y) -- Ekran alt ortası
-                        tracer.To = Vector2.new(pos.X, pos.Y)
-                        tracer.Visible = true
-                    else
-                        tracer.Visible = false
-                    end
-                else
-                    tracer.Visible = false
-                end
-            end
-        end
-
-        -- Aimbot & RageBot Çalıştırma
-        if (Settings.Combat.LegitAimbot and IsAiming) or Settings.Combat.RageBot then
-            local target = GetBestTarget()
-            
-            if target then
-                -- Kusursuz Gelecek Tahmini (Velocity * Prediction)
-                local targetVelocity = target.AssemblyLinearVelocity
-                local predictedPosition = target.Position + (targetVelocity * Settings.Combat.Prediction)
-                
-                local lookAtCFrame = CFrame.new(Camera.CFrame.Position, predictedPosition)
-                
-                if Settings.Combat.RageBot then
-                    -- RageBot anında kilitlenir
-                    Camera.CFrame = lookAtCFrame
-                    if Settings.Combat.TriggerBot then
-                        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
-                        task.wait(0.01)
-                        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
-                    end
-                else
-                    -- Legit Aimbot pürüzsüz kayar
-                    Camera.CFrame = Camera.CFrame:Lerp(lookAtCFrame, 1 / Settings.Combat.Smoothness)
-                end
-            end
-        end
-
-        -- TriggerBot Bağımsız (Aimbot kapalıyken bile Mouse hedefin üstündeyse sıkar)
-        if Settings.Combat.TriggerBot and not Settings.Combat.RageBot then
-            local mt = Mouse.Target
-            if mt and mt.Parent:FindFirstChild("Humanoid") and mt.Parent.Humanoid.Health > 0 then
-                local p = Players:GetPlayerFromCharacter(mt.Parent)
-                if p and (not Settings.Combat.TeamCheck or p.Team ~= LocalPlayer.Team) then
-                    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
-                    task.wait(0.01)
-                    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
-                end
-            end
-        end
-    end))
-
-    table.insert(Connections, RunService.Heartbeat:Connect(function()
-        -- SpinBot (Fizik motorunda dönmeli ki başkaları görsün)
-        if Settings.Misc.SpinBot and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            LocalPlayer.Character.HumanoidRootPart.CFrame *= CFrame.Angles(0, math.rad(Settings.Misc.SpinSpeed), 0)
-        end
-    end))
-
-    -- Oyuncu çıkınca Tracer'ı sil (Memory Leak Koruması)
-    table.insert(Connections, Players.PlayerRemoving:Connect(function(player)
-        if Tracers[player] then
-            Tracers[player]:Remove()
-            Tracers[player] = nil
-        end
-    end))
-
-    -- ==========================================
-    -- 5. UNLOAD VE TEMİZLİK
-    -- ==========================================
-    local MiscTab = Window:CreateTab("Misc / Unload")
-    MiscTab:CreateButton("Unload EMLOXA WARE", function()
-        -- Tüm döngüleri kapat
-        for _, conn in pairs(Connections) do conn:Disconnect() end
-        
-        -- Çizimleri sil
-        FOVCircle:Remove()
-        for _, tracer in pairs(Tracers) do tracer:Remove() end
-        
-        -- ESP'leri temizle
-        for _, player in pairs(Players:GetPlayers()) do
-            if player.Character and player.Character:FindFirstChild("EmloxaESP") then
-                player.Character.EmloxaESP:Destroy()
-            end
-        end
-        
-        -- Arayüzü sil
-        local ui = game:GetService("CoreGui"):FindFirstChild("EmloxaWareUI") or LocalPlayer.PlayerGui:FindFirstChild("EmloxaWareUI")
-        if ui then ui:Destroy() end
-    end)
-end
-
-return GameModule
+                        highlight.FillColor
