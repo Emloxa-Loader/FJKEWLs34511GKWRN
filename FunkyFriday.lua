@@ -512,6 +512,302 @@ function GameModule:Init(Window)
 
     -- ==========================================
 
+    -- 4. FUN SEKME (GÖRSEL EFEKTLER - AUTOPLAY'E DOKUNMAZ)
+
+    -- ==========================================
+
+    local FunTab = Window:CreateTab("Fun")
+
+    local funEffects = {
+
+        shake = false,
+
+        wave = false,
+
+        drift = false,
+
+        rgb = false
+
+    }
+
+    local visualClones = {}
+
+
+
+    local function cleanupAllClones()
+
+        for note, clone in pairs(visualClones) do
+
+            clone:Destroy()
+
+            -- Orijinal notayı tekrar görünür yap
+
+            if note and note.Parent then
+
+                note.BackgroundTransparency = 0
+
+                note.ImageTransparency = 0
+
+                note.TextTransparency = 0
+
+            end
+
+        end
+
+        visualClones = {}
+
+    end
+
+
+
+    local function checkAllOff()
+
+        if not (funEffects.shake or funEffects.wave or funEffects.drift or funEffects.rgb) then
+
+            cleanupAllClones()
+
+        end
+
+    end
+
+
+
+    FunTab:CreateToggle("Shake Notes (Titreme)", function(s)
+
+        funEffects.shake = s
+
+        checkAllOff()
+
+    end)
+
+    FunTab:CreateToggle("Wavy Notes (Dalgalı)", function(s)
+
+        funEffects.wave = s
+
+        checkAllOff()
+
+    end)
+
+    FunTab:CreateToggle("Drift Notes (Sürüklenme)", function(s)
+
+        funEffects.drift = s
+
+        checkAllOff()
+
+    end)
+
+    FunTab:CreateToggle("RGB Notes", function(s)
+
+        funEffects.rgb = s
+
+        checkAllOff()
+
+    end)
+
+
+
+    RunService.RenderStepped:Connect(function(deltaTime)
+
+        -- Hiçbir efekt açık değilse kopyaları temizle ve çık
+
+        if not (funEffects.shake or funEffects.wave or funEffects.drift or funEffects.rgb) then
+
+            cleanupAllClones()
+
+            return
+
+        end
+
+
+
+        local ui = LocalPlayer.PlayerGui:FindFirstChild("Window")
+
+        if not ui or not ui:FindFirstChild("Game") or not ui.Game:FindFirstChild("Fields") then
+
+            cleanupAllClones()
+
+            return
+
+        end
+
+
+
+        local mySide = nil
+
+        local scores = ui.Game:FindFirstChild("HUD") and ui.Game.HUD:FindFirstChild("Scores")
+
+        if scores then
+
+            for _, side in pairs({scores.Left, scores.Right}) do
+
+                if side:FindFirstChild(LocalPlayer.Name) or side:FindFirstChild(LocalPlayer.DisplayName) then
+
+                    mySide = side.Name
+
+                    break
+
+                end
+
+            end
+
+        end
+
+        if not mySide then
+
+            cleanupAllClones()
+
+            return
+
+        end
+
+
+
+        local fields = ui.Game.Fields[mySide].Inner
+
+
+
+        for i = 1, 4 do
+
+            local laneName = "Lane" .. i
+
+            local laneFrame = fields:FindFirstChild(laneName)
+
+            if laneFrame then
+
+                local notesFolder = laneFrame:FindFirstChild("Notes")
+
+                if notesFolder then
+
+                    for _, note in pairs(notesFolder:GetChildren()) do
+
+                        if note:IsA("GuiObject") then
+
+                            -- Görsel kopyayı oluştur / bul
+
+                            local clone = visualClones[note]
+
+                            if not clone then
+
+                                clone = note:Clone()
+
+                                clone.Name = "FunClone"
+
+                                -- Gereksiz kodları temizle
+
+                                for _, child in pairs(clone:GetChildren()) do
+
+                                    if child:IsA("LocalScript") or child:IsA("Script") then
+
+                                        child:Destroy()
+
+                                    end
+
+                                end
+
+                                clone.Parent = note.Parent
+
+                                clone.ZIndex = note.ZIndex + 1
+
+                                -- Orijinal notayı görünmez yap (autoplay algılaması için hala burada)
+
+                                note.BackgroundTransparency = 1
+
+                                note.ImageTransparency = 1
+
+                                note.TextTransparency = 1
+
+                                visualClones[note] = clone
+
+                            end
+
+
+
+                            -- Kopyayı orijinalin konumuna sıfırla
+
+                            clone.Position = note.Position
+
+
+
+                            -- Uygulanacak efektler
+
+                            if funEffects.shake then
+
+                                local offsetX = math.random(-3, 3)
+
+                                local offsetY = math.random(-3, 3)
+
+                                clone.Position = clone.Position + UDim2.new(0, offsetX, 0, offsetY)
+
+                            end
+
+
+
+                            if funEffects.wave then
+
+                                local waveOffset = math.sin(tick() * 10 + note.AbsolutePosition.Y * 0.1) * 5
+
+                                clone.Position = clone.Position + UDim2.new(0, 0, 0, waveOffset)
+
+                            end
+
+
+
+                            if funEffects.drift then
+
+                                local driftX = math.sin(tick() * 2 + i) * 20
+
+                                clone.Position = clone.Position + UDim2.new(0, driftX, 0, 0)
+
+                            end
+
+
+
+                            if funEffects.rgb then
+
+                                local hue = (tick() * 0.5) % 1
+
+                                clone.BackgroundColor3 = Color3.fromHSV(hue, 1, 1)
+
+                                if clone:IsA("ImageLabel") then
+
+                                    clone.ImageColor3 = Color3.fromHSV(hue, 1, 1)
+
+                                end
+
+                            end
+
+                        end
+
+                    end
+
+
+
+                    -- Silinmiş notaların kopyalarını temizle
+
+                    for note, clone in pairs(visualClones) do
+
+                        if not note.Parent or note.Parent ~= notesFolder then
+
+                            clone:Destroy()
+
+                            visualClones[note] = nil
+
+                        end
+
+                    end
+
+                end
+
+            end
+
+        end
+
+    end)
+
+
+
+    -- ==========================================
+
     -- 3. MISC & OPTIMIZATION
 
     -- ==========================================
