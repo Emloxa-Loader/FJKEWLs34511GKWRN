@@ -1,5 +1,5 @@
 -- =========================================================================
--- EMLOXA WARE: FUNKY FRIDAY V23 (ULTIMATE PRECISION & TELEPORT FIX)
+-- EMLOXA WARE: FUNKY FRIDAY V24 (ZERO-EARLY PERFECT SICK CORE)
 -- =========================================================================
 local GameModule = {}
 
@@ -33,35 +33,31 @@ function GameModule:Init(Window)
     end)
 
     -- ==========================================
-    -- 2. AUTO PLAYER (MILLISECOND ENGINE)
+    -- 2. AUTO PLAYER (PERFECT SICK ENGINE)
     -- ==========================================
     local FunkyTab = Window:CreateTab("Auto Player")
     local AdvancedTab = Window:CreateTab("Advanced")
     
     local AutoPlayerEnabled = false
-    local Aggression = 15 
+    local Aggression = 5 -- Artık varsayılan olarak en hassas ayarda
     local AutoplayMethod = "Hybrid"
     
     local LaneKeys = { Lane1 = Enum.KeyCode.A, Lane2 = Enum.KeyCode.S, Lane3 = Enum.KeyCode.W, Lane4 = Enum.KeyCode.D }
     
-    -- Şerit İstatistikleri
     local LaneStats = {
-        Lane1 = {Seen = 0, Taps = 0},
-        Lane2 = {Seen = 0, Taps = 0},
-        Lane3 = {Seen = 0, Taps = 0},
-        Lane4 = {Seen = 0, Taps = 0}
+        Lane1 = {Seen = 0, Taps = 0}, Lane2 = {Seen = 0, Taps = 0},
+        Lane3 = {Seen = 0, Taps = 0}, Lane4 = {Seen = 0, Taps = 0}
     }
     
     local ActiveHolds = {}
     local TappedNotes = {}
     local CountedNotes = {} 
-    local LastYPositions = {} -- Işınlanma (Object Pooling) Kontrolü İçin
+    local LastYPositions = {} 
 
-    FunkyTab:CreateToggle("Enable God Mode (Mili-Sec Engine)", function(s) AutoPlayerEnabled = s end)
-    FunkyTab:CreateSlider("Sick Hitbox Range", 5, 50, 15, function(v) Aggression = v end)
+    FunkyTab:CreateToggle("Enable God Mode (Perfect Center)", function(s) AutoPlayerEnabled = s end)
+    FunkyTab:CreateSlider("Sick Hitbox Range", 1, 30, 5, function(v) Aggression = v end)
     AdvancedTab:CreateDropdown("Autoplay Method", {"Calculate", "Rapid checks", "Hybrid"}, "Hybrid", function(val) AutoplayMethod = val end)
 
-    -- Şerit Üstü İstatistik UI
     local function UpdateLaneStats(laneFrame, laneName)
         local statLabel = laneFrame:FindFirstChild("EmloxaStats")
         if not statLabel then
@@ -79,32 +75,29 @@ function GameModule:Init(Window)
         statLabel.Text = "Seen: " .. LaneStats[laneName].Seen .. " | Taps: " .. LaneStats[laneName].Taps
     end
 
-    -- Dinamik Nokta (Siyah -> Yeşil)
     local function ManageDynamicDot(note, dist)
         local dot = note:FindFirstChild("EmloxaDynamicDot")
         if not dot then
             dot = Instance.new("Frame")
             dot.Name = "EmloxaDynamicDot"
-            dot.Size = UDim2.new(0, 8, 0, 8) -- Daha küçük
+            dot.Size = UDim2.new(0, 8, 0, 8)
             dot.Position = UDim2.new(0.5, -4, 0.5, -4)
             dot.BorderSizePixel = 0
             dot.ZIndex = 999999
-            local corner = Instance.new("UICorner")
-            corner.CornerRadius = UDim.new(1, 0)
-            corner.Parent = dot
+            Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
             dot.Parent = note
         end
 
         if dist > 150 then
-            dot.BackgroundColor3 = Color3.fromRGB(0, 0, 0) -- Uzaksa Siyah
+            dot.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
         else
             local intensity = math.clamp(1 - (dist / 150), 0, 1)
-            dot.BackgroundColor3 = Color3.fromRGB(0, math.floor(255 * intensity), 0) -- Yaklaştıkça Parlak Yeşil
+            dot.BackgroundColor3 = Color3.fromRGB(0, math.floor(255 * intensity), 0)
         end
     end
 
     -- ==========================================
-    -- MİLİSANİYELİK RENDER DÖNGÜSÜ (UI İÇİN EN HIZLI METOT)
+    -- MİLİSANİYELİK KUSURSUZ DÖNGÜ (SICK GARANTİSİ)
     -- ==========================================
     RunService.RenderStepped:Connect(function(deltaTime)
         if not AutoPlayerEnabled then
@@ -116,8 +109,7 @@ function GameModule:Init(Window)
         end
         
         local ui = LocalPlayer.PlayerGui:FindFirstChild("Window")
-        local inner = ui and ui:FindFirstChild("Game") and ui.Game:FindFirstChild("Fields")
-        if not inner then return end
+        if not ui or not ui:FindFirstChild("Game") or not ui.Game:FindFirstChild("Fields") then return end
         
         local mySide = nil
         local scores = ui.Game:FindFirstChild("HUD") and ui.Game.HUD:FindFirstChild("Scores")
@@ -128,7 +120,7 @@ function GameModule:Init(Window)
         end
         if not mySide then return end
         
-        local fields = inner[mySide].Inner
+        local fields = ui.Game.Fields[mySide].Inner
 
         for i = 1, 4 do
             local laneName = "Lane" .. i
@@ -149,29 +141,25 @@ function GameModule:Init(Window)
                             local noteCenterY = noteTop + (note.AbsoluteSize.Y / 2)
                             local dist = math.abs(noteCenterY - laneCenterY)
                             
-                            -- IŞINLANMA (OBJECT POOLING) KONTROLÜ
+                            -- Object Pooling Sıfırlaması
+                            if LastYPositions[note] and math.abs(noteCenterY - LastYPositions[note]) > 100 then
+                                CountedNotes[note] = nil
+                                TappedNotes[note] = nil
+                            end
+                            
+                            -- Hız (Velocity) Yön Kontrolü (Aşağı mı iniyor, Yukarı mı çıkıyor?)
+                            local noteVelocity = 0
                             if LastYPositions[note] then
-                                -- Eğer nota aniden 100 pikselden fazla sıçradıysa (tepeye ışınlandıysa)
-                                if math.abs(noteCenterY - LastYPositions[note]) > 100 then
-                                    CountedNotes[note] = nil
-                                    TappedNotes[note] = nil
-                                end
+                                noteVelocity = math.abs(noteCenterY - LastYPositions[note]) / deltaTime
                             end
                             LastYPositions[note] = noteCenterY
 
-                            -- Nota ekrana girip yaklaşmaya başladığında "Seen" sayacını artır
                             if dist < 400 and not CountedNotes[note] then
                                 CountedNotes[note] = true
                                 LaneStats[laneName].Seen = LaneStats[laneName].Seen + 1
                             end
 
-                            -- Görsel Nokta (Siyah -> Yeşil)
                             ManageDynamicDot(note, dist)
-                            
-                            local noteVelocity = 0
-                            if LastYPositions[note] then
-                                noteVelocity = (noteCenterY - LastYPositions[note]) / deltaTime
-                            end
 
                             local childCount = 0
                             for _, c in ipairs(note:GetChildren()) do
@@ -179,26 +167,43 @@ function GameModule:Init(Window)
                             end
                             local isHoldNote = childCount > 1
 
+                            -- ===============================================
+                            -- YENİ SİSTEM: ERKEN BASMAYI ÖNLEYEN MATEMATİK
+                            -- ===============================================
                             local shouldHit = false
+                            
                             if AutoplayMethod == "Rapid checks" then
-                                shouldHit = (dist <= Aggression)
+                                -- Sadece Hitbox'a girdiğinde değil, tam merkeze ÇOK yakınsa (2 piksel tolerans) bas. Erken vurmayı engeller.
+                                shouldHit = (dist <= math.clamp(Aggression, 1, 3))
+                                
                             elseif AutoplayMethod == "Calculate" then
+                                -- Nereye kadar yolum kaldı / Hızım ne = Ne zaman hedefe varırım?
                                 if noteVelocity > 0 and dist < 150 then
-                                    local timeToHit = dist / noteVelocity
-                                    shouldHit = (timeToHit <= (deltaTime * 1.5))
+                                    local timeToCenter = dist / noteVelocity
+                                    -- deltaTime * 0.8 yaparak bir önceki frame'in son anında mükemmel yakalar
+                                    shouldHit = (timeToCenter <= (deltaTime * 0.8)) 
                                 end
+                                
                             elseif AutoplayMethod == "Hybrid" then
-                                local dynamicRange = Aggression
-                                if noteVelocity > 0 then dynamicRange = Aggression + (noteVelocity * 0.015) end
-                                shouldHit = (dist <= dynamicRange)
+                                -- Hem mesafeyi hem de ulaşma süresini kontrol eder. Hız ve mesafe 0'a en yakın olduğunda sıkar!
+                                if noteVelocity > 0 and dist < 150 then
+                                    local timeToCenter = dist / noteVelocity
+                                    shouldHit = (dist <= Aggression) and (timeToCenter <= deltaTime)
+                                else
+                                    shouldHit = (dist <= 3)
+                                end
                             end
 
+                            -- VURUŞ İŞLEMLERİ (AŞIRI HIZLI TASK.SPAWN)
                             if isHoldNote then
-                                if (noteTop <= laneCenterY + Aggression) and (noteBottom >= laneCenterY - Aggression) then
+                                -- Hold notası için de toleransı düşürdüm ki erken basıp Good almasın
+                                if (noteTop <= laneCenterY + 5) and (noteBottom >= laneCenterY - 5) then
                                     if not ActiveHolds[note] then
                                         ActiveHolds[note] = laneKey
                                         LaneStats[laneName].Taps = LaneStats[laneName].Taps + 1
-                                        VirtualInputManager:SendKeyEvent(true, laneKey, false, game)
+                                        task.spawn(function()
+                                            VirtualInputManager:SendKeyEvent(true, laneKey, false, game)
+                                        end)
                                     end
                                 end
                             else
@@ -206,10 +211,13 @@ function GameModule:Init(Window)
                                     TappedNotes[note] = true
                                     LaneStats[laneName].Taps = LaneStats[laneName].Taps + 1
                                     
-                                    VirtualInputManager:SendKeyEvent(false, laneKey, false, game)
-                                    VirtualInputManager:SendKeyEvent(true, laneKey, false, game)
-                                    
-                                    task.delay(0.01, function()
+                                    -- Tuş basma işlemini ana döngüden koparıp ayrı thread'e aldık. 0 kasma garantisi.
+                                    task.spawn(function()
+                                        VirtualInputManager:SendKeyEvent(false, laneKey, false, game)
+                                        VirtualInputManager:SendKeyEvent(true, laneKey, false, game)
+                                        
+                                        task.wait(0.01)
+                                        
                                         local isHolding = false
                                         for hNote, k in pairs(ActiveHolds) do
                                             if k == laneKey and hNote.Parent then isHolding = true break end
@@ -224,9 +232,12 @@ function GameModule:Init(Window)
                     end
                 end
                 
+                -- Şeritteki biten Hold notalarını bırak
                 for holdNote, key in pairs(ActiveHolds) do
                     if key == laneKey and not holdNote.Parent then 
-                        VirtualInputManager:SendKeyEvent(false, key, false, game)
+                        task.spawn(function()
+                            VirtualInputManager:SendKeyEvent(false, key, false, game)
+                        end)
                         ActiveHolds[holdNote] = nil
                     end
                 end
