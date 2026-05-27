@@ -1,5 +1,5 @@
 -- =========================================================================
--- EMLOXA WARE: FUNKY FRIDAY V26 (ABSOLUTE FLAWLESS & GHOST-WIPE CORE)
+-- EMLOXA WARE: FUNKY FRIDAY V27 (ROLLBACK TO PERFECT V25 + INSTA-WIPE)
 -- =========================================================================
 local GameModule = {}
 
@@ -8,7 +8,6 @@ function GameModule:Init(Window)
     local RunService = game:GetService("RunService")
     local VirtualInputManager = game:GetService("VirtualInputManager")
     local LocalPlayer = Players.LocalPlayer
-    local Camera = workspace.CurrentCamera
 
     -- ==========================================
     -- 1. LOCAL PLAYER SEKME
@@ -34,7 +33,7 @@ function GameModule:Init(Window)
     end)
 
     -- ==========================================
-    -- 2. AUTO PLAYER (GHOST-WIPE ENGINE)
+    -- 2. AUTO PLAYER (PERFECT ENGINE)
     -- ==========================================
     local FunkyTab = Window:CreateTab("Auto Player")
     local AdvancedTab = Window:CreateTab("Advanced")
@@ -55,7 +54,7 @@ function GameModule:Init(Window)
     local LastYPositions = {} 
     local LastNoteSeenTime = tick()
 
-    FunkyTab:CreateToggle("Enable God Mode (No Miss Guarantee)", function(s) AutoPlayerEnabled = s end)
+    FunkyTab:CreateToggle("Enable God Mode (Flawless V27)", function(s) AutoPlayerEnabled = s end)
     AdvancedTab:CreateDropdown("Autoplay Method", {"Calculate", "Rapid checks", "Hybrid"}, "Hybrid", function(val) AutoplayMethod = val end)
 
     local function UpdateLaneStats(laneFrame, laneName)
@@ -88,16 +87,16 @@ function GameModule:Init(Window)
             dot.Parent = note
         end
 
-        if dist > 200 then
+        if dist > 150 then
             dot.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
         else
-            local intensity = math.clamp(1 - (dist / 200), 0, 1)
+            local intensity = math.clamp(1 - (dist / 150), 0, 1)
             dot.BackgroundColor3 = Color3.fromRGB(0, math.floor(255 * intensity), 0)
         end
     end
 
     -- ==========================================
-    -- MİLİSANİYELİK KUSURSUZ TARAMA DÖNGÜSÜ
+    -- MİLİSANİYELİK KUSURSUZ DÖNGÜ
     -- ==========================================
     RunService.RenderStepped:Connect(function(deltaTime)
         if not AutoPlayerEnabled then return end
@@ -131,68 +130,59 @@ function GameModule:Init(Window)
                 if notesFolder then
                     for _, note in pairs(notesFolder:GetChildren()) do
                         if note:IsA("GuiObject") then
+                            anyNoteSeenThisFrame = true
+                            LastNoteSeenTime = tick()
+
                             local noteTop = note.AbsolutePosition.Y
                             local noteBottom = noteTop + note.AbsoluteSize.Y
                             local noteCenterY = noteTop + (note.AbsoluteSize.Y / 2)
                             local dist = math.abs(noteCenterY - laneCenterY)
-
-                            -- ===============================================
-                            -- 1. DEPO (WIPE) KONTROLÜ - HAYALET NOTA ÇÖZÜMÜ
-                            -- ===============================================
-                            -- Eğer nota merkeze 1000 pikselden daha uzaksa (oyun onu saklıyorsa) hafızasını tamamen sil!
-                            if dist > 1000 then
-                                if CountedNotes[note] then
-                                    CountedNotes[note] = nil
-                                    TappedNotes[note] = nil
-                                    ActiveHolds[note] = nil
-                                    LastYPositions[note] = nil
-                                end
-                                continue -- Bu notayı çok uzakta olduğu için işlemeye gerek yok
-                            end
-
-                            -- Eğer buraya ulaştıysa nota 1000 pikselin içine (ekrana) girmiştir.
-                            anyNoteSeenThisFrame = true
-                            LastNoteSeenTime = tick()
-
-                            -- ===============================================
-                            -- 2. SEEN SAYACI (ANINDA YAKALAMA)
-                            -- ===============================================
-                            if not CountedNotes[note] then
-                                CountedNotes[note] = true
-                                LaneStats[laneName].Seen = LaneStats[laneName].Seen + 1
-                            end
-
-                            ManageDynamicDot(note, dist)
                             
+                            -- ===============================================
+                            -- KUSURSUZ HAFIZA SİLİCİ (TELEPORT ALGILAYICI)
+                            -- ===============================================
+                            -- Eğer nota bir önceki kareye göre 50 pikselden fazla sıçradıysa ışınlanmıştır!
+                            if LastYPositions[note] and math.abs(noteCenterY - LastYPositions[note]) > 50 then
+                                CountedNotes[note] = nil
+                                TappedNotes[note] = nil
+                                ActiveHolds[note] = nil
+                            end
+                            
+                            -- Hız Hesaplama
                             local noteVelocity = 0
                             if LastYPositions[note] then
                                 noteVelocity = math.abs(noteCenterY - LastYPositions[note]) / deltaTime
                             end
                             LastYPositions[note] = noteCenterY
 
+                            -- SEEN SAYACI (Doğduğu an tık diye sayar)
+                            if not CountedNotes[note] then
+                                CountedNotes[note] = true
+                                LaneStats[laneName].Seen = LaneStats[laneName].Seen + 1
+                            end
+
+                            ManageDynamicDot(note, dist)
+
+                            -- Hold Notası Tespiti
                             local childCount = 0
                             for _, c in ipairs(note:GetChildren()) do
                                 if c.Name ~= "EmloxaDynamicDot" then childCount = childCount + 1 end
                             end
                             local isHoldNote = (childCount > 1) or (note.AbsoluteSize.Y > note.AbsoluteSize.X * 1.5)
 
-                            -- ===============================================
-                            -- 3. VURUŞ MATEMATİĞİ (SICK GARANTİSİ)
-                            -- ===============================================
+                            -- V25'in Kusursuz Merkez (Sick) Matematiği
                             local shouldHit = false
                             local frameTravel = noteVelocity * deltaTime
                             
                             if AutoplayMethod == "Rapid checks" then
-                                shouldHit = (dist <= 3)
+                                shouldHit = (dist <= 3) 
                             elseif AutoplayMethod == "Calculate" then
-                                shouldHit = (dist <= math.max(2, frameTravel / 1.2))
+                                shouldHit = (dist <= math.max(2, frameTravel / 1.5))
                             elseif AutoplayMethod == "Hybrid" then
-                                shouldHit = (dist <= math.max(3, frameTravel))
+                                shouldHit = (dist <= math.max(3, frameTravel / 1.2))
                             end
 
-                            -- ===============================================
-                            -- 4. TUŞ ŞOKLAMA (Sıfır Gecikme)
-                            -- ===============================================
+                            -- VURUŞ İŞLEMLERİ (Şoklama)
                             if shouldHit and not TappedNotes[note] then
                                 TappedNotes[note] = true
                                 LaneStats[laneName].Taps = LaneStats[laneName].Taps + 1
@@ -222,7 +212,7 @@ function GameModule:Init(Window)
                             
                             -- Hold Notası Kuyruk Bırakma
                             if isHoldNote and TappedNotes[note] then
-                                if noteBottom < laneCenterY - 15 then 
+                                if noteBottom < laneCenterY - 10 then 
                                     if ActiveHolds[note] then
                                         task.spawn(function()
                                             VirtualInputManager:SendKeyEvent(false, laneKey, false, game)
@@ -235,6 +225,7 @@ function GameModule:Init(Window)
                     end
                 end
                 
+                -- Hata Payı Temizliği
                 for holdNote, key in pairs(ActiveHolds) do
                     if key == laneKey and not holdNote.Parent then 
                         task.spawn(function()
