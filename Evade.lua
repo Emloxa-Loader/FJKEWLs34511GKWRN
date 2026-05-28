@@ -1,6 +1,6 @@
 -- =========================================================================
 -- EMLOXA WARE: EVADE (PLACE ID: 9872472334)
--- BUILT FROM SCRATCH | VECTOR & CFRAME ENGINE | MAXIMUM FEATURES
+-- SIMPLE & STABLE CORE | NO CRASHES | FULL FEATURES
 -- =========================================================================
 local GameModule = {}
 
@@ -10,6 +10,7 @@ function GameModule:Init(Window)
     local UserInputService = game:GetService("UserInputService")
     local RunService = game:GetService("RunService")
     local VirtualInputManager = game:GetService("VirtualInputManager")
+    local VirtualUser = game:GetService("VirtualUser")
     local Workspace = game:GetService("Workspace")
     local Lighting = game:GetService("Lighting")
     local LocalPlayer = Players.LocalPlayer
@@ -19,29 +20,41 @@ function GameModule:Init(Window)
     -- ==========================================
     local Connections = {}
     local ActiveESPs = {}
+    
     local Settings = {
         Movement = { 
             SpeedEnabled = false, SpeedValue = 25, 
             JumpEnabled = false, JumpPower = 50, 
-            InfJump = false, AutoBhop = false, EmoteDash = false
+            AutoBhop = false, EmoteDash = false
         },
         Exploits = { 
             AutoReviveSelf = false, AutoReviveAura = false, 
-            AutoVote = false, MapNumber = 1 
+            AutoVote = false, MapNumber = 1, LastReviveCheck = 0
         },
         Visuals = { 
-            PlayerESP = false, BotESP = false, TicketESP = false, DownedColor = true 
+            PlayerESP = false, BotESP = false, TicketESP = false, DownedColor = true, Distance = true
         },
         World = { 
             FullBright = false, NoFog = false, FOV = 70, ThirdPerson = false 
+        },
+        Misc = {
+            AntiAFK = true
         }
     }
 
     local IsHoldingSpace = false
     local Camera = Workspace.CurrentCamera
 
+    -- Orijinal Ayarları Kaydetme
+    local OrigLighting = {
+        Brightness = Lighting.Brightness,
+        Ambient = Lighting.Ambient,
+        GlobalShadows = Lighting.GlobalShadows,
+        FogEnd = Lighting.FogEnd
+    }
+
     -- ==========================================
-    -- YARDIMCI FONKSİYONLAR (KUSURSUZ ESP)
+    -- YARDIMCI FONKSİYONLAR (ESP SİSTEMİ)
     -- ==========================================
     local function CreateESP(target, nameText, color, attachPart, yOffset)
         if not target or not attachPart or target:FindFirstChild("EmloxaESP") then return end
@@ -76,22 +89,21 @@ function GameModule:Init(Window)
     end
 
     -- ==========================================
-    -- SEKME 1: MOVEMENT (EVADE FİZİKLERİNİ EZEN MOTOR)
+    -- SEKME 1: MOVEMENT (BASİT VE HATASIZ)
     -- ==========================================
     local MoveTab = Window:CreateTab("Movement")
     
-    MoveTab:CreateToggle("True Speed (Bypasses Evade)", function(s) Settings.Movement.SpeedEnabled = s end)
-    MoveTab:CreateSlider("Speed Multiplier", 1, 100, 25, function(v) Settings.Movement.SpeedValue = v end)
+    MoveTab:CreateToggle("Enable WalkSpeed", function(s) Settings.Movement.SpeedEnabled = s end)
+    MoveTab:CreateSlider("WalkSpeed Value", 16, 150, 25, function(v) Settings.Movement.SpeedValue = v end)
     
     MoveTab:CreateDivider()
-    MoveTab:CreateToggle("True Jump (Vector Push)", function(s) Settings.Movement.JumpEnabled = s end)
-    MoveTab:CreateSlider("Jump Power", 50, 300, 50, function(v) Settings.Movement.JumpPower = v end)
-    MoveTab:CreateToggle("Infinite Jump (Fly basically)", function(s) Settings.Movement.InfJump = s end)
+    MoveTab:CreateToggle("Enable JumpPower", function(s) Settings.Movement.JumpEnabled = s end)
+    MoveTab:CreateSlider("JumpPower Value", 50, 300, 50, function(v) Settings.Movement.JumpPower = v end)
     
     MoveTab:CreateDivider()
-    MoveTab:CreateToggle("Auto Bhop (PC/Mobile Hold Jump)", function(s) Settings.Movement.AutoBhop = s end)
-    MoveTab:CreateToggle("Emote Dash Spam (OP Speed)", function(s) Settings.Movement.EmoteDash = s end)
-    
+    MoveTab:CreateToggle("Auto Bhop (Hold Space)", function(s) Settings.Movement.AutoBhop = s end)
+    MoveTab:CreateToggle("Emote Dash Spam (G + F)", function(s) Settings.Movement.EmoteDash = s end)
+
     -- ==========================================
     -- SEKME 2: EXPLOITS & AUTOMATION
     -- ==========================================
@@ -105,7 +117,7 @@ function GameModule:Init(Window)
     ExploitTab:CreateToggle("Auto Revive Loop (Self)", function(s) Settings.Exploits.AutoReviveSelf = s end)
     
     ExploitTab:CreateDivider()
-    ExploitTab:CreateToggle("Revive Aura (Heals players near you)", function(s) Settings.Exploits.AutoReviveAura = s end)
+    ExploitTab:CreateToggle("Revive Aura (Heals nearby players)", function(s) Settings.Exploits.AutoReviveAura = s end)
     
     ExploitTab:CreateDivider()
     ExploitTab:CreateDropdown("Select Map to Vote", {"Map 1", "Map 2", "Map 3", "Map 4"}, "Map 1", function(opt) 
@@ -122,6 +134,7 @@ function GameModule:Init(Window)
         if not s then for _, p in pairs(Players:GetPlayers()) do RemoveESP(p.Character) end end
     end)
     EspTab:CreateToggle("Highlight Downed Players (Red)", function(s) Settings.Visuals.DownedColor = s end)
+    EspTab:CreateToggle("Show Distance", function(s) Settings.Visuals.Distance = s end)
     
     EspTab:CreateDivider()
     EspTab:CreateToggle("NextBots ESP (Wallhack)", function(s) Settings.Visuals.BotESP = s
@@ -145,13 +158,13 @@ function GameModule:Init(Window)
     local WorldTab = Window:CreateTab("World")
     
     WorldTab:CreateToggle("FullBright (See in Dark)", function(s) Settings.World.FullBright = s
-        Lighting.Brightness = s and 5 or 1
+        Lighting.Brightness = s and 5 or OrigLighting.Brightness
         Lighting.GlobalShadows = not s
-        if s then Lighting.Ambient = Color3.fromRGB(255,255,255) else Lighting.Ambient = Color3.fromRGB(0,0,0) end
+        if s then Lighting.Ambient = Color3.fromRGB(255,255,255) else Lighting.Ambient = OrigLighting.Ambient end
     end)
     
     WorldTab:CreateToggle("No Fog", function(s) Settings.World.NoFog = s
-        Lighting.FogEnd = s and 999999 or 250
+        Lighting.FogEnd = s and 999999 or OrigLighting.FogEnd
     end)
     
     WorldTab:CreateSlider("Field of View (FOV)", 70, 120, 70, function(v) 
@@ -169,86 +182,86 @@ function GameModule:Init(Window)
     -- ==========================================
     local MiscTab = Window:CreateTab("Misc")
     
-    MiscTab:CreateButton("Bypass Anti-Cheat (Spoofer)", function()
-        -- Evade WalkSpeed taramalarını bozar
-        local mt = getrawmetatable(game)
-        setreadonly(mt, false)
-        local oldIndex = mt.__index
-        hookmetamethod(game, "__index", function(t, k)
-            if not checkcaller() and t:IsA("Humanoid") and (k == "WalkSpeed" or k == "JumpPower") then
-                return k == "WalkSpeed" and 16 or 50
-            end
-            return oldIndex(t, k)
-        end)
-        setreadonly(mt, true)
-        print("Emloxa: Evade Anti-Cheat Bypassed!")
-    end)
-
+    MiscTab:CreateToggle("Anti-AFK", function(s) Settings.Misc.AntiAFK = s end)
+    
     MiscTab:CreateButton("Unload EMLOXA WARE", function()
         for _, conn in pairs(Connections) do conn:Disconnect() end
         for _, p in pairs(Players:GetPlayers()) do RemoveESP(p.Character) end
         local f = Workspace:FindFirstChild("Game") and Workspace.Game:FindFirstChild("Players")
         if f then for _, b in pairs(f:GetChildren()) do RemoveESP(b) end end
+        
         if Camera then Camera.FieldOfView = 70 end
         LocalPlayer.CameraMaxZoomDistance = 128
         LocalPlayer.CameraMinZoomDistance = 0.5
+        Lighting.Brightness = OrigLighting.Brightness
+        Lighting.GlobalShadows = OrigLighting.GlobalShadows
+        Lighting.Ambient = OrigLighting.Ambient
+        Lighting.FogEnd = OrigLighting.FogEnd
+        
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            LocalPlayer.Character.Humanoid.WalkSpeed = 16
+            LocalPlayer.Character.Humanoid.JumpPower = 50
+        end
+
         local ui = game:GetService("CoreGui"):FindFirstChild("EmloxaWareUI") or LocalPlayer.PlayerGui:FindFirstChild("EmloxaWareUI")
         if ui then ui:Destroy() end
     end)
 
     -- ==========================================
-    -- EMLOXA KUSURSUZ MOTOR (HEARTBEAT & INPUT)
+    -- GİRDİ KONTROLLERİ (INPUTS)
     -- ==========================================
-
-    -- Input Taraması (Bhop & Inf Jump için)
     table.insert(Connections, UserInputService.InputBegan:Connect(function(input, gpe) 
         if gpe then return end
-        if input.KeyCode == Enum.KeyCode.Space then 
-            IsHoldingSpace = true 
-            -- Infinite Jump
-            if Settings.Movement.InfJump and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                LocalPlayer.Character.HumanoidRootPart.Velocity = Vector3.new(
-                    LocalPlayer.Character.HumanoidRootPart.Velocity.X, 
-                    Settings.Movement.JumpPower, 
-                    LocalPlayer.Character.HumanoidRootPart.Velocity.Z
-                )
-            end
-        end
+        if input.KeyCode == Enum.KeyCode.Space then IsHoldingSpace = true end
     end))
     
     table.insert(Connections, UserInputService.InputEnded:Connect(function(input) 
         if input.KeyCode == Enum.KeyCode.Space then IsHoldingSpace = false end 
     end))
 
-    table.insert(Connections, RunService.Heartbeat:Connect(function(deltaTime)
+    -- Anti-AFK Döngüsü
+    task.spawn(function()
+        while task.wait(60) do
+            if Settings.Misc.AntiAFK and LocalPlayer then
+                VirtualUser:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+                task.wait(0.1)
+                VirtualUser:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+            end
+        end
+    end)
+
+    -- ==========================================
+    -- ANA MOTOR DÖNGÜSÜ (BASİT VE HATASIZ)
+    -- ==========================================
+    table.insert(Connections, RunService.Heartbeat:Connect(function()
+        -- 1. KARAKTER VE FİZİK
         local char = LocalPlayer.Character
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                -- Basit WalkSpeed (CFrame hatası vermez)
+                if Settings.Movement.SpeedEnabled then
+                    hum.WalkSpeed = Settings.Movement.SpeedValue
+                end
+                
+                -- Basit JumpPower
+                if Settings.Movement.JumpEnabled then
+                    hum.UseJumpPower = true
+                    hum.JumpPower = Settings.Movement.JumpPower
+                end
 
-        -- 1. HAREKET FİZİKLERİ (C0 Hatalarını ve AC'yi Atlatır)
-        if hum and hrp then
-            -- True Speed (CFrame Delta ile Evade fiziklerini ezer, asla yürüme animasyonunu bozmaz)
-            if Settings.Movement.SpeedEnabled and hum.MoveDirection.Magnitude > 0 then
-                hrp.CFrame = hrp.CFrame + (hum.MoveDirection * (Settings.Movement.SpeedValue * deltaTime))
-            end
+                -- Basit Auto Bhop
+                if Settings.Movement.AutoBhop and IsHoldingSpace and hum.FloorMaterial ~= Enum.Material.Air then
+                    hum:ChangeState(Enum.HumanoidStateType.Jumping)
+                end
 
-            -- True Jump (Oyunun JumpPower sınırını Vektörel Güçle ezer)
-            if Settings.Movement.JumpEnabled and IsHoldingSpace and hum.FloorMaterial ~= Enum.Material.Air then
-                hrp.Velocity = Vector3.new(hrp.Velocity.X, Settings.Movement.JumpPower, hrp.Velocity.Z)
-            end
-
-            -- Auto Bhop
-            if Settings.Movement.AutoBhop and IsHoldingSpace and hum.FloorMaterial ~= Enum.Material.Air then
-                hum:ChangeState(Enum.HumanoidStateType.Jumping)
-            end
-
-            -- Emote Dash Spam (G ve F tuşlarını sanal olarak spamlar)
-            if Settings.Movement.EmoteDash and hum.MoveDirection.Magnitude > 0 then
-                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.G, false, game)
-                task.wait(0.05)
-                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
-                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.G, false, game)
-                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
+                -- Emote Dash (Spam)
+                if Settings.Movement.EmoteDash and hum.MoveDirection.Magnitude > 0 then
+                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.G, false, game)
+                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
+                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.G, false, game)
+                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
+                end
             end
         end
 
@@ -260,12 +273,11 @@ function GameModule:Init(Window)
             end
         end
 
-        if Settings.Exploits.AutoReviveAura and hrp then
-            -- Çevrendeki tüm Revive (Kaldırma) ProximityPrompt'larını otomatik tetikler
+        if Settings.Exploits.AutoReviveAura and char and char:FindFirstChild("HumanoidRootPart") then
             for _, prompt in pairs(Workspace:GetDescendants()) do
                 if prompt:IsA("ProximityPrompt") and prompt.ActionText:lower():match("revive") then
                     if prompt.Parent and prompt.Parent:IsA("BasePart") then
-                        if (prompt.Parent.Position - hrp.Position).Magnitude < 15 then
+                        if (prompt.Parent.Position - char.HumanoidRootPart.Position).Magnitude < 15 then
                             fireproximityprompt(prompt)
                         end
                     end
@@ -280,19 +292,16 @@ function GameModule:Init(Window)
             end
         end
 
-        -- 3. ESP VE GÖRSELLER (Tek Döngü Optimizasyonu)
+        -- 3. ESP VE GÖRSELLER
         if Settings.Visuals.PlayerESP then
             for _, p in pairs(Players:GetPlayers()) do
                 if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
                     local color = Color3.new(0.4, 0.8, 0.4)
                     local text = p.Name
-                    
-                    -- Yere Düşen Oyuncuları Kırmızı Göster
                     if Settings.Visuals.DownedColor and p.Character:GetAttribute("Downed") then
                         color = Color3.new(0.9, 0.1, 0.1)
                         text = p.Name .. " [DOWNED]"
                     end
-                    
                     CreateESP(p.Character, text, color, p.Character.HumanoidRootPart, 2)
                 end
             end
@@ -320,15 +329,18 @@ function GameModule:Init(Window)
             end
         end
 
-        -- ESP Etiketlerini ve Mesafelerini Güncelle
+        -- ESP Güncelleyici
         local camPos = Camera and Camera.CFrame.Position or Vector3.new(0,0,0)
         for i = #ActiveESPs, 1, -1 do
             local esp = ActiveESPs[i]
             if esp.Target and esp.Target.Parent and esp.Part and esp.Part.Parent then
-                local dist = math.floor((camPos - esp.Part.Position).Magnitude)
-                esp.Label.Text = esp.BaseText .. " [" .. dist .. "m]"
+                if Settings.Visuals.Distance then
+                    local dist = math.floor((camPos - esp.Part.Position).Magnitude)
+                    esp.Label.Text = esp.BaseText .. " [" .. dist .. "m]"
+                else
+                    esp.Label.Text = esp.BaseText
+                end
                 
-                -- Downed renk güncellemesi
                 if Settings.Visuals.DownedColor and esp.Target:GetAttribute("Downed") then
                     esp.Highlight.FillColor = Color3.new(0.9, 0.1, 0.1)
                     esp.Label.TextColor3 = Color3.new(0.9, 0.1, 0.1)
@@ -343,10 +355,7 @@ function GameModule:Init(Window)
             end
         end
 
-        -- FOV Koruması (Evade koşarken FOV'u zorla değiştirir, bunu kilitleriz)
-        if Settings.World.FOV ~= 70 and Camera then
-            Camera.FieldOfView = Settings.World.FOV
-        end
+        if Settings.World.FOV ~= 70 and Camera then Camera.FieldOfView = Settings.World.FOV end
     end))
 end
 
