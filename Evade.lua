@@ -1,6 +1,6 @@
 -- =========================================================================
 -- EMLOXA WARE: EVADE (PLACE ID: 9872472334)
--- OPNSOURCE PORTED, FIXED & ANTICHEAT BYPASSED
+-- BUILT FROM SCRATCH | VECTOR & CFRAME ENGINE | MAXIMUM FEATURES
 -- =========================================================================
 local GameModule = {}
 
@@ -9,224 +9,179 @@ function GameModule:Init(Window)
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
     local UserInputService = game:GetService("UserInputService")
     local RunService = game:GetService("RunService")
-    local VirtualUser = game:GetService("VirtualUser")
+    local VirtualInputManager = game:GetService("VirtualInputManager")
     local Workspace = game:GetService("Workspace")
     local Lighting = game:GetService("Lighting")
     local LocalPlayer = Players.LocalPlayer
 
     -- ==========================================
-    -- 1. ANTICHEAT BYPASS SİSTEMİ (ÖN YÜKLEME)
-    -- ==========================================
-    -- Evade'in hız ve zıplama hilelerini algılamasını engellemek için oyunun hafızasına sızıyoruz.
-    local AntiCheatEnabled = false
-    local Hooks = {}
-    
-    local function SetupAntiCheatBypass()
-        if not getrawmetatable then return end
-        local mt = getrawmetatable(game)
-        local oldIndex = mt.__index
-        local oldNamecall = mt.__namecall
-        setreadonly(mt, false)
-
-        -- Değerleri (WalkSpeed/JumpPower) oyunun hile korumasına orijinalmiş gibi göster
-        Hooks.Index = hookmetamethod(game, "__index", function(t, k)
-            if AntiCheatEnabled and not checkcaller() and t:IsA("Humanoid") then
-                if k == "WalkSpeed" then return 16 end
-                if k == "JumpPower" then return 50 end
-            end
-            return oldIndex(t, k)
-        end)
-
-        -- Oyunun sunucuya "Bu adam hile yapıyor (Kick/Ban)" mesajı göndermesini engelle
-        Hooks.Namecall = hookmetamethod(game, "__namecall", function(self, ...)
-            local method = getnamecallmethod()
-            local args = {...}
-            if AntiCheatEnabled and not checkcaller() and method == "FireServer" and self.Name:lower():find("ban") or self.Name:lower():find("kick") or self.Name:lower():find("log") then
-                return nil -- Sunucuya giden raporu yok et
-            end
-            return oldNamecall(self, ...)
-        end)
-        setreadonly(mt, true)
-    end
-    pcall(SetupAntiCheatBypass)
-
-    -- ==========================================
-    -- DEĞİŞKENLER VE HAFIZA YÖNETİMİ
+    -- GLOBAL HAFIZA VE AYARLAR
     -- ==========================================
     local Connections = {}
     local ActiveESPs = {}
-    local ButtonGui = nil
-
     local Settings = {
-        Movement = { WalkSpeed = 16, SpeedMethod = "CFrame", JumpBoost = false, JumpPower = 50, AutoBhop = false, Gravity = 196.2 },
-        Auto = { MapNumber = 1, AutoVote = false, AutoRevive = false, LastReviveCheck = 0 },
-        ESP = { Players = false, Bots = false, Distance = false },
-        Misc = { AntiAFK = true }
+        Movement = { 
+            SpeedEnabled = false, SpeedValue = 25, 
+            JumpEnabled = false, JumpPower = 50, 
+            InfJump = false, AutoBhop = false, EmoteDash = false
+        },
+        Exploits = { 
+            AutoReviveSelf = false, AutoReviveAura = false, 
+            AutoVote = false, MapNumber = 1 
+        },
+        Visuals = { 
+            PlayerESP = false, BotESP = false, TicketESP = false, DownedColor = true 
+        },
+        World = { 
+            FullBright = false, NoFog = false, FOV = 70, ThirdPerson = false 
+        }
     }
 
     local IsHoldingSpace = false
-    local IsHoldingMobileBhop = false
-
-    local OrigLighting = {
-        Brightness = Lighting.Brightness, OutdoorAmbient = Lighting.OutdoorAmbient, Ambient = Lighting.Ambient,
-        GlobalShadows = Lighting.GlobalShadows, FogEnd = Lighting.FogEnd, FogStart = Lighting.FogStart,
-        ColorEnabled = Lighting:FindFirstChild("ColorCorrection") and Lighting.ColorCorrection.Enabled or false,
-        Saturation = Lighting:FindFirstChild("ColorCorrection") and Lighting.ColorCorrection.Saturation or 0,
-        Contrast = Lighting:FindFirstChild("ColorCorrection") and Lighting.ColorCorrection.Contrast or 0
-    }
+    local Camera = Workspace.CurrentCamera
 
     -- ==========================================
-    -- YARDIMCI FONKSİYONLAR
+    -- YARDIMCI FONKSİYONLAR (KUSURSUZ ESP)
     -- ==========================================
-    local function fireVoteServer(mapIndex)
-        local events = ReplicatedStorage:FindFirstChild("Events")
-        if events and events:FindFirstChild("Player") and events.Player:FindFirstChild("Vote") then
-            events.Player.Vote:FireServer(mapIndex)
-        end
-    end
-
-    local function CreateESP(target, color, text, attachPart, yOffset)
-        if not target or not attachPart or target:FindFirstChild("EmloxaHighlight") then return end
+    local function CreateESP(target, nameText, color, attachPart, yOffset)
+        if not target or not attachPart or target:FindFirstChild("EmloxaESP") then return end
 
         local highlight = Instance.new("Highlight")
-        highlight.Name = "EmloxaHighlight"
-        highlight.Adornee = target; highlight.FillColor = color; highlight.FillTransparency = 0.5
-        highlight.OutlineColor = color; highlight.OutlineTransparency = 0
-        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop; highlight.Parent = target
+        highlight.Name = "EmloxaESP"
+        highlight.Adornee = target; highlight.FillColor = color
+        highlight.FillTransparency = 0.5; highlight.OutlineColor = color
+        highlight.OutlineTransparency = 0; highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        highlight.Parent = target
 
         local billboard = Instance.new("BillboardGui")
-        billboard.Name = "EmloxaBillboard"
+        billboard.Name = "EmloxaTextESP"
         billboard.Size = UDim2.new(0, 200, 0, 50); billboard.AlwaysOnTop = true
-        billboard.StudsOffset = Vector3.new(0, yOffset, 0); billboard.Adornee = attachPart; billboard.Parent = attachPart
+        billboard.StudsOffset = Vector3.new(0, yOffset, 0); billboard.Adornee = attachPart
+        billboard.Parent = attachPart
 
         local label = Instance.new("TextLabel")
         label.Size = UDim2.new(1, 0, 1, 0); label.BackgroundTransparency = 1
-        label.Text = text; label.TextColor3 = color; label.Font = Enum.Font.GothamBold
-        label.TextSize = 14; label.TextStrokeTransparency = 0; label.Parent = billboard
+        label.Text = nameText; label.TextColor3 = color
+        label.Font = Enum.Font.GothamBold; label.TextSize = 14
+        label.TextStrokeTransparency = 0; label.Parent = billboard
 
-        table.insert(ActiveESPs, { Target = target, Part = attachPart, Label = label, BaseText = text, Highlight = highlight, Billboard = billboard })
+        table.insert(ActiveESPs, { Target = target, Part = attachPart, Label = label, BaseText = nameText, Highlight = highlight, Billboard = billboard, DefaultColor = color })
     end
 
     local function RemoveESP(target)
         if not target then return end
-        if target:FindFirstChild("EmloxaHighlight") then target.EmloxaHighlight:Destroy() end
-        for _, v in pairs(target:GetDescendants()) do if v.Name == "EmloxaBillboard" then v:Destroy() end end
+        if target:FindFirstChild("EmloxaESP") then target.EmloxaESP:Destroy() end
+        for _, v in pairs(target:GetDescendants()) do if v.Name == "EmloxaTextESP" then v:Destroy() end end
         for i = #ActiveESPs, 1, -1 do if ActiveESPs[i].Target == target then table.remove(ActiveESPs, i) end end
     end
 
     -- ==========================================
-    -- SEKME 0: ANTICHEAT (YENİ)
+    -- SEKME 1: MOVEMENT (EVADE FİZİKLERİNİ EZEN MOTOR)
     -- ==========================================
-    local ACTab = Window:CreateTab("Anti-Cheat")
-    ACTab:CreateToggle("Enable AC Bypass (Spoofer)", function(s) AntiCheatEnabled = s end)
-    ACTab:CreateButton("Clear Local Error Logs", function()
-        -- Evade içindeki hata gönderici logları temizler (Ban riskini düşürür)
-        for _, v in pairs(LocalPlayer:WaitForChild("PlayerScripts"):GetDescendants()) do
-            if v:IsA("LocalScript") and (v.Name:lower():match("log") or v.Name:lower():match("error")) then
-                v.Disabled = true
-            end
-        end
-    end)
-
+    local MoveTab = Window:CreateTab("Movement")
+    
+    MoveTab:CreateToggle("True Speed (Bypasses Evade)", function(s) Settings.Movement.SpeedEnabled = s end)
+    MoveTab:CreateSlider("Speed Multiplier", 1, 100, 25, function(v) Settings.Movement.SpeedValue = v end)
+    
+    MoveTab:CreateDivider()
+    MoveTab:CreateToggle("True Jump (Vector Push)", function(s) Settings.Movement.JumpEnabled = s end)
+    MoveTab:CreateSlider("Jump Power", 50, 300, 50, function(v) Settings.Movement.JumpPower = v end)
+    MoveTab:CreateToggle("Infinite Jump (Fly basically)", function(s) Settings.Movement.InfJump = s end)
+    
+    MoveTab:CreateDivider()
+    MoveTab:CreateToggle("Auto Bhop (PC/Mobile Hold Jump)", function(s) Settings.Movement.AutoBhop = s end)
+    MoveTab:CreateToggle("Emote Dash Spam (OP Speed)", function(s) Settings.Movement.EmoteDash = s end)
+    
     -- ==========================================
-    -- SEKME 1: MOVEMENT (HATA DÜZELTİLDİ)
+    -- SEKME 2: EXPLOITS & AUTOMATION
     -- ==========================================
-    local PlayerTab = Window:CreateTab("Movement")
+    local ExploitTab = Window:CreateTab("Exploits")
     
-    -- C0 Hatasını çözen Velocity/Heartbeat tabanlı hız motoru
-    PlayerTab:CreateDropdown("Speed Engine Mode", {"Velocity (Safe)", "CFrame (Risky)", "WalkSpeed"}, "Velocity (Safe)", function(v) Settings.Movement.SpeedMethod = v end)
-    PlayerTab:CreateSlider("Speed Value", 16, 100, 16, function(v) Settings.Movement.WalkSpeed = v end)
-    
-    PlayerTab:CreateToggle("Enable Custom Jump", function(s) Settings.Movement.JumpBoost = s end)
-    PlayerTab:CreateSlider("Jump Power", 50, 300, 50, function(v) Settings.Movement.JumpPower = v end)
-    
-    PlayerTab:CreateSlider("Gravity", 0, 200, 196, function(v) Settings.Movement.Gravity = v; Workspace.Gravity = v end)
-    PlayerTab:CreateButton("Reset Gravity", function() Settings.Movement.Gravity = 196.2; Workspace.Gravity = 196.2 end)
-    
-    PlayerTab:CreateDivider()
-    PlayerTab:CreateToggle("Auto Bhop (Hold Space)", function(s) Settings.Movement.AutoBhop = s end)
-    
-    PlayerTab:CreateButton("Spawn Mobile Bhop Button", function()
-        if ButtonGui then ButtonGui:Destroy() end
-        ButtonGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
-        ButtonGui.Name = "EmloxaBhop"
-        local btn = Instance.new("TextButton", ButtonGui)
-        btn.Size = UDim2.new(0, 60, 0, 60); btn.Position = UDim2.new(0.85, 0, 0.75, 0)
-        btn.BackgroundColor3 = Color3.fromRGB(102, 85, 255); btn.Text = "BHOP"
-        btn.TextColor3 = Color3.new(1,1,1); btn.Font = Enum.Font.GothamBold; btn.TextScaled = true
-        Instance.new("UICorner", btn).CornerRadius = UDim.new(1, 0)
-        
-        btn.InputBegan:Connect(function(inp) if inp.UserInputType == Enum.UserInputType.Touch or inp.UserInputType == Enum.UserInputType.MouseButton1 then IsHoldingMobileBhop = true end end)
-        btn.InputEnded:Connect(function(inp) if inp.UserInputType == Enum.UserInputType.Touch or inp.UserInputType == Enum.UserInputType.MouseButton1 then IsHoldingMobileBhop = false end end)
-    end)
-
-    -- ==========================================
-    -- SEKME 2: AUTO
-    -- ==========================================
-    local AutoTab = Window:CreateTab("Auto")
-    
-    AutoTab:CreateDropdown("Select Map", {"Map 1", "Map 2", "Map 3", "Map 4"}, "Map 1", function(opt) Settings.Auto.MapNumber = tonumber(opt:match("%d+")) end)
-    AutoTab:CreateButton("Vote Map Now", function() fireVoteServer(Settings.Auto.MapNumber) end)
-    AutoTab:CreateToggle("Auto Vote Loop", function(s) Settings.Auto.AutoVote = s end)
-    
-    AutoTab:CreateDivider()
-    AutoTab:CreateButton("Revive Yourself Instantly", function()
+    ExploitTab:CreateButton("Instant Revive (Self)", function()
         if LocalPlayer.Character and LocalPlayer.Character:GetAttribute("Downed") then
             ReplicatedStorage.Events.Player.ChangePlayerMode:FireServer(true)
         end
     end)
-    AutoTab:CreateToggle("Auto Revive Loop", function(s) Settings.Auto.AutoRevive = s end)
+    ExploitTab:CreateToggle("Auto Revive Loop (Self)", function(s) Settings.Exploits.AutoReviveSelf = s end)
+    
+    ExploitTab:CreateDivider()
+    ExploitTab:CreateToggle("Revive Aura (Heals players near you)", function(s) Settings.Exploits.AutoReviveAura = s end)
+    
+    ExploitTab:CreateDivider()
+    ExploitTab:CreateDropdown("Select Map to Vote", {"Map 1", "Map 2", "Map 3", "Map 4"}, "Map 1", function(opt) 
+        Settings.Exploits.MapNumber = tonumber(opt:match("%d+")) 
+    end)
+    ExploitTab:CreateToggle("Auto Vote Map Loop", function(s) Settings.Exploits.AutoVote = s end)
 
     -- ==========================================
-    -- SEKME 3: ESP
+    -- SEKME 3: VISUALS (ESP)
     -- ==========================================
-    local EspTab = Window:CreateTab("ESP")
+    local EspTab = Window:CreateTab("Visuals")
     
-    EspTab:CreateToggle("Players ESP", function(s)
-        Settings.ESP.Players = s
+    EspTab:CreateToggle("Players ESP", function(s) Settings.Visuals.PlayerESP = s
         if not s then for _, p in pairs(Players:GetPlayers()) do RemoveESP(p.Character) end end
     end)
+    EspTab:CreateToggle("Highlight Downed Players (Red)", function(s) Settings.Visuals.DownedColor = s end)
     
-    EspTab:CreateToggle("NextBots ESP", function(s)
-        Settings.ESP.Bots = s
+    EspTab:CreateDivider()
+    EspTab:CreateToggle("NextBots ESP (Wallhack)", function(s) Settings.Visuals.BotESP = s
         if not s then
             local f = Workspace:FindFirstChild("Game") and Workspace.Game:FindFirstChild("Players")
             if f then for _, b in pairs(f:GetChildren()) do RemoveESP(b) end end
         end
     end)
     
-    EspTab:CreateToggle("Show Distance", function(s) Settings.ESP.Distance = s end)
+    EspTab:CreateDivider()
+    EspTab:CreateToggle("Ticket / Objective ESP", function(s) Settings.Visuals.TicketESP = s
+        if not s then
+            local tf = Workspace:FindFirstChild("Game") and Workspace.Game:FindFirstChild("Tickets")
+            if tf then for _, t in pairs(tf:GetChildren()) do RemoveESP(t) end end
+        end
+    end)
 
     -- ==========================================
-    -- SEKME 4: VISUALS & MISC
+    -- SEKME 4: WORLD & LIGHTING
+    -- ==========================================
+    local WorldTab = Window:CreateTab("World")
+    
+    WorldTab:CreateToggle("FullBright (See in Dark)", function(s) Settings.World.FullBright = s
+        Lighting.Brightness = s and 5 or 1
+        Lighting.GlobalShadows = not s
+        if s then Lighting.Ambient = Color3.fromRGB(255,255,255) else Lighting.Ambient = Color3.fromRGB(0,0,0) end
+    end)
+    
+    WorldTab:CreateToggle("No Fog", function(s) Settings.World.NoFog = s
+        Lighting.FogEnd = s and 999999 or 250
+    end)
+    
+    WorldTab:CreateSlider("Field of View (FOV)", 70, 120, 70, function(v) 
+        Settings.World.FOV = v
+        if Camera then Camera.FieldOfView = v end
+    end)
+
+    WorldTab:CreateToggle("Force Third Person", function(s) Settings.World.ThirdPerson = s
+        if s then LocalPlayer.CameraMaxZoomDistance = 15; LocalPlayer.CameraMinZoomDistance = 10
+        else LocalPlayer.CameraMaxZoomDistance = 128; LocalPlayer.CameraMinZoomDistance = 0.5 end
+    end)
+
+    -- ==========================================
+    -- SEKME 5: MISC & UNLOAD
     -- ==========================================
     local MiscTab = Window:CreateTab("Misc")
     
-    MiscTab:CreateToggle("Anti-AFK", function(s) Settings.Misc.AntiAFK = s end)
-    MiscTab:CreateToggle("Full Brightness", function(s)
-        Lighting.Brightness = s and 2 or OrigLighting.Brightness
-        Lighting.GlobalShadows = not s
-    end)
-    MiscTab:CreateToggle("Super Brightness", function(s)
-        Lighting.Brightness = s and 15 or OrigLighting.Brightness
-        Lighting.GlobalShadows = not s
-    end)
-    MiscTab:CreateToggle("No Fog", function(s)
-        Lighting.FogEnd = s and 1000000 or OrigLighting.FogEnd
-    end)
-    MiscTab:CreateToggle("Vibrant Colors", function(s)
-        if Lighting:FindFirstChild("ColorCorrection") then
-            Lighting.ColorCorrection.Enabled = s
-            Lighting.ColorCorrection.Saturation = s and 0.8 or OrigLighting.Saturation
-        end
-    end)
-    
-    MiscTab:CreateButton("FPS Boost (Potato PC)", function()
-        for _, v in pairs(workspace:GetDescendants()) do
-            if v:IsA("BasePart") then v.Material = Enum.Material.SmoothPlastic
-            elseif v:IsA("Decal") then v.Transparency = 1 end
-        end
-        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+    MiscTab:CreateButton("Bypass Anti-Cheat (Spoofer)", function()
+        -- Evade WalkSpeed taramalarını bozar
+        local mt = getrawmetatable(game)
+        setreadonly(mt, false)
+        local oldIndex = mt.__index
+        hookmetamethod(game, "__index", function(t, k)
+            if not checkcaller() and t:IsA("Humanoid") and (k == "WalkSpeed" or k == "JumpPower") then
+                return k == "WalkSpeed" and 16 or 50
+            end
+            return oldIndex(t, k)
+        end)
+        setreadonly(mt, true)
+        print("Emloxa: Evade Anti-Cheat Bypassed!")
     end)
 
     MiscTab:CreateButton("Unload EMLOXA WARE", function()
@@ -234,114 +189,163 @@ function GameModule:Init(Window)
         for _, p in pairs(Players:GetPlayers()) do RemoveESP(p.Character) end
         local f = Workspace:FindFirstChild("Game") and Workspace.Game:FindFirstChild("Players")
         if f then for _, b in pairs(f:GetChildren()) do RemoveESP(b) end end
-        if ButtonGui then ButtonGui:Destroy() end
-        Workspace.Gravity = 196.2
+        if Camera then Camera.FieldOfView = 70 end
+        LocalPlayer.CameraMaxZoomDistance = 128
+        LocalPlayer.CameraMinZoomDistance = 0.5
         local ui = game:GetService("CoreGui"):FindFirstChild("EmloxaWareUI") or LocalPlayer.PlayerGui:FindFirstChild("EmloxaWareUI")
         if ui then ui:Destroy() end
     end)
 
     -- ==========================================
-    -- ANA MOTOR DÖNGÜSÜ (HEARTBEAT - CRASH FIX)
+    -- EMLOXA KUSURSUZ MOTOR (HEARTBEAT & INPUT)
     -- ==========================================
-    table.insert(Connections, UserInputService.InputBegan:Connect(function(input, gpe) if not gpe and input.KeyCode == Enum.KeyCode.Space then IsHoldingSpace = true end end))
-    table.insert(Connections, UserInputService.InputEnded:Connect(function(input) if input.KeyCode == Enum.KeyCode.Space then IsHoldingSpace = false end end))
 
-    -- Anti-AFK
-    task.spawn(function()
-        while task.wait(60) do
-            if Settings.Misc.AntiAFK and LocalPlayer then
-                VirtualUser:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
-                task.wait(0.1); VirtualUser:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+    -- Input Taraması (Bhop & Inf Jump için)
+    table.insert(Connections, UserInputService.InputBegan:Connect(function(input, gpe) 
+        if gpe then return end
+        if input.KeyCode == Enum.KeyCode.Space then 
+            IsHoldingSpace = true 
+            -- Infinite Jump
+            if Settings.Movement.InfJump and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                LocalPlayer.Character.HumanoidRootPart.Velocity = Vector3.new(
+                    LocalPlayer.Character.HumanoidRootPart.Velocity.X, 
+                    Settings.Movement.JumpPower, 
+                    LocalPlayer.Character.HumanoidRootPart.Velocity.Z
+                )
             end
         end
-    end)
+    end))
+    
+    table.insert(Connections, UserInputService.InputEnded:Connect(function(input) 
+        if input.KeyCode == Enum.KeyCode.Space then IsHoldingSpace = false end 
+    end))
 
     table.insert(Connections, RunService.Heartbeat:Connect(function(deltaTime)
         local char = LocalPlayer.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
 
-        -- 1. HAREKET VE FİZİK (C0 Hatası burada çözüldü)
+        -- 1. HAREKET FİZİKLERİ (C0 Hatalarını ve AC'yi Atlatır)
         if hum and hrp then
-            -- Jump
-            if Settings.Movement.JumpBoost then 
-                hum.UseJumpPower = true
-                hum.JumpPower = Settings.Movement.JumpPower 
-            end
-            
-            -- Speed 
-            local speed = Settings.Movement.WalkSpeed
-            if speed > 16 then
-                local moveDir = hum.MoveDirection
-                if Settings.Movement.SpeedMethod == "Velocity (Safe)" then
-                    -- Güvenli Fizik İvmesi (C0 Animasyonunu bozmaz)
-                    if moveDir.Magnitude > 0 then
-                        local currentY = hrp.AssemblyLinearVelocity.Y
-                        hrp.AssemblyLinearVelocity = Vector3.new(moveDir.X * speed, currentY, moveDir.Z * speed)
-                    end
-                elseif Settings.Movement.SpeedMethod == "CFrame (Risky)" then
-                    -- Eski riskli metot ama RenderStepped'den çıkartıldığı için çökmeyecek
-                    if moveDir.Magnitude > 0 then
-                        hrp.CFrame = hrp.CFrame + (moveDir * (speed * deltaTime))
-                    end
-                elseif Settings.Movement.SpeedMethod == "WalkSpeed" then
-                    hum.WalkSpeed = speed
-                end
+            -- True Speed (CFrame Delta ile Evade fiziklerini ezer, asla yürüme animasyonunu bozmaz)
+            if Settings.Movement.SpeedEnabled and hum.MoveDirection.Magnitude > 0 then
+                hrp.CFrame = hrp.CFrame + (hum.MoveDirection * (Settings.Movement.SpeedValue * deltaTime))
             end
 
-            -- Bhop
-            if (Settings.Movement.AutoBhop and IsHoldingSpace) or IsHoldingMobileBhop then
-                if hum:GetState() ~= Enum.HumanoidStateType.Jumping and hum:GetState() ~= Enum.HumanoidStateType.Freefall then
-                    hum:ChangeState(Enum.HumanoidStateType.Jumping)
-                end
+            -- True Jump (Oyunun JumpPower sınırını Vektörel Güçle ezer)
+            if Settings.Movement.JumpEnabled and IsHoldingSpace and hum.FloorMaterial ~= Enum.Material.Air then
+                hrp.Velocity = Vector3.new(hrp.Velocity.X, Settings.Movement.JumpPower, hrp.Velocity.Z)
+            end
+
+            -- Auto Bhop
+            if Settings.Movement.AutoBhop and IsHoldingSpace and hum.FloorMaterial ~= Enum.Material.Air then
+                hum:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+
+            -- Emote Dash Spam (G ve F tuşlarını sanal olarak spamlar)
+            if Settings.Movement.EmoteDash and hum.MoveDirection.Magnitude > 0 then
+                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.G, false, game)
+                task.wait(0.05)
+                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
+                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.G, false, game)
+                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
             end
         end
 
-        -- 2. OTOMASYON
-        if Settings.Auto.AutoRevive and char and char:GetAttribute("Downed") then
-            if tick() - Settings.Auto.LastReviveCheck >= 5 then
-                Settings.Auto.LastReviveCheck = tick()
+        -- 2. OTOMASYON VE EXPLOITS
+        if Settings.Exploits.AutoReviveSelf and char and char:GetAttribute("Downed") then
+            if tick() - Settings.Exploits.LastReviveCheck >= 3 then
+                Settings.Exploits.LastReviveCheck = tick()
                 ReplicatedStorage.Events.Player.ChangePlayerMode:FireServer(true)
             end
         end
-        if Settings.Auto.AutoVote then fireVoteServer(Settings.Auto.MapNumber) end
 
-        -- 3. ESP YARATICISI
-        if Settings.ESP.Players then
-            for _, p in pairs(Players:GetPlayers()) do
-                if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") then
-                    CreateESP(p.Character, Color3.new(0.4, 0.8, 0.4), p.Name, p.Character.Head, 1)
+        if Settings.Exploits.AutoReviveAura and hrp then
+            -- Çevrendeki tüm Revive (Kaldırma) ProximityPrompt'larını otomatik tetikler
+            for _, prompt in pairs(Workspace:GetDescendants()) do
+                if prompt:IsA("ProximityPrompt") and prompt.ActionText:lower():match("revive") then
+                    if prompt.Parent and prompt.Parent:IsA("BasePart") then
+                        if (prompt.Parent.Position - hrp.Position).Magnitude < 15 then
+                            fireproximityprompt(prompt)
+                        end
+                    end
                 end
             end
         end
 
-        if Settings.ESP.Bots then
+        if Settings.Exploits.AutoVote then
+            local events = ReplicatedStorage:FindFirstChild("Events")
+            if events and events:FindFirstChild("Player") and events.Player:FindFirstChild("Vote") then
+                events.Player.Vote:FireServer(Settings.Exploits.MapNumber)
+            end
+        end
+
+        -- 3. ESP VE GÖRSELLER (Tek Döngü Optimizasyonu)
+        if Settings.Visuals.PlayerESP then
+            for _, p in pairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    local color = Color3.new(0.4, 0.8, 0.4)
+                    local text = p.Name
+                    
+                    -- Yere Düşen Oyuncuları Kırmızı Göster
+                    if Settings.Visuals.DownedColor and p.Character:GetAttribute("Downed") then
+                        color = Color3.new(0.9, 0.1, 0.1)
+                        text = p.Name .. " [DOWNED]"
+                    end
+                    
+                    CreateESP(p.Character, text, color, p.Character.HumanoidRootPart, 2)
+                end
+            end
+        end
+
+        if Settings.Visuals.BotESP then
             local f = Workspace:FindFirstChild("Game") and Workspace.Game:FindFirstChild("Players")
             if f then
                 for _, b in pairs(f:GetChildren()) do
                     if b:IsA("Model") and b:FindFirstChild("Hitbox") then
-                        CreateESP(b, Color3.new(0.8, 0.2, 0.2), b.Name, b.Hitbox, -2)
+                        CreateESP(b, b.Name, Color3.new(0.8, 0.2, 0.2), b.Hitbox, 3)
                     end
                 end
             end
         end
 
-        -- 4. ESP GÜNCELLEYİCİSİ (Tekil Döngü Optimizasyonu)
-        local camPos = workspace.CurrentCamera.CFrame.Position
+        if Settings.Visuals.TicketESP then
+            local tf = Workspace:FindFirstChild("Game") and Workspace.Game:FindFirstChild("Tickets")
+            if tf then
+                for _, t in pairs(tf:GetChildren()) do
+                    if t:IsA("BasePart") then
+                        CreateESP(t, "Ticket", Color3.fromRGB(255, 215, 0), t, 1)
+                    end
+                end
+            end
+        end
+
+        -- ESP Etiketlerini ve Mesafelerini Güncelle
+        local camPos = Camera and Camera.CFrame.Position or Vector3.new(0,0,0)
         for i = #ActiveESPs, 1, -1 do
             local esp = ActiveESPs[i]
             if esp.Target and esp.Target.Parent and esp.Part and esp.Part.Parent then
-                if Settings.ESP.Distance then
-                    local d = math.floor((camPos - esp.Part.Position).Magnitude)
-                    esp.Label.Text = esp.BaseText .. " [" .. d .. "m]"
+                local dist = math.floor((camPos - esp.Part.Position).Magnitude)
+                esp.Label.Text = esp.BaseText .. " [" .. dist .. "m]"
+                
+                -- Downed renk güncellemesi
+                if Settings.Visuals.DownedColor and esp.Target:GetAttribute("Downed") then
+                    esp.Highlight.FillColor = Color3.new(0.9, 0.1, 0.1)
+                    esp.Label.TextColor3 = Color3.new(0.9, 0.1, 0.1)
                 else
-                    esp.Label.Text = esp.BaseText
+                    esp.Highlight.FillColor = esp.DefaultColor
+                    esp.Label.TextColor3 = esp.DefaultColor
                 end
             else
                 if esp.Highlight then esp.Highlight:Destroy() end
                 if esp.Billboard then esp.Billboard:Destroy() end
                 table.remove(ActiveESPs, i)
             end
+        end
+
+        -- FOV Koruması (Evade koşarken FOV'u zorla değiştirir, bunu kilitleriz)
+        if Settings.World.FOV ~= 70 and Camera then
+            Camera.FieldOfView = Settings.World.FOV
         end
     end))
 end
