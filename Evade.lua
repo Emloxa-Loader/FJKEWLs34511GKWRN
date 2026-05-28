@@ -1,6 +1,6 @@
 -- =========================================================================
 -- EMLOXA WARE: EVADE (PLACE ID: 9872472334)
--- SIMPLE & STABLE CORE | NO CRASHES | FULL FEATURES
+-- EMLOXA UI FIX | SIMPLE & STABLE CORE | NO CRASHES
 -- =========================================================================
 local GameModule = {}
 
@@ -45,7 +45,6 @@ function GameModule:Init(Window)
     local IsHoldingSpace = false
     local Camera = Workspace.CurrentCamera
 
-    -- Orijinal Ayarları Kaydetme
     local OrigLighting = {
         Brightness = Lighting.Brightness,
         Ambient = Lighting.Ambient,
@@ -89,23 +88,19 @@ function GameModule:Init(Window)
     end
 
     -- ==========================================
-    -- SEKME 1: MOVEMENT (BASİT VE HATASIZ)
+    -- SEKME 1: MOVEMENT (TAMAMEN EMLOXA UI UYUMLU)
     -- ==========================================
     local MoveTab = Window:CreateTab("Movement")
     
     MoveTab:CreateToggle("Enable WalkSpeed", function(s) Settings.Movement.SpeedEnabled = s end)
     MoveTab:CreateSlider("WalkSpeed Value", 16, 150, 25, function(v) Settings.Movement.SpeedValue = v end)
-    
-    MoveTab:CreateDivider()
     MoveTab:CreateToggle("Enable JumpPower", function(s) Settings.Movement.JumpEnabled = s end)
     MoveTab:CreateSlider("JumpPower Value", 50, 300, 50, function(v) Settings.Movement.JumpPower = v end)
-    
-    MoveTab:CreateDivider()
     MoveTab:CreateToggle("Auto Bhop (Hold Space)", function(s) Settings.Movement.AutoBhop = s end)
     MoveTab:CreateToggle("Emote Dash Spam (G + F)", function(s) Settings.Movement.EmoteDash = s end)
 
     -- ==========================================
-    -- SEKME 2: EXPLOITS & AUTOMATION
+    -- SEKME 2: EXPLOITS
     -- ==========================================
     local ExploitTab = Window:CreateTab("Exploits")
     
@@ -115,18 +110,14 @@ function GameModule:Init(Window)
         end
     end)
     ExploitTab:CreateToggle("Auto Revive Loop (Self)", function(s) Settings.Exploits.AutoReviveSelf = s end)
-    
-    ExploitTab:CreateDivider()
     ExploitTab:CreateToggle("Revive Aura (Heals nearby players)", function(s) Settings.Exploits.AutoReviveAura = s end)
-    
-    ExploitTab:CreateDivider()
     ExploitTab:CreateDropdown("Select Map to Vote", {"Map 1", "Map 2", "Map 3", "Map 4"}, "Map 1", function(opt) 
         Settings.Exploits.MapNumber = tonumber(opt:match("%d+")) 
     end)
     ExploitTab:CreateToggle("Auto Vote Map Loop", function(s) Settings.Exploits.AutoVote = s end)
 
     -- ==========================================
-    -- SEKME 3: VISUALS (ESP)
+    -- SEKME 3: VISUALS
     -- ==========================================
     local EspTab = Window:CreateTab("Visuals")
     
@@ -135,16 +126,12 @@ function GameModule:Init(Window)
     end)
     EspTab:CreateToggle("Highlight Downed Players (Red)", function(s) Settings.Visuals.DownedColor = s end)
     EspTab:CreateToggle("Show Distance", function(s) Settings.Visuals.Distance = s end)
-    
-    EspTab:CreateDivider()
     EspTab:CreateToggle("NextBots ESP (Wallhack)", function(s) Settings.Visuals.BotESP = s
         if not s then
             local f = Workspace:FindFirstChild("Game") and Workspace.Game:FindFirstChild("Players")
             if f then for _, b in pairs(f:GetChildren()) do RemoveESP(b) end end
         end
     end)
-    
-    EspTab:CreateDivider()
     EspTab:CreateToggle("Ticket / Objective ESP", function(s) Settings.Visuals.TicketESP = s
         if not s then
             local tf = Workspace:FindFirstChild("Game") and Workspace.Game:FindFirstChild("Tickets")
@@ -153,7 +140,7 @@ function GameModule:Init(Window)
     end)
 
     -- ==========================================
-    -- SEKME 4: WORLD & LIGHTING
+    -- SEKME 4: WORLD
     -- ==========================================
     local WorldTab = Window:CreateTab("World")
     
@@ -162,28 +149,24 @@ function GameModule:Init(Window)
         Lighting.GlobalShadows = not s
         if s then Lighting.Ambient = Color3.fromRGB(255,255,255) else Lighting.Ambient = OrigLighting.Ambient end
     end)
-    
     WorldTab:CreateToggle("No Fog", function(s) Settings.World.NoFog = s
         Lighting.FogEnd = s and 999999 or OrigLighting.FogEnd
     end)
-    
     WorldTab:CreateSlider("Field of View (FOV)", 70, 120, 70, function(v) 
         Settings.World.FOV = v
         if Camera then Camera.FieldOfView = v end
     end)
-
     WorldTab:CreateToggle("Force Third Person", function(s) Settings.World.ThirdPerson = s
         if s then LocalPlayer.CameraMaxZoomDistance = 15; LocalPlayer.CameraMinZoomDistance = 10
         else LocalPlayer.CameraMaxZoomDistance = 128; LocalPlayer.CameraMinZoomDistance = 0.5 end
     end)
 
     -- ==========================================
-    -- SEKME 5: MISC & UNLOAD
+    -- SEKME 5: MISC
     -- ==========================================
     local MiscTab = Window:CreateTab("Misc")
     
     MiscTab:CreateToggle("Anti-AFK", function(s) Settings.Misc.AntiAFK = s end)
-    
     MiscTab:CreateButton("Unload EMLOXA WARE", function()
         for _, conn in pairs(Connections) do conn:Disconnect() end
         for _, p in pairs(Players:GetPlayers()) do RemoveESP(p.Character) end
@@ -231,7 +214,7 @@ function GameModule:Init(Window)
     end)
 
     -- ==========================================
-    -- ANA MOTOR DÖNGÜSÜ (BASİT VE HATASIZ)
+    -- ANA MOTOR DÖNGÜSÜ (STABLE CORE)
     -- ==========================================
     table.insert(Connections, RunService.Heartbeat:Connect(function()
         -- 1. KARAKTER VE FİZİK
@@ -239,23 +222,19 @@ function GameModule:Init(Window)
         if char then
             local hum = char:FindFirstChildOfClass("Humanoid")
             if hum then
-                -- Basit WalkSpeed (CFrame hatası vermez)
                 if Settings.Movement.SpeedEnabled then
                     hum.WalkSpeed = Settings.Movement.SpeedValue
                 end
                 
-                -- Basit JumpPower
                 if Settings.Movement.JumpEnabled then
                     hum.UseJumpPower = true
                     hum.JumpPower = Settings.Movement.JumpPower
                 end
 
-                -- Basit Auto Bhop
                 if Settings.Movement.AutoBhop and IsHoldingSpace and hum.FloorMaterial ~= Enum.Material.Air then
                     hum:ChangeState(Enum.HumanoidStateType.Jumping)
                 end
 
-                -- Emote Dash (Spam)
                 if Settings.Movement.EmoteDash and hum.MoveDirection.Magnitude > 0 then
                     VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.G, false, game)
                     VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
