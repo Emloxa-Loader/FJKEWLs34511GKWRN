@@ -1,6 +1,6 @@
 -- =========================================================================
 -- EMLOXA WARE: EVADE (PLACE ID: 9872472334)
--- ULTIMATE GOD-CORE V33 | BODYVELOCITY ENGINE | ADVANCED CARRY & HUD SISTER
+-- UISTROKE FIX | NO DIVIDERS | ULTIMATE CARRY & HUD CORE
 -- =========================================================================
 local GameModule = {}
 
@@ -32,9 +32,8 @@ function GameModule:Init(Window)
         },
         CarrySystem = {
             AutoMode = false,
-            State = "Idle", -- Idle, Waiting, Teleporting, Lifting, Reviving
-            TargetPlayer = nil,
-            ManualStep = 1 -- 1: Teleport&Pick, 2: Lift, 3: Drop&Revive
+            State = "Idle",
+            TargetPlayer = nil
         },
         Exploits = { 
             AutoReviveSelf = false, AutoReviveAura = false, 
@@ -75,7 +74,7 @@ function GameModule:Init(Window)
 
     local Stroke = Instance.new("UIStroke")
     Stroke.Color = Color3.fromRGB(102, 85, 255)
-    Stroke.Width = 2
+    Stroke.Thickness = 2 -- HATALI KISIM BURASIYDI, "Width" yerine "Thickness" olarak düzeltildi.
     Stroke.Parent = MainFrame
 
     local TitleLabel = Instance.new("TextLabel")
@@ -130,7 +129,7 @@ function GameModule:Init(Window)
     end
 
     -- ==========================================
-    -- YARDIMCI FONKSİYONLAR (ESP SİSTEMİ)
+    -- YARDIMCI FONKSİYONLAR (ESP)
     -- ==========================================
     local function CreateESP(target, nameText, color, attachPart, yOffset)
         if not target or not attachPart or target:FindFirstChild("EmloxaESP") then return end
@@ -165,31 +164,21 @@ function GameModule:Init(Window)
     end
 
     -- ==========================================
-    -- SEKME 1: MOVEMENT (BODYVELOCITY ENGINE)
+    -- MENÜ SEKMELERİ (DIVIDER'LAR SİLİNDİ)
     -- ==========================================
     local MoveTab = Window:CreateTab("Movement")
-    
     MoveTab:CreateToggle("Enable True Speed", function(s) Settings.Movement.SpeedEnabled = s end)
     MoveTab:CreateSlider("Speed Velocity Value", 16, 150, 40, function(v) Settings.Movement.SpeedValue = v end)
-    
-    MoveTab:CreateDivider()
     MoveTab:CreateToggle("Enable Fly Mode", function(s) Settings.Movement.FlyEnabled = s end)
     MoveTab:CreateSlider("Fly Velocity Value", 20, 200, 50, function(v) Settings.Movement.FlySpeed = v end)
-    
-    MoveTab:CreateDivider()
     MoveTab:CreateToggle("Auto Bhop (Hold Space)", function(s) Settings.Movement.AutoBhop = s end)
     MoveTab:CreateToggle("Emote Dash Spam (G + F)", function(s) Settings.Movement.EmoteDash = s end)
 
-    -- ==========================================
-    -- SEKME 2: CARRY & LIFT SYSTEM (YENİ)
-    -- ==========================================
-    local CarryTab = Window:CreateTab("Carry System")
-    
+    local CarryTab = Window:CreateTab("Carry")
     CarryTab:CreateToggle("Enable Auto Carry Loop", function(s) 
         Settings.CarrySystem.AutoMode = s 
         if not s then Settings.CarrySystem.State = "Idle"; Settings.CarrySystem.TargetPlayer = nil UpdateHUD() end
     end)
-    
     CarryTab:CreateButton("Reset Carry State", function()
         Settings.CarrySystem.State = "Idle"
         Settings.CarrySystem.TargetPlayer = nil
@@ -199,25 +188,15 @@ function GameModule:Init(Window)
         UpdateHUD()
     end)
 
-    -- ==========================================
-    -- SEKME 3: EXPLOITS
-    -- ==========================================
     local ExploitTab = Window:CreateTab("Exploits")
-    
     ExploitTab:CreateToggle("Auto Revive Aura (Lag-Free)", function(s) Settings.Exploits.AutoReviveAura = s end)
     ExploitTab:CreateToggle("Auto Revive Loop (Self)", function(s) Settings.Exploits.AutoReviveSelf = s end)
-    
-    ExploitTab:CreateDivider()
     ExploitTab:CreateDropdown("Select Map to Vote", {"Map 1", "Map 2", "Map 3", "Map 4"}, "Map 1", function(opt) 
         Settings.Exploits.MapNumber = tonumber(opt:match("%d+")) 
     end)
     ExploitTab:CreateToggle("Auto Vote Map Loop", function(s) Settings.Exploits.AutoVote = s end)
 
-    -- ==========================================
-    -- SEKME 4: VISUALS
-    -- ==========================================
     local EspTab = Window:CreateTab("Visuals")
-    
     EspTab:CreateToggle("Players ESP", function(s) Settings.Visuals.PlayerESP = s
         if not s then for _, p in pairs(Players:GetPlayers()) do RemoveESP(p.Character) end end
     end)
@@ -236,11 +215,7 @@ function GameModule:Init(Window)
         end
     end)
 
-    -- ==========================================
-    -- SEKME 5: WORLD & MISC
-    -- ==========================================
     local WorldTab = Window:CreateTab("World")
-    
     WorldTab:CreateToggle("FullBright", function(s) Settings.World.FullBright = s
         Lighting.Brightness = s and 5 or OrigLighting.Brightness
         Lighting.GlobalShadows = not s
@@ -258,7 +233,6 @@ function GameModule:Init(Window)
         else LocalPlayer.CameraMaxZoomDistance = 128; LocalPlayer.CameraMinZoomDistance = 0.5 end
     end)
 
-    -- Unload
     local MiscTab = Window:CreateTab("Misc")
     MiscTab:CreateButton("Unload EMLOXA WARE", function()
         for _, conn in pairs(Connections) do conn:Disconnect() end
@@ -274,16 +248,14 @@ function GameModule:Init(Window)
     end)
 
     -- ==========================================
-    -- GİRDİ TAKİBİ VE TUŞ KONTROLLERİ
+    -- GİRDİ KONTROLLERİ (CARRY MANUEL TUŞLARI)
     -- ==========================================
     table.insert(Connections, UserInputService.InputBegan:Connect(function(input, gpe) 
         if gpe then return end
         if input.KeyCode == Enum.KeyCode.Space then IsHoldingSpace = true end
         if input.KeyCode == Enum.KeyCode.LeftShift then IsHoldingCtrl = true end
         
-        -- MANUEL SİSTEM TUŞLARI
         if input.KeyCode == Enum.KeyCode.H then
-            -- Manuel Adım 1: En yakın bayılanı seç, ışınlan ve Q ile sırtla
             local closest = nil
             local minDist = math.huge
             local myHrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
@@ -310,9 +282,7 @@ function GameModule:Init(Window)
                     UpdateHUD()
                 end)
             end
-        elseif input.KeyCode == Enum.KeyCode.Original then -- J Tuşu (Tr klavyede bazen KeyCode farklı algılanabilir, direkt J atayalım)
         elseif input.KeyCode == Enum.KeyCode.J then
-            -- Manuel Adım 2: 100 Stud Üste Platform kur ve oraya uçur
             local myHrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
             if myHrp and Settings.CarrySystem.TargetPlayer then
                 Settings.CarrySystem.State = "Lifting"
@@ -329,7 +299,6 @@ function GameModule:Init(Window)
                 myHrp.CFrame = CurrentPlatform.CFrame + Vector3.new(0, 3, 0)
             end
         elseif input.KeyCode == Enum.KeyCode.K then
-            -- Manuel Adım 3: Q ile bırak ve E ile kaldırmayı spamla
             Settings.CarrySystem.State = "Reviving"
             UpdateHUD()
             VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Q, false, game)
@@ -355,15 +324,14 @@ function GameModule:Init(Window)
     end))
 
     -- ==========================================
-    -- ANA MOTOR DÖNGÜSÜ (STABLE CORE V33)
+    -- ANA MOTOR (STABLE LOOP)
     -- ==========================================
-    table.insert(Connections, RunService.Heartbeat:Connect(function(deltaTime)
+    table.insert(Connections, RunService.Heartbeat:Connect(function()
         local char = LocalPlayer.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
 
         if hum and hrp then
-            -- 1. ADIMSIZ GÜVENLİ HIZ VE FLY MOTORU (BodyVelocity Altyapısı)
             local bVel = hrp:FindFirstChild("EmloxaVelocity")
             if not bVel then
                 bVel = Instance.new("BodyVelocity")
@@ -372,7 +340,6 @@ function GameModule:Init(Window)
             end
 
             if Settings.Movement.FlyEnabled then
-                -- Kusursuz Fly Sistemi
                 bVel.MaxForce = Vector3.new(100000, 100000, 100000)
                 local moveDir = hum.MoveDirection
                 local flyDir = Vector3.new(0, 0, 0)
@@ -381,7 +348,6 @@ function GameModule:Init(Window)
                 if moveDir.Magnitude > 0 then flyDir = flyDir + moveDir end
                 bVel.Velocity = flyDir * Settings.Movement.FlySpeed
             elseif Settings.Movement.SpeedEnabled and hum.MoveDirection.Magnitude > 0 then
-                -- Evade'in Algılayamadığı Vektörel Hız Sistemi
                 bVel.MaxForce = Vector3.new(100000, 0, 100000)
                 bVel.Velocity = hum.MoveDirection * Settings.Movement.SpeedValue
                 hrp.AssemblyLinearVelocity = Vector3.new(bVel.Velocity.X, hrp.AssemblyLinearVelocity.Y, bVel.Velocity.Z)
@@ -390,12 +356,10 @@ function GameModule:Init(Window)
                 bVel.Velocity = Vector3.new(0, 0, 0)
             end
 
-            -- Auto Bhop
             if Settings.Movement.AutoBhop and IsHoldingSpace and hum.FloorMaterial ~= Enum.Material.Air then
                 hum:ChangeState(Enum.HumanoidStateType.Jumping)
             end
 
-            -- Emote Dash Spam
             if Settings.Movement.EmoteDash and hum.MoveDirection.Magnitude > 0 then
                 VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.G, false, game)
                 VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
@@ -404,7 +368,6 @@ function GameModule:Init(Window)
             end
         end
 
-        -- 2. OTOMATİK TAŞIMA VE LİFT SİSTEMİ (ZAMANLAYICILI)
         for _, p in pairs(Players:GetPlayers()) do
             if p ~= LocalPlayer and p.Character then
                 if p.Character:GetAttribute("Downed") then
@@ -467,7 +430,6 @@ function GameModule:Init(Window)
             end
         end
 
-        -- 3. LAG-FREE OPTİMİZE CANLANDIRMA AURASI
         if Settings.Exploits.AutoReviveAura and char and hrp then
             for _, p in pairs(Players:GetPlayers()) do
                 if p ~= LocalPlayer and p.Character and p.Character:GetAttribute("Downed") then
@@ -486,6 +448,7 @@ function GameModule:Init(Window)
                 ReplicatedStorage.Events.Player.ChangePlayerMode:FireServer(true)
             end
         end
+
         if Settings.Exploits.AutoVote then
             local ev = ReplicatedStorage:FindFirstChild("Events")
             if ev and ev:FindFirstChild("Player") and ev.Player:FindFirstChild("Vote") then
@@ -493,7 +456,6 @@ function GameModule:Init(Window)
             end
         end
 
-        -- 4. KUSURSUZ ESP DÖNGÜSÜ
         if Settings.Visuals.PlayerESP then
             for _, p in pairs(Players:GetPlayers()) do
                 if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
@@ -528,7 +490,6 @@ function GameModule:Init(Window)
             end
         end
 
-        -- ESP Etiket Senkronu
         local camPos = Camera and Camera.CFrame.Position or Vector3.new(0,0,0)
         for i = #ActiveESPs, 1, -1 do
             local esp = ActiveESPs[i]
