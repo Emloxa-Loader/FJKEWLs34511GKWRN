@@ -1,28 +1,29 @@
 -- =========================================================================
--- EMLOXA UI LIBRARY (V_FINAL - HOTFIX)
+-- EMLOXA UI LIBRARY (V_FINAL - BUTTON HOTFIX)
 -- CONFIG MANAGER & EMLOXA WARE RADAR INTEGRATED
 -- =========================================================================
 local EmloxaUI = {}
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService") -- HATA BURADAYDI: Bu servis unutulmuştu, eklendi!
+local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
 local LocalPlayer = Players.LocalPlayer
 
--- Dosya Sistemi Koruması (Farklı exploitlerde hata vermemesi için)
+-- Dosya Sistemi Koruması (Exploitlerin hata vermemesi için sahte fonksiyonlar)
 local isfolder = isfolder or function() return false end
 local makefolder = makefolder or function() end
 local isfile = isfile or function() return false end
 local writefile = writefile or function() end
 local readfile = readfile or function() return "{}" end
 local delfile = delfile or function() end
-local listfiles = listfiles or function() return {} end
 
 local ConfigFolder = "EmloxaWare_Configs"
 if not isfolder(ConfigFolder) then makefolder(ConfigFolder) end
 
+-- ==========================================
 -- EMLOXA GİZLİ RADAR (TRACKER) PROTOKOLÜ
+-- ==========================================
 local TrackerEnabled = false
 local TrackedUsers = {}
 
@@ -38,12 +39,12 @@ local function SetupEmloxaRadar()
         
         if sender ~= LocalPlayer.Name then
             if msg == "[EMLOXA_PING]" then
-                -- Başka biri ping attı, biz de buradayız demek için Pong gönder!
+                -- Başka biri ping attı, biz de buradayız demek için Pong gönder
                 ChatEvents.SayMessageRequest:FireServer("[EMLOXA_PONG]", "All")
                 TrackedUsers[sender] = true
                 print("Emloxa Radar: User Found ->", sender)
             elseif msg == "[EMLOXA_PONG]" then
-                -- Biz ping attık, o cevap verdi!
+                -- Biz ping attık, o cevap verdi
                 TrackedUsers[sender] = true
                 print("Emloxa Radar: User Found ->", sender)
             end
@@ -52,37 +53,41 @@ local function SetupEmloxaRadar()
 end
 pcall(SetupEmloxaRadar)
 
--- UI OLUŞTURUCU
+-- ==========================================
+-- UI OLUŞTURUCU (ANA KÜTÜPHANE)
+-- ==========================================
 function EmloxaUI:CreateWindow(Config)
     local Window = {
         Elements = {}, -- Config için tüm ayarları burada tutacağız
         Tabs = {}
     }
 
-    -- Ana Arayüz (Burayı kendi EmloxaUI görseline göre ayarlayabilirsin, ben temel iskeleti kurdum)
+    -- Ana Arayüz (Burayı kendi EmloxaUI görsel tasarımına bağlayabilirsin)
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "EmloxaWareUI"
     ScreenGui.Parent = CoreGui
     
-    -- KÜTÜPHANE FONKSİYONLARI
+    -- ==========================================
+    -- SEKME (TAB) VE ELEMENT FONKSİYONLARI
+    -- ==========================================
     function Window:CreateTab(tabName)
         local Tab = {}
         
+        -- TOGGLE OLUŞTURUCU
         function Tab:CreateToggle(name, callback)
-            -- Toggle görsel oluşturma kodların buraya gelecek...
-            -- (Örnek mantık)
             local state = false
             Window.Elements[name] = {
                 Type = "Toggle",
                 GetValue = function() return state end,
                 SetValue = function(val)
                     state = val
-                    -- Toggle rengini vs. burada değiştir
+                    -- Toggle rengini ve görselini burada değiştir
                     pcall(callback, state)
                 end
             }
         end
         
+        -- SLIDER OLUŞTURUCU
         function Tab:CreateSlider(name, min, max, default, callback)
             local value = default
             Window.Elements[name] = {
@@ -90,12 +95,13 @@ function EmloxaUI:CreateWindow(Config)
                 GetValue = function() return value end,
                 SetValue = function(val)
                     value = val
-                    -- Slider görselini burada güncelle
+                    -- Slider çubuğunu ve metnini burada güncelle
                     pcall(callback, value)
                 end
             }
         end
 
+        -- DROPDOWN OLUŞTURUCU
         function Tab:CreateDropdown(name, options, default, callback)
             local selected = default
             Window.Elements[name] = {
@@ -103,22 +109,38 @@ function EmloxaUI:CreateWindow(Config)
                 GetValue = function() return selected end,
                 SetValue = function(val)
                     selected = val
-                    -- Dropdown textini burada güncelle
+                    -- Dropdown metnini burada güncelle
                     pcall(callback, selected)
                 end
             }
+        end
+
+        -- BUTTON OLUŞTURUCU (HATA BURADAN KAYNAKLANIYORDU, EKLENDİ!)
+        function Tab:CreateButton(name, callback)
+            -- Butonlar bir değer(value) saklamadığı için Config sistemine kaydetmiyoruz
+            -- Sadece tıklandığında callback'i çalıştıran görsel altyapıyı buraya yazabilirsin
+            -- Örnek (Görsel kodlarını buraya entegre edersin):
+            -- TextButton.MouseButton1Click:Connect(function() pcall(callback) end)
+            
+            -- Hata vermemesi için kütüphaneye tanımlandı.
+            return true
+        end
+
+        -- DIVIDER OLUŞTURUCU (Başka scriptlerde hata çıkmaması için boş fonksiyon)
+        function Tab:CreateDivider()
+            return true
         end
 
         return Tab
     end
 
     -- ==========================================
-    -- MENU VE CONFIG SİSTEMİ OTOMATİK EKLENİR
+    -- MENU VE CONFIG SİSTEMİ (OTOMATİK EKLENİR)
     -- ==========================================
     local MenuTab = Window:CreateTab("Menu & Config")
     local CurrentConfigName = "Default"
 
-    -- 1. EMLOXA RADAR
+    -- 1. EMLOXA RADAR (KULLANICI TAKİBİ)
     MenuTab:CreateToggle("Track Emloxa Ware Users", function(state)
         TrackerEnabled = state
         if state then
@@ -132,7 +154,7 @@ function EmloxaUI:CreateWindow(Config)
         end
     end)
 
-    -- Tracker kullananları ESP ile işaretleme döngüsü (Artık RunService tanımlı, çökmeyecek!)
+    -- Tracker kullananları ESP ile işaretleme döngüsü
     RunService.RenderStepped:Connect(function()
         if not TrackerEnabled then return end
         for playerName, _ in pairs(TrackedUsers) do
