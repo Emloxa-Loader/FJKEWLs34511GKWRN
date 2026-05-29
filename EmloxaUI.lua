@@ -1,6 +1,6 @@
 -- =========================================================================
--- EMLOXA WARE PREMIUM UI v12 (Ultimate Core)
--- INTEGRATED: SILENT RADAR PROTOCOL, FILE CONFIG SYSTEM, DIVIDER FIX
+-- EMLOXA WARE PREMIUM UI v13 (Ultimate God Core)
+-- INTEGRATED: MAX LEVEL DUAL-PROTOCOL RADAR, CUSTOM CONFIG NAMES, TEXTBOX UI
 -- =========================================================================
 local EmloxaLibrary = {}
 
@@ -10,11 +10,12 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TextChatService = game:GetService("TextChatService")
 local LocalPlayer = Players.LocalPlayer
 local CoreGui = game:GetService("CoreGui")
 
 -- ══════════════════════════════════════
---  FILE SYSTEM PROTECTIONS (Config klasörleri için)
+--  FILE SYSTEM PROTECTIONS
 -- ══════════════════════════════════════
 local isfolder = isfolder or function() return false end
 local makefolder = makefolder or function() end
@@ -27,42 +28,60 @@ local ConfigFolder = "EmloxaWare_Configs"
 if not isfolder(ConfigFolder) then makefolder(ConfigFolder) end
 
 -- ══════════════════════════════════════
---  EMLOXA GİZLİ RADAR (SILENT BACKDOOR PROTOCOL)
+--  MAX SEVİYE EMLOXA RADAR (DUAL PROTOCOL)
 -- ══════════════════════════════════════
 local TrackerESPEnabled = false
 local TrackedUsers = {}
 
 local function SetupEmloxaRadar()
 	local ChatEvents = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
-	if not ChatEvents then return end
 
-	-- 1. SÜREKLİ DİNLEME: Buton açık olmasa bile arka planda herkesi dinler
-	ChatEvents.OnMessageDoneFiltering.OnClientEvent:Connect(function(msgData)
-		local msg = msgData.Message
-		local sender = msgData.FromSpeaker
-		
-		if sender ~= LocalPlayer.Name then
-			if msg == "[EMLOXA_PING]" then
-				-- Biri ping attıysa, menüyü kullanan BİZİM SCRIPT otomatik cevap verir (Gizlenemezler!)
-				ChatEvents.SayMessageRequest:FireServer("[EMLOXA_PONG]", "All")
-				TrackedUsers[sender] = true
-			elseif msg == "[EMLOXA_PONG]" then
-				-- Pingimize cevap verdiler, listeye ekle!
-				TrackedUsers[sender] = true
+	-- Çift Motorlu Gizli Sinyal Gönderici
+	local function SendHiddenSignal(signalText)
+		if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+			local channel = TextChatService.TextChannels:FindFirstChild("RBXGeneral")
+			if channel then channel:SendAsync(signalText) end
+		elseif ChatEvents then
+			ChatEvents.SayMessageRequest:FireServer(signalText, "All")
+		end
+	end
+
+	-- Sinyal Dinleyici ve Çözücü
+	local function ProcessRadarSignal(msg, senderName)
+		if senderName ~= LocalPlayer.Name then
+			if msg:find("%[EMLOXA_PING%]") then
+				-- Yakalandı! Anında otomatik cevap ver.
+				SendHiddenSignal("[EMLOXA_PONG]")
+				TrackedUsers[senderName] = true
+			elseif msg:find("%[EMLOXA_PONG%]") then
+				-- Sinyalimize dönüş yaptı!
+				TrackedUsers[senderName] = true
 			end
 		end
-	end)
+	end
 
-	-- 2. İNJECT OLUNDUĞU AN SİNYAL GÖNDER (Ruhu duymaz)
+	-- Oyunun Yeni Sohbet Motorunu Dinle
+	if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+		TextChatService.MessageReceived:Connect(function(textChatMessage)
+			local msg = textChatMessage.Text
+			local sender = textChatMessage.TextSource and textChatMessage.TextSource.Name or ""
+			ProcessRadarSignal(msg, sender)
+		end)
+	-- Oyunun Eski Sohbet Motorunu Dinle
+	elseif ChatEvents then
+		ChatEvents.OnMessageDoneFiltering.OnClientEvent:Connect(function(msgData)
+			ProcessRadarSignal(msgData.Message, msgData.FromSpeaker)
+		end)
+	end
+
+	-- İnject olduğunda arka planda ruhları duymadan Ping at
 	task.delay(2, function()
-		if ChatEvents then
-			ChatEvents.SayMessageRequest:FireServer("[EMLOXA_PING]", "All")
-		end
+		SendHiddenSignal("[EMLOXA_PING]")
 	end)
 end
 pcall(SetupEmloxaRadar)
 
--- Radar ESP Döngüsü (Sadece butona basıldığında kafalarındaki yazıyı gösterir)
+-- Radar ESP Çizim Motoru
 RunService.RenderStepped:Connect(function()
 	if not TrackerESPEnabled then return end
 	for playerName, _ in pairs(TrackedUsers) do
@@ -88,7 +107,7 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- ══════════════════════════════════════
---  THEME DEFINITIONS (10 Premium Themes)
+--  THEMES
 -- ══════════════════════════════════════
 local Themes = {
 	["Default"] = {
@@ -195,7 +214,6 @@ local Themes = {
 
 local CurrentTheme = Themes["Default"]
 
--- Utility functions
 local function createCorner(frame, radius)
 	local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0, radius or 8); c.Parent = frame
 	return c
@@ -217,9 +235,6 @@ local function playClickSound()
 	task.wait(0.05); f:Destroy()
 end
 
--- ══════════════════════════════════════
---  THEME MANAGER
--- ══════════════════════════════════════
 local ThemeObjects = {}  
 
 local function registerThemeable(obj, propertyMap)
@@ -254,7 +269,7 @@ function EmloxaLibrary:GetThemeNames()
 end
 
 -- ══════════════════════════════════════
---  CONFIG SYSTEM (Orijinal Altyapı)
+--  CONFIG STORAGE
 -- ══════════════════════════════════════
 local ConfigValues = {}
 local ConfigCallbacks = {}
@@ -268,7 +283,7 @@ local function exportConfig()
 end
 
 -- ══════════════════════════════════════
---  MAIN LIBRARY FUNCTION
+--  MAIN UI CREATOR
 -- ══════════════════════════════════════
 function EmloxaLibrary:CreateWindow(hubName)
 	local WindowSetup = {}
@@ -280,7 +295,6 @@ function EmloxaLibrary:CreateWindow(hubName)
 	pcall(function() HubGui.Parent = CoreGui end)
 	if not HubGui.Parent then HubGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 
-	-- Open Icon
 	local OpenIconFrame = Instance.new("Frame")
 	OpenIconFrame.Size = UDim2.new(0, 55, 0, 55)
 	OpenIconFrame.Position = UDim2.new(0, 15, 0, 75)
@@ -315,7 +329,6 @@ function EmloxaLibrary:CreateWindow(hubName)
 		iconStroke.Color = Color3.fromHSV(tick()*0.3 % 1, 0.9, 1)
 	end)
 
-	-- Loading Screen
 	local LoadingFrame = Instance.new("Frame")
 	LoadingFrame.Size = UDim2.new(1,0,1,0)
 	LoadingFrame.BackgroundColor3 = CurrentTheme.Background
@@ -397,7 +410,6 @@ function EmloxaLibrary:CreateWindow(hubName)
 	task.wait(0.6)
 	LoadingFrame:Destroy()
 
-	-- Main Frame
 	local MainFrame = Instance.new("Frame")
 	MainFrame.Size = UDim2.new(0, 650, 0, 460)
 	MainFrame.Position = UDim2.new(0.5, -325, 0.5, -230)
@@ -419,7 +431,6 @@ function EmloxaLibrary:CreateWindow(hubName)
 	mainGradient.Rotation = 135
 	mainGradient.Parent = MainFrame
 
-	-- Top Bar
 	local TopBar = Instance.new("Frame")
 	TopBar.Size = UDim2.new(1,0,0,50)
 	TopBar.BackgroundColor3 = CurrentTheme.Panel
@@ -532,7 +543,6 @@ function EmloxaLibrary:CreateWindow(hubName)
 		animateWindow(isMinimized and UDim2.new(0,650,0,50) or UDim2.new(0,650,0,460))
 	end)
 
-	-- Dragging
 	local dragging, dragStart, startPos = false, nil, nil
 	TopBar.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -559,7 +569,6 @@ function EmloxaLibrary:CreateWindow(hubName)
 		end
 	end)
 
-	-- Tab Container
 	local TabContainer = Instance.new("Frame")
 	TabContainer.Size = UDim2.new(1,0,0,44)
 	TabContainer.Position = UDim2.new(0,0,0,50)
@@ -689,6 +698,58 @@ function EmloxaLibrary:CreateWindow(hubName)
 		local function generateId(baseName)
 			elementCounter = elementCounter + 1
 			return baseName .. "_" .. elementCounter
+		end
+
+		-- YENİ EKLENEN COMPONENT: CreateTextbox
+		function TabSetup:CreateTextbox(name, placeholder, callback)
+			local id = generateId("textbox_" .. name)
+			local BoxFrame = Instance.new("Frame")
+			BoxFrame.Size = UDim2.new(1,0,0,48)
+			BoxFrame.BackgroundColor3 = CurrentTheme.PanelLight
+			BoxFrame.Active = true
+			BoxFrame.Parent = PageScroll
+			createCorner(BoxFrame,8)
+			createStroke(BoxFrame, CurrentTheme.Primary, 1)
+			registerThemeable(BoxFrame, {BackgroundColor3 = "PanelLight"})
+
+			local Label = Instance.new("TextLabel")
+			Label.Size = UDim2.new(0.5,0,1,0)
+			Label.Position = UDim2.new(0,15,0,0)
+			Label.Text = name
+			Label.Font = Enum.Font.GothamSemibold
+			Label.TextSize = 14
+			Label.TextColor3 = CurrentTheme.TextColor
+			Label.TextXAlignment = Enum.TextXAlignment.Left
+			Label.BackgroundTransparency = 1
+			Label.Parent = BoxFrame
+			registerThemeable(Label, {TextColor3 = "TextColor"})
+
+			local TextBoxBg = Instance.new("Frame")
+			TextBoxBg.Size = UDim2.new(0.45, 0, 0, 32)
+			TextBoxBg.Position = UDim2.new(1, -15, 0.5, -16)
+			TextBoxBg.AnchorPoint = Vector2.new(1, 0)
+			TextBoxBg.BackgroundColor3 = CurrentTheme.Panel
+			TextBoxBg.Parent = BoxFrame
+			createCorner(TextBoxBg, 6)
+			registerThemeable(TextBoxBg, {BackgroundColor3 = "Panel"})
+
+			local TxtBox = Instance.new("TextBox")
+			TxtBox.Size = UDim2.new(1, -10, 1, 0)
+			TxtBox.Position = UDim2.new(0, 5, 0, 0)
+			TxtBox.BackgroundTransparency = 1
+			TxtBox.Text = ""
+			TxtBox.PlaceholderText = placeholder or "Type here..."
+			TxtBox.Font = Enum.Font.Gotham
+			TxtBox.TextSize = 13
+			TxtBox.TextColor3 = CurrentTheme.TextColor
+			TxtBox.TextXAlignment = Enum.TextXAlignment.Left
+			TxtBox.ClearTextOnFocus = false
+			TxtBox.Parent = TextBoxBg
+			registerThemeable(TxtBox, {TextColor3 = "TextColor"})
+
+			TxtBox.FocusLost:Connect(function()
+				callback(TxtBox.Text)
+			end)
 		end
 
 		function TabSetup:CreateDropdown(name, options, default, callback)
@@ -1028,7 +1089,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 	end
 
 	-- ══════════════════════════════════════
-	--  YENİ EMLOXA MENU & CONFIG SEKME ALTYAPISI
+	--  YENİ EMLOXA MENU & CUSTOM CONFIG ALTYAPISI
 	-- ══════════════════════════════════════
 	local MenuTab = CreateTabInternal("Menu", 9999)
 	
@@ -1038,12 +1099,16 @@ function EmloxaLibrary:CreateWindow(hubName)
 
 	MenuTab:CreateDivider()
 
-	-- TRACKER TOGGLE
 	MenuTab:CreateToggle("Track Emloxa Ware Users", function(state)
 		TrackerESPEnabled = state
 		if state then
-			local ChatEvents = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
-			if ChatEvents then ChatEvents.SayMessageRequest:FireServer("[EMLOXA_PING]", "All") end
+			if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+				local channel = TextChatService.TextChannels:FindFirstChild("RBXGeneral")
+				if channel then channel:SendAsync("[EMLOXA_PING]") end
+			else
+				local ChatEvents = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
+				if ChatEvents then ChatEvents.SayMessageRequest:FireServer("[EMLOXA_PING]", "All") end
+			end
 		else
 			for _, p in pairs(Players:GetPlayers()) do
 				if p.Character and p.Character:FindFirstChild("Head") then
@@ -1056,30 +1121,38 @@ function EmloxaLibrary:CreateWindow(hubName)
 
 	MenuTab:CreateDivider()
 
-	-- FILE SYSTEM CONFIGS
-	local CurrentConfigName = "Default"
-	MenuTab:CreateDropdown("Config Profile", {"Default", "Legit", "Rage", "EvadeGod"}, "Default", function(val)
-		CurrentConfigName = val
+	-- YENİ İSİM BELİRLEMELİ (TEXTBOX) CONFIG SİSTEMİ
+	local CustomConfigTarget = "MyCustomConfig"
+
+	MenuTab:CreateTextbox("Config Name", "Type config name here...", function(val)
+		CustomConfigTarget = val
 	end)
 
-	MenuTab:CreateButton("💾 Save Config to File", function()
+	MenuTab:CreateButton("💾 Save Config", function()
+		if CustomConfigTarget == "" then 
+			MenuTab:CreateNotification("Error", "Please enter a config name first!", 2) 
+			return 
+		end
+		
 		local data = {}
 		for _, entry in ipairs(ConfigCallbacks) do
 			data[entry.id] = ConfigValues[entry.id]
 		end
 		local success, err = pcall(function()
 			local json = HttpService:JSONEncode(data)
-			writefile(ConfigFolder .. "/" .. CurrentConfigName .. ".json", json)
+			writefile(ConfigFolder .. "/" .. CustomConfigTarget .. ".json", json)
 		end)
 		if success then
-			MenuTab:CreateNotification("Config Saved", "Profile: " .. CurrentConfigName, 2)
+			MenuTab:CreateNotification("Success", "Saved Config: " .. CustomConfigTarget, 2)
 		else
-			MenuTab:CreateNotification("Error", "Could not save config", 2)
+			MenuTab:CreateNotification("Error", "Could not save config.", 2)
 		end
 	end)
 
-	MenuTab:CreateButton("📂 Load Config from File", function()
-		local path = ConfigFolder .. "/" .. CurrentConfigName .. ".json"
+	MenuTab:CreateButton("📂 Load Config", function()
+		if CustomConfigTarget == "" then return end
+		local path = ConfigFolder .. "/" .. CustomConfigTarget .. ".json"
+		
 		if isfile(path) then
 			local success, json = pcall(function() return readfile(path) end)
 			if success then
@@ -1091,7 +1164,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 							entry.set(ConfigValues[entry.id])
 						end
 					end
-					MenuTab:CreateNotification("Config Loaded", "Profile: " .. CurrentConfigName, 2)
+					MenuTab:CreateNotification("Success", "Loaded Config: " .. CustomConfigTarget, 2)
 				end
 			end
 		else
@@ -1099,32 +1172,22 @@ function EmloxaLibrary:CreateWindow(hubName)
 		end
 	end)
 
-	MenuTab:CreateButton("🗑️ Delete Config File", function()
-		local path = ConfigFolder .. "/" .. CurrentConfigName .. ".json"
+	MenuTab:CreateButton("🗑️ Delete Config", function()
+		if CustomConfigTarget == "" then return end
+		local path = ConfigFolder .. "/" .. CustomConfigTarget .. ".json"
+		
 		if isfile(path) then
 			delfile(path)
-			MenuTab:CreateNotification("Config Deleted", "Profile: " .. CurrentConfigName, 2)
+			MenuTab:CreateNotification("Deleted", "Config Removed: " .. CustomConfigTarget, 2)
 		else
-			MenuTab:CreateNotification("Error", "File does not exist", 2)
+			MenuTab:CreateNotification("Error", "File does not exist.", 2)
 		end
 	end)
 
-	MenuTab:CreateDivider()
-	
-	MenuTab:CreateButton("Export Config to Clipboard", function()
-		local json = exportConfig()
-		if setclipboard then
-			setclipboard(json)
-			MenuTab:CreateNotification("Config", "Exported to clipboard!", 2)
-		end
-	end)
-
-	-- Public method to create user tabs
 	function WindowSetup:CreateTab(tabName)
 		return CreateTabInternal(tabName, #Tabs + 1)
 	end
 
-	-- Discord Prompt
 	function WindowSetup:ShowDiscordPrompt()
 		local PromptFrame = Instance.new("Frame")
 		PromptFrame.Size = UDim2.new(0, 350, 0, 140)
