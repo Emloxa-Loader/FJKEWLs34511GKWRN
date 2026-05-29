@@ -1,6 +1,6 @@
 -- =========================================================================
 -- EMLOXA WARE: EVADE (PLACE ID: 9872472334)
--- EMLOXA UI FIX | SIMPLE & STABLE CORE | NO CRASHES
+-- ULTIMATE GOD-CORE V33 | BODYVELOCITY ENGINE | ADVANCED CARRY & HUD SISTER
 -- =========================================================================
 local GameModule = {}
 
@@ -14,18 +14,27 @@ function GameModule:Init(Window)
     local Workspace = game:GetService("Workspace")
     local Lighting = game:GetService("Lighting")
     local LocalPlayer = Players.LocalPlayer
+    local Camera = Workspace.CurrentCamera
 
     -- ==========================================
     -- GLOBAL HAFIZA VE AYARLAR
     -- ==========================================
     local Connections = {}
     local ActiveESPs = {}
+    local DownedTimers = {}
+    local CurrentPlatform = nil
     
     local Settings = {
         Movement = { 
-            SpeedEnabled = false, SpeedValue = 25, 
-            JumpEnabled = false, JumpPower = 50, 
+            SpeedEnabled = false, SpeedValue = 40, 
+            FlyEnabled = false, FlySpeed = 50,
             AutoBhop = false, EmoteDash = false
+        },
+        CarrySystem = {
+            AutoMode = false,
+            State = "Idle", -- Idle, Waiting, Teleporting, Lifting, Reviving
+            TargetPlayer = nil,
+            ManualStep = 1 -- 1: Teleport&Pick, 2: Lift, 3: Drop&Revive
         },
         Exploits = { 
             AutoReviveSelf = false, AutoReviveAura = false, 
@@ -37,20 +46,88 @@ function GameModule:Init(Window)
         World = { 
             FullBright = false, NoFog = false, FOV = 70, ThirdPerson = false 
         },
-        Misc = {
-            AntiAFK = true
-        }
+        Misc = { AntiAFK = true }
     }
 
     local IsHoldingSpace = false
-    local Camera = Workspace.CurrentCamera
+    local IsHoldingCtrl = false
 
     local OrigLighting = {
-        Brightness = Lighting.Brightness,
-        Ambient = Lighting.Ambient,
-        GlobalShadows = Lighting.GlobalShadows,
-        FogEnd = Lighting.FogEnd
+        Brightness = Lighting.Brightness, Ambient = Lighting.Ambient,
+        GlobalShadows = Lighting.GlobalShadows, FogEnd = Lighting.FogEnd
     }
+
+    -- ==========================================
+    -- SAĞ TARAF DURUM PANELİ (HUD) OLUŞTURMA
+    -- ==========================================
+    local StatusGui = Instance.new("ScreenGui")
+    StatusGui.Name = "EmloxaStatusUI"
+    StatusGui.Parent = game:GetService("CoreGui") or LocalPlayer.PlayerGui
+
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Size = UDim2.new(0, 240, 0, 180)
+    MainFrame.Position = UDim2.new(1, -250, 0.3, 0)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+    MainFrame.BackgroundTransparency = 0.2
+    MainFrame.BorderSizePixel = 0
+    Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
+    MainFrame.Parent = StatusGui
+
+    local Stroke = Instance.new("UIStroke")
+    Stroke.Color = Color3.fromRGB(102, 85, 255)
+    Stroke.Width = 2
+    Stroke.Parent = MainFrame
+
+    local TitleLabel = Instance.new("TextLabel")
+    TitleLabel.Size = UDim2.new(1, 0, 0, 30)
+    TitleLabel.BackgroundTransparency = 1
+    TitleLabel.Text = "EMLOXA CARRY HUD"
+    TitleLabel.TextColor3 = Color3.fromRGB(102, 85, 255)
+    TitleLabel.Font = Enum.Font.GothamBold
+    TitleLabel.TextSize = 14
+    TitleLabel.Parent = MainFrame
+
+    local StateLabel = Instance.new("TextLabel")
+    StateLabel.Size = UDim2.new(1, -20, 0, 25)
+    StateLabel.Position = UDim2.new(0, 10, 0, 35)
+    StateLabel.BackgroundTransparency = 1
+    StateLabel.Text = "System State: IDLE"
+    StateLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    StateLabel.Font = Enum.Font.Gotham
+    StateLabel.TextSize = 12
+    StateLabel.TextXAlignment = Enum.TextXAlignment.Left
+    StateLabel.Parent = MainFrame
+
+    local TargetLabel = Instance.new("TextLabel")
+    TargetLabel.Size = UDim2.new(1, -20, 0, 25)
+    TargetLabel.Position = UDim2.new(0, 10, 0, 60)
+    TargetLabel.BackgroundTransparency = 1
+    TargetLabel.Text = "Target: None"
+    TargetLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    TargetLabel.Font = Enum.Font.Gotham
+    TargetLabel.TextSize = 12
+    TargetLabel.TextXAlignment = Enum.TextXAlignment.Left
+    TargetLabel.Parent = MainFrame
+
+    local ManualKeyLabel = Instance.new("TextLabel")
+    ManualKeyLabel.Size = UDim2.new(1, -20, 0, 50)
+    ManualKeyLabel.Position = UDim2.new(0, 10, 0, 90)
+    ManualKeyLabel.BackgroundTransparency = 1
+    ManualKeyLabel.Text = "[H] -> Manual Step 1: Teleport & Pick\n[J] -> Manual Step 2: Lift to Sky\n[K] -> Manual Step 3: Drop & Revive"
+    ManualKeyLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+    ManualKeyLabel.Font = Enum.Font.Gotham
+    ManualKeyLabel.TextSize = 11
+    ManualKeyLabel.TextXAlignment = Enum.TextXAlignment.Left
+    ManualKeyLabel.Parent = MainFrame
+
+    local function UpdateHUD()
+        StateLabel.Text = "System State: " .. Settings.CarrySystem.State:upper()
+        if Settings.CarrySystem.TargetPlayer then
+            TargetLabel.Text = "Target: " .. Settings.CarrySystem.TargetPlayer.Name
+        else
+            TargetLabel.Text = "Target: None"
+        end
+    end
 
     -- ==========================================
     -- YARDIMCI FONKSİYONLAR (ESP SİSTEMİ)
@@ -88,51 +165,71 @@ function GameModule:Init(Window)
     end
 
     -- ==========================================
-    -- SEKME 1: MOVEMENT (TAMAMEN EMLOXA UI UYUMLU)
+    -- SEKME 1: MOVEMENT (BODYVELOCITY ENGINE)
     -- ==========================================
     local MoveTab = Window:CreateTab("Movement")
     
-    MoveTab:CreateToggle("Enable WalkSpeed", function(s) Settings.Movement.SpeedEnabled = s end)
-    MoveTab:CreateSlider("WalkSpeed Value", 16, 150, 25, function(v) Settings.Movement.SpeedValue = v end)
-    MoveTab:CreateToggle("Enable JumpPower", function(s) Settings.Movement.JumpEnabled = s end)
-    MoveTab:CreateSlider("JumpPower Value", 50, 300, 50, function(v) Settings.Movement.JumpPower = v end)
+    MoveTab:CreateToggle("Enable True Speed", function(s) Settings.Movement.SpeedEnabled = s end)
+    MoveTab:CreateSlider("Speed Velocity Value", 16, 150, 40, function(v) Settings.Movement.SpeedValue = v end)
+    
+    MoveTab:CreateDivider()
+    MoveTab:CreateToggle("Enable Fly Mode", function(s) Settings.Movement.FlyEnabled = s end)
+    MoveTab:CreateSlider("Fly Velocity Value", 20, 200, 50, function(v) Settings.Movement.FlySpeed = v end)
+    
+    MoveTab:CreateDivider()
     MoveTab:CreateToggle("Auto Bhop (Hold Space)", function(s) Settings.Movement.AutoBhop = s end)
     MoveTab:CreateToggle("Emote Dash Spam (G + F)", function(s) Settings.Movement.EmoteDash = s end)
 
     -- ==========================================
-    -- SEKME 2: EXPLOITS
+    -- SEKME 2: CARRY & LIFT SYSTEM (YENİ)
+    -- ==========================================
+    local CarryTab = Window:CreateTab("Carry System")
+    
+    CarryTab:CreateToggle("Enable Auto Carry Loop", function(s) 
+        Settings.CarrySystem.AutoMode = s 
+        if not s then Settings.CarrySystem.State = "Idle"; Settings.CarrySystem.TargetPlayer = nil UpdateHUD() end
+    end)
+    
+    CarryTab:CreateButton("Reset Carry State", function()
+        Settings.CarrySystem.State = "Idle"
+        Settings.CarrySystem.TargetPlayer = nil
+        if CurrentPlatform then CurrentPlatform:Destroy(); CurrentPlatform = nil end
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Q, false, game)
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+        UpdateHUD()
+    end)
+
+    -- ==========================================
+    -- SEKME 3: EXPLOITS
     -- ==========================================
     local ExploitTab = Window:CreateTab("Exploits")
     
-    ExploitTab:CreateButton("Instant Revive (Self)", function()
-        if LocalPlayer.Character and LocalPlayer.Character:GetAttribute("Downed") then
-            ReplicatedStorage.Events.Player.ChangePlayerMode:FireServer(true)
-        end
-    end)
+    ExploitTab:CreateToggle("Auto Revive Aura (Lag-Free)", function(s) Settings.Exploits.AutoReviveAura = s end)
     ExploitTab:CreateToggle("Auto Revive Loop (Self)", function(s) Settings.Exploits.AutoReviveSelf = s end)
-    ExploitTab:CreateToggle("Revive Aura (Heals nearby players)", function(s) Settings.Exploits.AutoReviveAura = s end)
+    
+    ExploitTab:CreateDivider()
     ExploitTab:CreateDropdown("Select Map to Vote", {"Map 1", "Map 2", "Map 3", "Map 4"}, "Map 1", function(opt) 
         Settings.Exploits.MapNumber = tonumber(opt:match("%d+")) 
     end)
     ExploitTab:CreateToggle("Auto Vote Map Loop", function(s) Settings.Exploits.AutoVote = s end)
 
     -- ==========================================
-    -- SEKME 3: VISUALS
+    -- SEKME 4: VISUALS
     -- ==========================================
     local EspTab = Window:CreateTab("Visuals")
     
     EspTab:CreateToggle("Players ESP", function(s) Settings.Visuals.PlayerESP = s
         if not s then for _, p in pairs(Players:GetPlayers()) do RemoveESP(p.Character) end end
     end)
-    EspTab:CreateToggle("Highlight Downed Players (Red)", function(s) Settings.Visuals.DownedColor = s end)
+    EspTab:CreateToggle("Highlight Downed Players", function(s) Settings.Visuals.DownedColor = s end)
     EspTab:CreateToggle("Show Distance", function(s) Settings.Visuals.Distance = s end)
-    EspTab:CreateToggle("NextBots ESP (Wallhack)", function(s) Settings.Visuals.BotESP = s
+    EspTab:CreateToggle("NextBots ESP", function(s) Settings.Visuals.BotESP = s
         if not s then
             local f = Workspace:FindFirstChild("Game") and Workspace.Game:FindFirstChild("Players")
             if f then for _, b in pairs(f:GetChildren()) do RemoveESP(b) end end
         end
     end)
-    EspTab:CreateToggle("Ticket / Objective ESP", function(s) Settings.Visuals.TicketESP = s
+    EspTab:CreateToggle("Ticket ESP", function(s) Settings.Visuals.TicketESP = s
         if not s then
             local tf = Workspace:FindFirstChild("Game") and Workspace.Game:FindFirstChild("Tickets")
             if tf then for _, t in pairs(tf:GetChildren()) do RemoveESP(t) end end
@@ -140,11 +237,11 @@ function GameModule:Init(Window)
     end)
 
     -- ==========================================
-    -- SEKME 4: WORLD
+    -- SEKME 5: WORLD & MISC
     -- ==========================================
     local WorldTab = Window:CreateTab("World")
     
-    WorldTab:CreateToggle("FullBright (See in Dark)", function(s) Settings.World.FullBright = s
+    WorldTab:CreateToggle("FullBright", function(s) Settings.World.FullBright = s
         Lighting.Brightness = s and 5 or OrigLighting.Brightness
         Lighting.GlobalShadows = not s
         if s then Lighting.Ambient = Color3.fromRGB(255,255,255) else Lighting.Ambient = OrigLighting.Ambient end
@@ -152,7 +249,7 @@ function GameModule:Init(Window)
     WorldTab:CreateToggle("No Fog", function(s) Settings.World.NoFog = s
         Lighting.FogEnd = s and 999999 or OrigLighting.FogEnd
     end)
-    WorldTab:CreateSlider("Field of View (FOV)", 70, 120, 70, function(v) 
+    WorldTab:CreateSlider("Field of View", 70, 120, 70, function(v) 
         Settings.World.FOV = v
         if Camera then Camera.FieldOfView = v end
     end)
@@ -161,117 +258,242 @@ function GameModule:Init(Window)
         else LocalPlayer.CameraMaxZoomDistance = 128; LocalPlayer.CameraMinZoomDistance = 0.5 end
     end)
 
-    -- ==========================================
-    -- SEKME 5: MISC
-    -- ==========================================
+    -- Unload
     local MiscTab = Window:CreateTab("Misc")
-    
-    MiscTab:CreateToggle("Anti-AFK", function(s) Settings.Misc.AntiAFK = s end)
     MiscTab:CreateButton("Unload EMLOXA WARE", function()
         for _, conn in pairs(Connections) do conn:Disconnect() end
         for _, p in pairs(Players:GetPlayers()) do RemoveESP(p.Character) end
-        local f = Workspace:FindFirstChild("Game") and Workspace.Game:FindFirstChild("Players")
-        if f then for _, b in pairs(f:GetChildren()) do RemoveESP(b) end end
-        
-        if Camera then Camera.FieldOfView = 70 end
-        LocalPlayer.CameraMaxZoomDistance = 128
-        LocalPlayer.CameraMinZoomDistance = 0.5
-        Lighting.Brightness = OrigLighting.Brightness
-        Lighting.GlobalShadows = OrigLighting.GlobalShadows
-        Lighting.Ambient = OrigLighting.Ambient
-        Lighting.FogEnd = OrigLighting.FogEnd
-        
-        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-            LocalPlayer.Character.Humanoid.WalkSpeed = 16
-            LocalPlayer.Character.Humanoid.JumpPower = 50
+        StatusGui:Destroy()
+        if CurrentPlatform then CurrentPlatform:Destroy() end
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            if char.HumanoidRootPart:FindFirstChild("EmloxaVelocity") then char.HumanoidRootPart.EmloxaVelocity:Destroy() end
         end
-
         local ui = game:GetService("CoreGui"):FindFirstChild("EmloxaWareUI") or LocalPlayer.PlayerGui:FindFirstChild("EmloxaWareUI")
         if ui then ui:Destroy() end
     end)
 
     -- ==========================================
-    -- GİRDİ KONTROLLERİ (INPUTS)
+    -- GİRDİ TAKİBİ VE TUŞ KONTROLLERİ
     -- ==========================================
     table.insert(Connections, UserInputService.InputBegan:Connect(function(input, gpe) 
         if gpe then return end
         if input.KeyCode == Enum.KeyCode.Space then IsHoldingSpace = true end
+        if input.KeyCode == Enum.KeyCode.LeftShift then IsHoldingCtrl = true end
+        
+        -- MANUEL SİSTEM TUŞLARI
+        if input.KeyCode == Enum.KeyCode.H then
+            -- Manuel Adım 1: En yakın bayılanı seç, ışınlan ve Q ile sırtla
+            local closest = nil
+            local minDist = math.huge
+            local myHrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if myHrp then
+                for _, p in pairs(Players:GetPlayers()) do
+                    if p ~= LocalPlayer and p.Character and p.Character:GetAttribute("Downed") then
+                        local pHrp = p.Character:FindFirstChild("HumanoidRootPart")
+                        if pHrp then
+                            local d = (pHrp.Position - myHrp.Position).Magnitude
+                            if d < minDist then minDist = d; closest = p end
+                        end
+                    end
+                end
+            end
+            if closest then
+                Settings.CarrySystem.TargetPlayer = closest
+                Settings.CarrySystem.State = "Teleporting"
+                UpdateHUD()
+                myHrp.CFrame = closest.Character.HumanoidRootPart.CFrame
+                task.spawn(function()
+                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Q, false, game)
+                    task.wait(0.1)
+                    Settings.CarrySystem.State = "Carrying"
+                    UpdateHUD()
+                end)
+            end
+        elseif input.KeyCode == Enum.KeyCode.Original then -- J Tuşu (Tr klavyede bazen KeyCode farklı algılanabilir, direkt J atayalım)
+        elseif input.KeyCode == Enum.KeyCode.J then
+            -- Manuel Adım 2: 100 Stud Üste Platform kur ve oraya uçur
+            local myHrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if myHrp and Settings.CarrySystem.TargetPlayer then
+                Settings.CarrySystem.State = "Lifting"
+                UpdateHUD()
+                if CurrentPlatform then CurrentPlatform:Destroy() end
+                CurrentPlatform = Instance.new("Part")
+                CurrentPlatform.Size = Vector3.new(30, 1, 30)
+                CurrentPlatform.CFrame = myHrp.CFrame + Vector3.new(0, 100, 0)
+                CurrentPlatform.Anchored = true
+                CurrentPlatform.Material = Enum.Material.Glass
+                CurrentPlatform.Parent = Workspace
+                
+                task.wait(0.1)
+                myHrp.CFrame = CurrentPlatform.CFrame + Vector3.new(0, 3, 0)
+            end
+        elseif input.KeyCode == Enum.KeyCode.K then
+            -- Manuel Adım 3: Q ile bırak ve E ile kaldırmayı spamla
+            Settings.CarrySystem.State = "Reviving"
+            UpdateHUD()
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Q, false, game)
+            task.spawn(function()
+                local startTime = tick()
+                while tick() - startTime < 4 do
+                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                    task.wait(0.05)
+                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                    task.wait(0.05)
+                end
+                Settings.CarrySystem.State = "Idle"
+                Settings.CarrySystem.TargetPlayer = nil
+                if CurrentPlatform then CurrentPlatform:Destroy(); CurrentPlatform = nil end
+                UpdateHUD()
+            end)
+        end
     end))
     
     table.insert(Connections, UserInputService.InputEnded:Connect(function(input) 
         if input.KeyCode == Enum.KeyCode.Space then IsHoldingSpace = false end 
+        if input.KeyCode == Enum.KeyCode.LeftShift then IsHoldingCtrl = false end 
     end))
 
-    -- Anti-AFK Döngüsü
-    task.spawn(function()
-        while task.wait(60) do
-            if Settings.Misc.AntiAFK and LocalPlayer then
-                VirtualUser:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
-                task.wait(0.1)
-                VirtualUser:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
-            end
-        end
-    end)
-
     -- ==========================================
-    -- ANA MOTOR DÖNGÜSÜ (STABLE CORE)
+    -- ANA MOTOR DÖNGÜSÜ (STABLE CORE V33)
     -- ==========================================
-    table.insert(Connections, RunService.Heartbeat:Connect(function()
-        -- 1. KARAKTER VE FİZİK
+    table.insert(Connections, RunService.Heartbeat:Connect(function(deltaTime)
         local char = LocalPlayer.Character
-        if char then
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            if hum then
-                if Settings.Movement.SpeedEnabled then
-                    hum.WalkSpeed = Settings.Movement.SpeedValue
-                end
-                
-                if Settings.Movement.JumpEnabled then
-                    hum.UseJumpPower = true
-                    hum.JumpPower = Settings.Movement.JumpPower
-                end
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
 
-                if Settings.Movement.AutoBhop and IsHoldingSpace and hum.FloorMaterial ~= Enum.Material.Air then
-                    hum:ChangeState(Enum.HumanoidStateType.Jumping)
-                end
+        if hum and hrp then
+            -- 1. ADIMSIZ GÜVENLİ HIZ VE FLY MOTORU (BodyVelocity Altyapısı)
+            local bVel = hrp:FindFirstChild("EmloxaVelocity")
+            if not bVel then
+                bVel = Instance.new("BodyVelocity")
+                bVel.Name = "EmloxaVelocity"
+                bVel.Parent = hrp
+            end
 
-                if Settings.Movement.EmoteDash and hum.MoveDirection.Magnitude > 0 then
-                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.G, false, game)
-                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
-                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.G, false, game)
-                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
+            if Settings.Movement.FlyEnabled then
+                -- Kusursuz Fly Sistemi
+                bVel.MaxForce = Vector3.new(100000, 100000, 100000)
+                local moveDir = hum.MoveDirection
+                local flyDir = Vector3.new(0, 0, 0)
+                if IsHoldingSpace then flyDir = flyDir + Vector3.new(0, 1, 0) end
+                if IsHoldingCtrl then flyDir = flyDir + Vector3.new(0, -1, 0) end
+                if moveDir.Magnitude > 0 then flyDir = flyDir + moveDir end
+                bVel.Velocity = flyDir * Settings.Movement.FlySpeed
+            elseif Settings.Movement.SpeedEnabled and hum.MoveDirection.Magnitude > 0 then
+                -- Evade'in Algılayamadığı Vektörel Hız Sistemi
+                bVel.MaxForce = Vector3.new(100000, 0, 100000)
+                bVel.Velocity = hum.MoveDirection * Settings.Movement.SpeedValue
+                hrp.AssemblyLinearVelocity = Vector3.new(bVel.Velocity.X, hrp.AssemblyLinearVelocity.Y, bVel.Velocity.Z)
+            else
+                bVel.MaxForce = Vector3.new(0, 0, 0)
+                bVel.Velocity = Vector3.new(0, 0, 0)
+            end
+
+            -- Auto Bhop
+            if Settings.Movement.AutoBhop and IsHoldingSpace and hum.FloorMaterial ~= Enum.Material.Air then
+                hum:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+
+            -- Emote Dash Spam
+            if Settings.Movement.EmoteDash and hum.MoveDirection.Magnitude > 0 then
+                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.G, false, game)
+                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
+                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.G, false, game)
+                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
+            end
+        end
+
+        -- 2. OTOMATİK TAŞIMA VE LİFT SİSTEMİ (ZAMANLAYICILI)
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character then
+                if p.Character:GetAttribute("Downed") then
+                    if not DownedTimers[p] then DownedTimers[p] = tick() end
+                else
+                    DownedTimers[p] = nil
                 end
             end
         end
 
-        -- 2. OTOMASYON VE EXPLOITS
+        if Settings.CarrySystem.AutoMode and hrp then
+            if Settings.CarrySystem.State == "Idle" then
+                for p, startTime in pairs(DownedTimers) do
+                    if p.Character and p.Character:FindFirstChild("HumanoidRootPart") and (tick() - startTime >= 5) then
+                        Settings.CarrySystem.TargetPlayer = p
+                        Settings.CarrySystem.State = "Teleporting"
+                        UpdateHUD()
+                        break
+                    end
+                end
+            elseif Settings.CarrySystem.State == "Teleporting" and Settings.CarrySystem.TargetPlayer then
+                local targetHrp = Settings.CarrySystem.TargetPlayer.Character and Settings.CarrySystem.TargetPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if targetHrp then
+                    hrp.CFrame = targetHrp.CFrame
+                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Q, false, game)
+                    task.wait(0.2)
+                    Settings.CarrySystem.State = "Lifting"
+                    UpdateHUD()
+                else
+                    Settings.CarrySystem.State = "Idle"
+                    UpdateHUD()
+                end
+            elseif Settings.CarrySystem.State == "Lifting" then
+                if CurrentPlatform then CurrentPlatform:Destroy() end
+                CurrentPlatform = Instance.new("Part")
+                CurrentPlatform.Size = Vector3.new(30, 1, 30)
+                CurrentPlatform.CFrame = hrp.CFrame + Vector3.new(0, 100, 0)
+                CurrentPlatform.Anchored = true
+                CurrentPlatform.Material = Enum.Material.Glass
+                CurrentPlatform.Parent = Workspace
+                
+                task.wait(0.1)
+                hrp.CFrame = CurrentPlatform.CFrame + Vector3.new(0, 3, 0)
+                task.wait(0.2)
+                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Q, false, game)
+                Settings.CarrySystem.State = "Reviving"
+                UpdateHUD()
+            elseif Settings.CarrySystem.State == "Reviving" and Settings.CarrySystem.TargetPlayer then
+                local tChar = Settings.CarrySystem.TargetPlayer.Character
+                if tChar and tChar:GetAttribute("Downed") then
+                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                    task.wait(0.05)
+                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                else
+                    if CurrentPlatform then CurrentPlatform:Destroy(); CurrentPlatform = nil end
+                    Settings.CarrySystem.State = "Idle"
+                    Settings.CarrySystem.TargetPlayer = nil
+                    UpdateHUD()
+                end
+            end
+        end
+
+        -- 3. LAG-FREE OPTİMİZE CANLANDIRMA AURASI
+        if Settings.Exploits.AutoReviveAura and char and hrp then
+            for _, p in pairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and p.Character and p.Character:GetAttribute("Downed") then
+                    local pRoot = p.Character:FindFirstChild("HumanoidRootPart")
+                    if pRoot and (pRoot.Position - hrp.Position).Magnitude < 15 then
+                        local prompt = p.Character:FindFirstChildOfClass("ProximityPrompt") or p.Character:GetComponentOfClass("ProximityPrompt")
+                        if prompt then fireproximityprompt(prompt) end
+                    end
+                end
+            end
+        end
+
         if Settings.Exploits.AutoReviveSelf and char and char:GetAttribute("Downed") then
             if tick() - Settings.Exploits.LastReviveCheck >= 3 then
                 Settings.Exploits.LastReviveCheck = tick()
                 ReplicatedStorage.Events.Player.ChangePlayerMode:FireServer(true)
             end
         end
-
-        if Settings.Exploits.AutoReviveAura and char and char:FindFirstChild("HumanoidRootPart") then
-            for _, prompt in pairs(Workspace:GetDescendants()) do
-                if prompt:IsA("ProximityPrompt") and prompt.ActionText:lower():match("revive") then
-                    if prompt.Parent and prompt.Parent:IsA("BasePart") then
-                        if (prompt.Parent.Position - char.HumanoidRootPart.Position).Magnitude < 15 then
-                            fireproximityprompt(prompt)
-                        end
-                    end
-                end
-            end
-        end
-
         if Settings.Exploits.AutoVote then
-            local events = ReplicatedStorage:FindFirstChild("Events")
-            if events and events:FindFirstChild("Player") and events.Player:FindFirstChild("Vote") then
-                events.Player.Vote:FireServer(Settings.Exploits.MapNumber)
+            local ev = ReplicatedStorage:FindFirstChild("Events")
+            if ev and ev:FindFirstChild("Player") and ev.Player:FindFirstChild("Vote") then
+                ev.Player.Vote:FireServer(Settings.Exploits.MapNumber)
             end
         end
 
-        -- 3. ESP VE GÖRSELLER
+        -- 4. KUSURSUZ ESP DÖNGÜSÜ
         if Settings.Visuals.PlayerESP then
             for _, p in pairs(Players:GetPlayers()) do
                 if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
@@ -301,14 +523,12 @@ function GameModule:Init(Window)
             local tf = Workspace:FindFirstChild("Game") and Workspace.Game:FindFirstChild("Tickets")
             if tf then
                 for _, t in pairs(tf:GetChildren()) do
-                    if t:IsA("BasePart") then
-                        CreateESP(t, "Ticket", Color3.fromRGB(255, 215, 0), t, 1)
-                    end
+                    if t:IsA("BasePart") then CreateESP(t, "Ticket", Color3.fromRGB(255, 215, 0), t, 1) end
                 end
             end
         end
 
-        -- ESP Güncelleyici
+        -- ESP Etiket Senkronu
         local camPos = Camera and Camera.CFrame.Position or Vector3.new(0,0,0)
         for i = #ActiveESPs, 1, -1 do
             local esp = ActiveESPs[i]
@@ -318,14 +538,6 @@ function GameModule:Init(Window)
                     esp.Label.Text = esp.BaseText .. " [" .. dist .. "m]"
                 else
                     esp.Label.Text = esp.BaseText
-                end
-                
-                if Settings.Visuals.DownedColor and esp.Target:GetAttribute("Downed") then
-                    esp.Highlight.FillColor = Color3.new(0.9, 0.1, 0.1)
-                    esp.Label.TextColor3 = Color3.new(0.9, 0.1, 0.1)
-                else
-                    esp.Highlight.FillColor = esp.DefaultColor
-                    esp.Label.TextColor3 = esp.DefaultColor
                 end
             else
                 if esp.Highlight then esp.Highlight:Destroy() end
