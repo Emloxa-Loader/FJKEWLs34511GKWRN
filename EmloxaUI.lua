@@ -700,7 +700,6 @@ function EmloxaLibrary:CreateWindow(hubName)
 			return baseName .. "_" .. elementCounter
 		end
 
-		-- YENİ EKLENEN COMPONENT: CreateTextbox
 		function TabSetup:CreateTextbox(name, placeholder, callback)
 			local id = generateId("textbox_" .. name)
 			local BoxFrame = Instance.new("Frame")
