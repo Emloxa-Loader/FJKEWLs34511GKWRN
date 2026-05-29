@@ -1,11 +1,12 @@
 -- =========================================================================
--- EMLOXA UI LIBRARY (V_FINAL)
+-- EMLOXA UI LIBRARY (V_FINAL - HOTFIX)
 -- CONFIG MANAGER & EMLOXA WARE RADAR INTEGRATED
 -- =========================================================================
 local EmloxaUI = {}
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService") -- HATA BURADAYDI: Bu servis unutulmuştu, eklendi!
 local CoreGui = game:GetService("CoreGui")
 local LocalPlayer = Players.LocalPlayer
 
@@ -131,7 +132,7 @@ function EmloxaUI:CreateWindow(Config)
         end
     end)
 
-    -- Tracker kullananları ESP ile işaretleme döngüsü
+    -- Tracker kullananları ESP ile işaretleme döngüsü (Artık RunService tanımlı, çökmeyecek!)
     RunService.RenderStepped:Connect(function()
         if not TrackerEnabled then return end
         for playerName, _ in pairs(TrackedUsers) do
