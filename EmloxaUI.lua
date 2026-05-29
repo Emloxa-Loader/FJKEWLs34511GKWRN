@@ -1,5 +1,5 @@
 -- =========================================================================
--- EMLOXA UI LIBRARY (V_FINAL - BUTTON HOTFIX)
+-- EMLOXA UI LIBRARY (V_FINAL - DISCORD PROMPT HOTFIX)
 -- CONFIG MANAGER & EMLOXA WARE RADAR INTEGRATED
 -- =========================================================================
 local EmloxaUI = {}
@@ -68,6 +68,17 @@ function EmloxaUI:CreateWindow(Config)
     ScreenGui.Parent = CoreGui
     
     -- ==========================================
+    -- DISCORD PROMPT VE EKRAN FONKSİYONLARI
+    -- ==========================================
+    
+    -- Eksik olan metod buraya eklendi! Artık kod hata verip çökmeyecek.
+    function Window:ShowDiscordPrompt(inviteLink)
+        print("Emloxa Ware: Discord Prompt tetiklendi. (Davet Kodu: " .. tostring(inviteLink) .. ")")
+        -- İleride buraya özel bir Discord Katılım paneli tasarlayabilirsin.
+        return true
+    end
+
+    -- ==========================================
     -- SEKME (TAB) VE ELEMENT FONKSİYONLARI
     -- ==========================================
     function Window:CreateTab(tabName)
@@ -115,18 +126,14 @@ function EmloxaUI:CreateWindow(Config)
             }
         end
 
-        -- BUTTON OLUŞTURUCU (HATA BURADAN KAYNAKLANIYORDU, EKLENDİ!)
+        -- BUTTON OLUŞTURUCU
         function Tab:CreateButton(name, callback)
             -- Butonlar bir değer(value) saklamadığı için Config sistemine kaydetmiyoruz
             -- Sadece tıklandığında callback'i çalıştıran görsel altyapıyı buraya yazabilirsin
-            -- Örnek (Görsel kodlarını buraya entegre edersin):
-            -- TextButton.MouseButton1Click:Connect(function() pcall(callback) end)
-            
-            -- Hata vermemesi için kütüphaneye tanımlandı.
             return true
         end
 
-        -- DIVIDER OLUŞTURUCU (Başka scriptlerde hata çıkmaması için boş fonksiyon)
+        -- DIVIDER OLUŞTURUCU (Hata çıkmaması için boş fonksiyon)
         function Tab:CreateDivider()
             return true
         end
