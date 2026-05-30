@@ -1,6 +1,6 @@
 -- =========================================================================
 -- EMLOXA WARE: EVADE (PLACE ID: 9872472334)
--- UISTROKE FIX | NO DIVIDERS | ULTIMATE CARRY & HUD CORE | REVIVE TP
+-- UISTROKE FIX | NO DIVIDERS | ULTIMATE CARRY & HUD CORE | REVIVE TP & NEXTBOT LOOP
 -- =========================================================================
 local GameModule = {}
 
@@ -26,6 +26,7 @@ function GameModule:Init(Window)
     
     local PreReviveCFrame = nil
     local AwaitingReviveTeleport = false
+    local TargetedNextbot = nil
     
     local Settings = {
         Movement = { 
@@ -39,8 +40,10 @@ function GameModule:Init(Window)
             TargetPlayer = nil
         },
         Exploits = { 
-            AutoReviveSelf = false, AutoReviveAura = false, TeleportBackOnRevive = false,
-            AutoVote = false, MapNumber = 1, LastReviveCheck = 0
+            AutoReviveSelf = false, AutoReviveAura = false, 
+            TeleportBackOnRevive = false, ReviveTPDelay = 1,
+            AutoVote = false, MapNumber = 1, LastReviveCheck = 0,
+            LoopTPNextbot = false
         },
         Visuals = { 
             PlayerESP = false, BotESP = false, TicketESP = false, DownedColor = true, Distance = true
@@ -195,6 +198,11 @@ function GameModule:Init(Window)
     ExploitTab:CreateToggle("Auto Revive Aura (Lag-Free)", function(s) Settings.Exploits.AutoReviveAura = s end)
     ExploitTab:CreateToggle("Auto Revive Loop (Self)", function(s) Settings.Exploits.AutoReviveSelf = s end)
     ExploitTab:CreateToggle("TP Back After Revive", function(s) Settings.Exploits.TeleportBackOnRevive = s end)
+    ExploitTab:CreateSlider("Revive TP Delay (Sec)", 0, 10, 1, function(v) Settings.Exploits.ReviveTPDelay = v end)
+    ExploitTab:CreateToggle("Loop TP to Nextbot", function(s) 
+        Settings.Exploits.LoopTPNextbot = s 
+        if not s then TargetedNextbot = nil end
+    end)
     ExploitTab:CreateDropdown("Select Map to Vote", {"Map 1", "Map 2", "Map 3", "Map 4"}, "Map 1", function(opt) 
         Settings.Exploits.MapNumber = tonumber(opt:match("%d+")) 
     end)
@@ -337,13 +345,14 @@ function GameModule:Init(Window)
 
         if hum and hrp then
             local bVel = hrp:FindFirstChild("EmloxaVelocity")
-            if not bVel then
-                bVel = Instance.new("BodyVelocity")
-                bVel.Name = "EmloxaVelocity"
-                bVel.Parent = hrp
-            end
-
+            
+            -- SPEED VE FLY MANTIĞI TAMAMEN AYRILDI
             if Settings.Movement.FlyEnabled then
+                if not bVel then
+                    bVel = Instance.new("BodyVelocity")
+                    bVel.Name = "EmloxaVelocity"
+                    bVel.Parent = hrp
+                end
                 bVel.MaxForce = Vector3.new(100000, 100000, 100000)
                 local moveDir = hum.MoveDirection
                 local flyDir = Vector3.new(0, 0, 0)
@@ -351,13 +360,13 @@ function GameModule:Init(Window)
                 if IsHoldingCtrl then flyDir = flyDir + Vector3.new(0, -1, 0) end
                 if moveDir.Magnitude > 0 then flyDir = flyDir + moveDir end
                 bVel.Velocity = flyDir * Settings.Movement.FlySpeed
-            elseif Settings.Movement.SpeedEnabled and hum.MoveDirection.Magnitude > 0 then
-                bVel.MaxForce = Vector3.new(100000, 0, 100000)
-                bVel.Velocity = hum.MoveDirection * Settings.Movement.SpeedValue
-                hrp.AssemblyLinearVelocity = Vector3.new(bVel.Velocity.X, hrp.AssemblyLinearVelocity.Y, bVel.Velocity.Z)
             else
-                bVel.MaxForce = Vector3.new(0, 0, 0)
-                bVel.Velocity = Vector3.new(0, 0, 0)
+                if bVel then bVel:Destroy() end
+                
+                if Settings.Movement.SpeedEnabled and hum.MoveDirection.Magnitude > 0 then
+                    local dir = hum.MoveDirection
+                    hrp.AssemblyLinearVelocity = Vector3.new(dir.X * Settings.Movement.SpeedValue, hrp.AssemblyLinearVelocity.Y, dir.Z * Settings.Movement.SpeedValue)
+                end
             end
 
             if Settings.Movement.AutoBhop and IsHoldingSpace and hum.FloorMaterial ~= Enum.Material.Air then
@@ -369,6 +378,24 @@ function GameModule:Init(Window)
                 VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
                 VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.G, false, game)
                 VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
+            end
+        end
+
+        -- NEXTBOT LOOP TP MANTIĞI
+        if Settings.Exploits.LoopTPNextbot and hrp then
+            if not TargetedNextbot or not TargetedNextbot.Parent or not TargetedNextbot:FindFirstChild("Hitbox") then
+                local f = Workspace:FindFirstChild("Game") and Workspace.Game:FindFirstChild("Players")
+                if f then
+                    for _, b in ipairs(f:GetChildren()) do
+                        if b:IsA("Model") and b:FindFirstChild("Hitbox") then
+                            TargetedNextbot = b
+                            break
+                        end
+                    end
+                end
+            end
+            if TargetedNextbot and TargetedNextbot:FindFirstChild("Hitbox") then
+                hrp.CFrame = TargetedNextbot.Hitbox.CFrame
             end
         end
 
@@ -470,7 +497,7 @@ function GameModule:Init(Window)
                     PreReviveCFrame = nil
                     
                     task.spawn(function()
-                        task.wait(1)
+                        task.wait(Settings.Exploits.ReviveTPDelay)
                         local curChar = LocalPlayer.Character
                         local curHrp = curChar and curChar:FindFirstChild("HumanoidRootPart")
                         if curHrp then
