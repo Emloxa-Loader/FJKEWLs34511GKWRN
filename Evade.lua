@@ -1,6 +1,6 @@
 -- =========================================================================
 -- EMLOXA WARE: EVADE (PLACE ID: 9872472334)
--- UISTROKE FIX | NO DIVIDERS | ULTIMATE CARRY & HUD CORE
+-- UISTROKE FIX | NO DIVIDERS | ULTIMATE CARRY & HUD CORE | REVIVE TP
 -- =========================================================================
 local GameModule = {}
 
@@ -24,6 +24,9 @@ function GameModule:Init(Window)
     local DownedTimers = {}
     local CurrentPlatform = nil
     
+    local PreReviveCFrame = nil
+    local AwaitingReviveTeleport = false
+    
     local Settings = {
         Movement = { 
             SpeedEnabled = false, SpeedValue = 40, 
@@ -36,7 +39,7 @@ function GameModule:Init(Window)
             TargetPlayer = nil
         },
         Exploits = { 
-            AutoReviveSelf = false, AutoReviveAura = false, 
+            AutoReviveSelf = false, AutoReviveAura = false, TeleportBackOnRevive = false,
             AutoVote = false, MapNumber = 1, LastReviveCheck = 0
         },
         Visuals = { 
@@ -74,7 +77,7 @@ function GameModule:Init(Window)
 
     local Stroke = Instance.new("UIStroke")
     Stroke.Color = Color3.fromRGB(102, 85, 255)
-    Stroke.Thickness = 2 -- HATALI KISIM BURASIYDI, "Width" yerine "Thickness" olarak düzeltildi.
+    Stroke.Thickness = 2
     Stroke.Parent = MainFrame
 
     local TitleLabel = Instance.new("TextLabel")
@@ -164,7 +167,7 @@ function GameModule:Init(Window)
     end
 
     -- ==========================================
-    -- MENÜ SEKMELERİ (DIVIDER'LAR SİLİNDİ)
+    -- MENÜ SEKMELERİ
     -- ==========================================
     local MoveTab = Window:CreateTab("Movement")
     MoveTab:CreateToggle("Enable True Speed", function(s) Settings.Movement.SpeedEnabled = s end)
@@ -191,6 +194,7 @@ function GameModule:Init(Window)
     local ExploitTab = Window:CreateTab("Exploits")
     ExploitTab:CreateToggle("Auto Revive Aura (Lag-Free)", function(s) Settings.Exploits.AutoReviveAura = s end)
     ExploitTab:CreateToggle("Auto Revive Loop (Self)", function(s) Settings.Exploits.AutoReviveSelf = s end)
+    ExploitTab:CreateToggle("TP Back After Revive", function(s) Settings.Exploits.TeleportBackOnRevive = s end)
     ExploitTab:CreateDropdown("Select Map to Vote", {"Map 1", "Map 2", "Map 3", "Map 4"}, "Map 1", function(opt) 
         Settings.Exploits.MapNumber = tonumber(opt:match("%d+")) 
     end)
@@ -442,10 +446,38 @@ function GameModule:Init(Window)
             end
         end
 
-        if Settings.Exploits.AutoReviveSelf and char and char:GetAttribute("Downed") then
-            if tick() - Settings.Exploits.LastReviveCheck >= 3 then
-                Settings.Exploits.LastReviveCheck = tick()
-                ReplicatedStorage.Events.Player.ChangePlayerMode:FireServer(true)
+        -- ==========================================
+        -- AUTO REVIVE SELF & TP BACK LOGIC
+        -- ==========================================
+        if Settings.Exploits.AutoReviveSelf and char then
+            local isDowned = char:GetAttribute("Downed")
+            
+            if isDowned then
+                if Settings.Exploits.TeleportBackOnRevive and hrp and not AwaitingReviveTeleport then
+                    PreReviveCFrame = hrp.CFrame
+                    AwaitingReviveTeleport = true
+                end
+
+                if tick() - Settings.Exploits.LastReviveCheck >= 3 then
+                    Settings.Exploits.LastReviveCheck = tick()
+                    ReplicatedStorage.Events.Player.ChangePlayerMode:FireServer(true)
+                end
+            elseif not isDowned and AwaitingReviveTeleport then
+                AwaitingReviveTeleport = false
+                
+                if PreReviveCFrame and Settings.Exploits.TeleportBackOnRevive then
+                    local targetCFrame = PreReviveCFrame
+                    PreReviveCFrame = nil
+                    
+                    task.spawn(function()
+                        task.wait(1)
+                        local curChar = LocalPlayer.Character
+                        local curHrp = curChar and curChar:FindFirstChild("HumanoidRootPart")
+                        if curHrp then
+                            curHrp.CFrame = targetCFrame
+                        end
+                    end)
+                end
             end
         end
 
