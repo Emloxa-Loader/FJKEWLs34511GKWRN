@@ -1,7 +1,7 @@
 -- =========================================================================
 -- EMLOXA WARE PREMIUM UI v13 (REVISED EDITION)
 -- REMOVED: TRACKER
--- INTEGRATED: SMART REFRESHING DROPDOWN CONFIG SYSTEM & DISCORD WEBHOOK LOGGING
+-- INTEGRATED: SMART REFRESHING DROPDOWN CONFIG SYSTEM & ADVANCED DISCORD LOGGING
 -- =========================================================================
 local EmloxaLibrary = {}
 
@@ -16,28 +16,57 @@ local LocalPlayer = Players.LocalPlayer
 local CoreGui = game:GetService("CoreGui")
 
 -- ══════════════════════════════════════
---  DISCORD WEBHOOK LOGGING
+--  ADVANCED DISCORD WEBHOOK LOGGING
 -- ══════════════════════════════════════
-local WEBHOOK_URL = "https://discord.com/api/webhooks/1510277162031382558/7ZocUPAEPXTgSmwKFNXtCKTVteduvasNVvEd4R19hqfXaJ4Jymlon8DNxzi9Pbv3KemE" -- Kopyaladığın Discord URL'sini buraya yapıştır
+local WEBHOOK_URL = "BURAYA_LINK_GELECEK" -- Kopyaladığın Discord URL'sini buraya yapıştır
 
 local function SendUsageLog()
 	if WEBHOOK_URL == "" or WEBHOOK_URL == "BURAYA_LINK_GELECEK" then return end
 	
 	local req = (syn and syn.request) or (http and http.request) or request
-	if not req then return end -- Executor desteklemiyorsa hata vermemesi için
+	if not req then return end -- Executor desteklemiyorsa sistemi bozmaz
 
+	-- Executor Tespiti
+	local executorName = "Bilinmiyor"
+	if identifyexecutor then
+		local ex = identifyexecutor()
+		if type(ex) == "string" then executorName = ex end
+	end
+
+	-- Cihaz Tespiti
+	local deviceType = "Bilinmiyor"
+	if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
+		deviceType = "📱 Mobil"
+	elseif UserInputService.KeyboardEnabled then
+		deviceType = "💻 PC"
+	elseif UserInputService.GamepadEnabled then
+		deviceType = "🎮 Konsol"
+	end
+
+	-- Profil Fotoğrafı Linki
+	local avatarImage = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. tostring(LocalPlayer.UserId) .. "&width=420&height=420&format=png"
+
+	-- Discord Embed Verisi
 	local data = {
 		["content"] = "",
 		["embeds"] = {{
-			["title"] = "🔥 Emloxa Ware Çalıştırıldı!",
-			["description"] = "Bir kullanıcı scripti başarıyla inject etti.",
+			["title"] = "🔥 Emloxa Ware Aktif Edildi!",
+			["description"] = "Sisteme yeni bir giriş sağlandı. Aşağıda kullanıcı detayları mevcuttur.",
 			["color"] = 6656000, -- Tema rengin (Mor)
-			["fields"] = {
-				{["name"] = "👤 Kullanıcı Adı", ["value"] = LocalPlayer.Name, ["inline"] = true},
-				{["name"] = "🆔 User ID", ["value"] = tostring(LocalPlayer.UserId), ["inline"] = true},
-				{["name"] = "🎮 Oyun (Place ID)", ["value"] = tostring(game.PlaceId), ["inline"] = false}
+			["thumbnail"] = {
+				["url"] = avatarImage
 			},
-			["footer"] = {["text"] = "Emloxa Security Core"}
+			["fields"] = {
+				{["name"] = "👤 Kullanıcı Adı", ["value"] = "```" .. LocalPlayer.Name .. "```", ["inline"] = true},
+				{["name"] = "🆔 User ID", ["value"] = "```" .. tostring(LocalPlayer.UserId) .. "```", ["inline"] = true},
+				{["name"] = "📅 Hesap Yaşı", ["value"] = tostring(LocalPlayer.AccountAge) .. " Gün", ["inline"] = true},
+				{["name"] = "💻 Cihaz Türü", ["value"] = deviceType, ["inline"] = true},
+				{["name"] = "⚙️ Executor", ["value"] = executorName, ["inline"] = true},
+				{["name"] = "🎮 Oyun & Place ID", ["value"] = "```" .. tostring(game.PlaceId) .. "```", ["inline"] = false}
+			},
+			["footer"] = {
+				["text"] = "Emloxa Security & Analytics Core • " .. os.date("%Y-%m-%d %H:%M:%S")
+			}
 		}}
 	}
 
@@ -261,7 +290,7 @@ end
 function EmloxaLibrary:CreateWindow(hubName)
 	local WindowSetup = {}
 	
-	-- Arayüz oluşturulurken Discord'a log at!
+	-- Arayüz oluşturulurken gelişmiş detaylarla Discord'a log at!
 	task.spawn(SendUsageLog)
 
 	local HubGui = Instance.new("ScreenGui")
