@@ -1,6 +1,7 @@
 -- =========================================================================
 -- EMLOXA WARE: EVADE (PLACE ID: 9872472334)
 -- UISTROKE FIX | NO DIVIDERS | ULTIMATE CARRY & HUD CORE | REVIVE TP & NEXTBOT LOOP
+-- PHYSICS OVERRIDE: TRUE FLY & RAW SPEED INCLUDED
 -- =========================================================================
 local GameModule = {}
 
@@ -41,7 +42,7 @@ function GameModule:Init(Window)
         },
         Exploits = { 
             AutoReviveSelf = false, AutoReviveAura = false, 
-            TeleportBackOnRevive = false, ReviveTPDelay = 1,
+            TeleportBackOnRevive = false, ReviveTPDelay = 0,
             AutoVote = false, MapNumber = 1, LastReviveCheck = 0,
             LoopTPNextbot = false
         },
@@ -174,7 +175,7 @@ function GameModule:Init(Window)
     -- ==========================================
     local MoveTab = Window:CreateTab("Movement")
     MoveTab:CreateToggle("Enable True Speed", function(s) Settings.Movement.SpeedEnabled = s end)
-    MoveTab:CreateSlider("Speed Velocity Value", 16, 150, 40, function(v) Settings.Movement.SpeedValue = v end)
+    MoveTab:CreateSlider("Speed Velocity Value", 16, 200, 40, function(v) Settings.Movement.SpeedValue = v end)
     MoveTab:CreateToggle("Enable Fly Mode", function(s) Settings.Movement.FlyEnabled = s end)
     MoveTab:CreateSlider("Fly Velocity Value", 20, 200, 50, function(v) Settings.Movement.FlySpeed = v end)
     MoveTab:CreateToggle("Auto Bhop (Hold Space)", function(s) Settings.Movement.AutoBhop = s end)
@@ -198,7 +199,7 @@ function GameModule:Init(Window)
     ExploitTab:CreateToggle("Auto Revive Aura (Lag-Free)", function(s) Settings.Exploits.AutoReviveAura = s end)
     ExploitTab:CreateToggle("Auto Revive Loop (Self)", function(s) Settings.Exploits.AutoReviveSelf = s end)
     ExploitTab:CreateToggle("TP Back After Revive", function(s) Settings.Exploits.TeleportBackOnRevive = s end)
-    ExploitTab:CreateSlider("Revive TP Delay (Sec)", 0, 10, 1, function(v) Settings.Exploits.ReviveTPDelay = v end)
+    ExploitTab:CreateSlider("Revive TP Delay (Sec)", 0, 10, 0, function(v) Settings.Exploits.ReviveTPDelay = v end)
     ExploitTab:CreateToggle("Loop TP to Nextbot", function(s) 
         Settings.Exploits.LoopTPNextbot = s 
         if not s then TargetedNextbot = nil end
@@ -253,6 +254,8 @@ function GameModule:Init(Window)
         if CurrentPlatform then CurrentPlatform:Destroy() end
         local char = LocalPlayer.Character
         if char and char:FindFirstChild("HumanoidRootPart") then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then hum.PlatformStand = false end
             if char.HumanoidRootPart:FindFirstChild("EmloxaVelocity") then char.HumanoidRootPart.EmloxaVelocity:Destroy() end
         end
         local ui = game:GetService("CoreGui"):FindFirstChild("EmloxaWareUI") or LocalPlayer.PlayerGui:FindFirstChild("EmloxaWareUI")
@@ -346,26 +349,39 @@ function GameModule:Init(Window)
         if hum and hrp then
             local bVel = hrp:FindFirstChild("EmloxaVelocity")
             
-            -- SPEED VE FLY MANTIĞI TAMAMEN AYRILDI
+            -- SPEED VE FLY MANTIĞI TAMAMEN YENİLENDİ VE EVADE FİZİĞİ EZİLDİ
             if Settings.Movement.FlyEnabled then
                 if not bVel then
                     bVel = Instance.new("BodyVelocity")
                     bVel.Name = "EmloxaVelocity"
                     bVel.Parent = hrp
                 end
-                bVel.MaxForce = Vector3.new(100000, 100000, 100000)
-                local moveDir = hum.MoveDirection
-                local flyDir = Vector3.new(0, 0, 0)
+                
+                hum.PlatformStand = true -- Oyunun yerçekimini ve sürtünmesini ezer
+                bVel.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                
+                local flyDir = hum.MoveDirection
                 if IsHoldingSpace then flyDir = flyDir + Vector3.new(0, 1, 0) end
                 if IsHoldingCtrl then flyDir = flyDir + Vector3.new(0, -1, 0) end
-                if moveDir.Magnitude > 0 then flyDir = flyDir + moveDir end
+                
+                if flyDir.Magnitude > 0 then flyDir = flyDir.Unit end
                 bVel.Velocity = flyDir * Settings.Movement.FlySpeed
             else
-                if bVel then bVel:Destroy() end
+                if hum.PlatformStand then
+                    hum.PlatformStand = false -- Uçma kapanınca normale dön
+                end
                 
                 if Settings.Movement.SpeedEnabled and hum.MoveDirection.Magnitude > 0 then
-                    local dir = hum.MoveDirection
-                    hrp.AssemblyLinearVelocity = Vector3.new(dir.X * Settings.Movement.SpeedValue, hrp.AssemblyLinearVelocity.Y, dir.Z * Settings.Movement.SpeedValue)
+                    -- Hızın Evade sürtünmesine takılmaması için BodyVelocity ile zorla
+                    if not bVel then
+                        bVel = Instance.new("BodyVelocity")
+                        bVel.Name = "EmloxaVelocity"
+                        bVel.Parent = hrp
+                    end
+                    bVel.MaxForce = Vector3.new(math.huge, 0, math.huge)
+                    bVel.Velocity = hum.MoveDirection * Settings.Movement.SpeedValue
+                else
+                    if bVel then bVel:Destroy() end
                 end
             end
 
@@ -395,7 +411,8 @@ function GameModule:Init(Window)
                 end
             end
             if TargetedNextbot and TargetedNextbot:FindFirstChild("Hitbox") then
-                hrp.CFrame = TargetedNextbot.Hitbox.CFrame
+                -- Botun tam üstüne ışınla ki anında ölmesin, ama peşinde kalsın
+                hrp.CFrame = TargetedNextbot.Hitbox.CFrame + Vector3.new(0, 3, 0)
             end
         end
 
@@ -497,7 +514,12 @@ function GameModule:Init(Window)
                     PreReviveCFrame = nil
                     
                     task.spawn(function()
-                        task.wait(Settings.Exploits.ReviveTPDelay)
+                        if Settings.Exploits.ReviveTPDelay > 0 then
+                            task.wait(Settings.Exploits.ReviveTPDelay)
+                        else
+                            task.wait() -- 0 saniye seçilmişse frame atla ki buga girmesin
+                        end
+                        
                         local curChar = LocalPlayer.Character
                         local curHrp = curChar and curChar:FindFirstChild("HumanoidRootPart")
                         if curHrp then
