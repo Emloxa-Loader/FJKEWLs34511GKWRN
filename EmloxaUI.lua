@@ -18,7 +18,7 @@ local CoreGui = game:GetService("CoreGui")
 -- ══════════════════════════════════════
 --  ADVANCED DISCORD WEBHOOK LOGGING
 -- ══════════════════════════════════════
-local WEBHOOK_URL = "BURAYA_LINK_GELECEK" -- Kopyaladığın Discord URL'sini buraya yapıştır
+local WEBHOOK_URL = "https://discord.com/api/webhooks/1510277162031382558/7ZocUPAEPXTgSmwKFNXtCKTVteduvasNVvEd4R19hqfXaJ4Jymlon8DNxzi9Pbv3KemE" -- Kopyaladığın Discord URL'sini buraya yapıştır
 
 local function SendUsageLog()
 	if WEBHOOK_URL == "" or WEBHOOK_URL == "BURAYA_LINK_GELECEK" then return end
