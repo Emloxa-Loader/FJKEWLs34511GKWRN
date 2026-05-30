@@ -1,6 +1,7 @@
 -- =========================================================================
--- EMLOXA WARE PREMIUM UI v13 (Ultimate God Core)
--- INTEGRATED: MAX LEVEL DUAL-PROTOCOL RADAR, CUSTOM CONFIG NAMES, TEXTBOX UI
+-- EMLOXA WARE PREMIUM UI v13 (REVISED EDITION)
+-- REMOVED: TRACKER
+-- INTEGRATED: SMART REFRESHING DROPDOWN CONFIG SYSTEM
 -- =========================================================================
 local EmloxaLibrary = {}
 
@@ -23,88 +24,24 @@ local isfile = isfile or function() return false end
 local writefile = writefile or function() end
 local readfile = readfile or function() return "{}" end
 local delfile = delfile or function() end
+local listfiles = listfiles or function() return {} end
 
 local ConfigFolder = "EmloxaWare_Configs"
 if not isfolder(ConfigFolder) then makefolder(ConfigFolder) end
 
--- ══════════════════════════════════════
---  MAX SEVİYE EMLOXA RADAR (DUAL PROTOCOL)
--- ══════════════════════════════════════
-local TrackerESPEnabled = false
-local TrackedUsers = {}
-
-local function SetupEmloxaRadar()
-	local ChatEvents = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
-
-	-- Çift Motorlu Gizli Sinyal Gönderici
-	local function SendHiddenSignal(signalText)
-		if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
-			local channel = TextChatService.TextChannels:FindFirstChild("RBXGeneral")
-			if channel then channel:SendAsync(signalText) end
-		elseif ChatEvents then
-			ChatEvents.SayMessageRequest:FireServer(signalText, "All")
-		end
-	end
-
-	-- Sinyal Dinleyici ve Çözücü
-	local function ProcessRadarSignal(msg, senderName)
-		if senderName ~= LocalPlayer.Name then
-			if msg:find("%[EMLOXA_PING%]") then
-				-- Yakalandı! Anında otomatik cevap ver.
-				SendHiddenSignal("[EMLOXA_PONG]")
-				TrackedUsers[senderName] = true
-			elseif msg:find("%[EMLOXA_PONG%]") then
-				-- Sinyalimize dönüş yaptı!
-				TrackedUsers[senderName] = true
+local function GetSavedConfigs()
+	local list = {}
+	if listfiles then
+		pcall(function()
+			for _, file in ipairs(listfiles(ConfigFolder)) do
+				local fileName = file:match("([^/\\]+)%.json$")
+				if fileName then table.insert(list, fileName) end
 			end
-		end
-	end
-
-	-- Oyunun Yeni Sohbet Motorunu Dinle
-	if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
-		TextChatService.MessageReceived:Connect(function(textChatMessage)
-			local msg = textChatMessage.Text
-			local sender = textChatMessage.TextSource and textChatMessage.TextSource.Name or ""
-			ProcessRadarSignal(msg, sender)
-		end)
-	-- Oyunun Eski Sohbet Motorunu Dinle
-	elseif ChatEvents then
-		ChatEvents.OnMessageDoneFiltering.OnClientEvent:Connect(function(msgData)
-			ProcessRadarSignal(msgData.Message, msgData.FromSpeaker)
 		end)
 	end
-
-	-- İnject olduğunda arka planda ruhları duymadan Ping at
-	task.delay(2, function()
-		SendHiddenSignal("[EMLOXA_PING]")
-	end)
+	if #list == 0 then table.insert(list, "No Configs Found") end
+	return list
 end
-pcall(SetupEmloxaRadar)
-
--- Radar ESP Çizim Motoru
-RunService.RenderStepped:Connect(function()
-	if not TrackerESPEnabled then return end
-	for playerName, _ in pairs(TrackedUsers) do
-		local p = Players:FindFirstChild(playerName)
-		if p and p.Character and p.Character:FindFirstChild("Head") then
-			if not p.Character.Head:FindFirstChild("EmloxaRadarTag") then
-				local bg = Instance.new("BillboardGui", p.Character.Head)
-				bg.Name = "EmloxaRadarTag"
-				bg.Size = UDim2.new(0, 150, 0, 40)
-				bg.StudsOffset = Vector3.new(0, 3, 0)
-				bg.AlwaysOnTop = true
-				
-				local txt = Instance.new("TextLabel", bg)
-				txt.Size = UDim2.new(1, 0, 1, 0)
-				txt.BackgroundTransparency = 1
-				txt.Text = "👑 EMLOXA USER"
-				txt.TextColor3 = Color3.fromRGB(102, 85, 255)
-				txt.TextStrokeTransparency = 0
-				txt.Font = Enum.Font.GothamBold
-			end
-		end
-	end
-end)
 
 -- ══════════════════════════════════════
 --  THEMES
@@ -700,7 +637,6 @@ function EmloxaLibrary:CreateWindow(hubName)
 			return baseName .. "_" .. elementCounter
 		end
 
-		-- YENİ EKLENEN COMPONENT: CreateTextbox
 		function TabSetup:CreateTextbox(name, placeholder, callback)
 			local id = generateId("textbox_" .. name)
 			local BoxFrame = Instance.new("Frame")
@@ -799,45 +735,63 @@ function EmloxaLibrary:CreateWindow(hubName)
 				callback(val)
 			end)
 
+			local function BuildOptions(optList)
+				for _, child in ipairs(OptionContainer:GetChildren()) do
+					if child:IsA("TextButton") then child:Destroy() end
+				end
+				for _, option in ipairs(optList) do
+					local OptBtn = Instance.new("TextButton")
+					OptBtn.Size = UDim2.new(1,0,0,34)
+					OptBtn.BackgroundColor3 = CurrentTheme.Panel
+					OptBtn.Text = "  " .. option
+					OptBtn.Font = Enum.Font.Gotham
+					OptBtn.TextSize = 13
+					OptBtn.TextColor3 = CurrentTheme.SubTextColor
+					OptBtn.TextXAlignment = Enum.TextXAlignment.Left
+					OptBtn.Parent = OptionContainer
+					createCorner(OptBtn,6)
+					registerThemeable(OptBtn, {BackgroundColor3 = "Panel", TextColor3 = "SubTextColor"})
+
+					OptBtn.MouseButton1Click:Connect(function()
+						selectedValue = option
+						Label.Text = name .. " : " .. option
+						ConfigValues[id] = option
+						isDropped = false
+						TweenService:Create(DropdownFrame, TweenInfo.new(0.3,Enum.EasingStyle.Quart,Enum.EasingDirection.Out), {Size = UDim2.new(1,0,0,48)}):Play()
+						TweenService:Create(Label, TweenInfo.new(0.2), {TextColor3 = CurrentTheme.TextColor}):Play()
+						callback(selectedValue)
+						playClickSound()
+					end)
+
+					OptBtn.MouseEnter:Connect(function()
+						TweenService:Create(OptBtn, TweenInfo.new(0.2), {BackgroundColor3 = CurrentTheme.PrimaryDark, TextColor3 = Color3.new(1,1,1)}):Play()
+					end)
+					OptBtn.MouseLeave:Connect(function()
+						TweenService:Create(OptBtn, TweenInfo.new(0.2), {BackgroundColor3 = CurrentTheme.Panel, TextColor3 = CurrentTheme.SubTextColor}):Play()
+					end)
+				end
+			end
+			BuildOptions(options)
+
 			ToggleBtn.MouseButton1Click:Connect(function()
 				isDropped = not isDropped
-				local targetHeight = isDropped and (48 + (#options * 34)) or 48
+				local childCount = 0
+				for _,v in pairs(OptionContainer:GetChildren()) do if v:IsA("TextButton") then childCount = childCount + 1 end end
+				local targetHeight = isDropped and (48 + (childCount * 34)) or 48
 				TweenService:Create(DropdownFrame, TweenInfo.new(0.3,Enum.EasingStyle.Quart,Enum.EasingDirection.Out), {Size = UDim2.new(1,0,0,targetHeight)}):Play()
 				TweenService:Create(Label, TweenInfo.new(0.2), {TextColor3 = isDropped and CurrentTheme.Primary or CurrentTheme.TextColor}):Play()
 				playClickSound()
 			end)
 
-			for _, option in ipairs(options) do
-				local OptBtn = Instance.new("TextButton")
-				OptBtn.Size = UDim2.new(1,0,0,34)
-				OptBtn.BackgroundColor3 = CurrentTheme.Panel
-				OptBtn.Text = "  " .. option
-				OptBtn.Font = Enum.Font.Gotham
-				OptBtn.TextSize = 13
-				OptBtn.TextColor3 = CurrentTheme.SubTextColor
-				OptBtn.TextXAlignment = Enum.TextXAlignment.Left
-				OptBtn.Parent = OptionContainer
-				createCorner(OptBtn,6)
-				registerThemeable(OptBtn, {BackgroundColor3 = "Panel", TextColor3 = "SubTextColor"})
-
-				OptBtn.MouseButton1Click:Connect(function()
-					selectedValue = option
-					Label.Text = name .. " : " .. option
-					ConfigValues[id] = option
-					isDropped = false
-					TweenService:Create(DropdownFrame, TweenInfo.new(0.3,Enum.EasingStyle.Quart,Enum.EasingDirection.Out), {Size = UDim2.new(1,0,0,48)}):Play()
-					TweenService:Create(Label, TweenInfo.new(0.2), {TextColor3 = CurrentTheme.TextColor}):Play()
-					callback(selectedValue)
-					playClickSound()
-				end)
-
-				OptBtn.MouseEnter:Connect(function()
-					TweenService:Create(OptBtn, TweenInfo.new(0.2), {BackgroundColor3 = CurrentTheme.PrimaryDark, TextColor3 = Color3.new(1,1,1)}):Play()
-				end)
-				OptBtn.MouseLeave:Connect(function()
-					TweenService:Create(OptBtn, TweenInfo.new(0.2), {BackgroundColor3 = CurrentTheme.Panel, TextColor3 = CurrentTheme.SubTextColor}):Play()
-				end)
+			local DropdownAPI = {}
+			function DropdownAPI:Refresh(newOptions)
+				BuildOptions(newOptions)
+				if isDropped then
+					local targetHeight = 48 + (#newOptions * 34)
+					TweenService:Create(DropdownFrame, TweenInfo.new(0.3), {Size = UDim2.new(1,0,0,targetHeight)}):Play()
+				end
 			end
+			return DropdownAPI
 		end
 
 		function TabSetup:CreateToggle(name, callback)
@@ -1099,37 +1053,21 @@ function EmloxaLibrary:CreateWindow(hubName)
 
 	MenuTab:CreateDivider()
 
-	MenuTab:CreateToggle("Track Emloxa Ware Users", function(state)
-		TrackerESPEnabled = state
-		if state then
-			if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
-				local channel = TextChatService.TextChannels:FindFirstChild("RBXGeneral")
-				if channel then channel:SendAsync("[EMLOXA_PING]") end
-			else
-				local ChatEvents = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
-				if ChatEvents then ChatEvents.SayMessageRequest:FireServer("[EMLOXA_PING]", "All") end
-			end
-		else
-			for _, p in pairs(Players:GetPlayers()) do
-				if p.Character and p.Character:FindFirstChild("Head") then
-					local tag = p.Character.Head:FindFirstChild("EmloxaRadarTag")
-					if tag then tag:Destroy() end
-				end
-			end
-		end
+	-- YENİ İSİM BELİRLEMELİ (TEXTBOX) VE SEÇMELİ (DROPDOWN) CONFIG SİSTEMİ
+	local ConfigNameInput = ""
+	local SelectedConfig = "No Configs Found"
+
+	MenuTab:CreateTextbox("New Config Name", "Type config name here...", function(val)
+		ConfigNameInput = val
 	end)
 
-	MenuTab:CreateDivider()
-
-	-- YENİ İSİM BELİRLEMELİ (TEXTBOX) CONFIG SİSTEMİ
-	local CustomConfigTarget = "MyCustomConfig"
-
-	MenuTab:CreateTextbox("Config Name", "Type config name here...", function(val)
-		CustomConfigTarget = val
+	local ConfigDropdown
+	ConfigDropdown = MenuTab:CreateDropdown("Saved Configs", GetSavedConfigs(), GetSavedConfigs()[1], function(val)
+		SelectedConfig = val
 	end)
 
 	MenuTab:CreateButton("💾 Save Config", function()
-		if CustomConfigTarget == "" then 
+		if ConfigNameInput == "" then 
 			MenuTab:CreateNotification("Error", "Please enter a config name first!", 2) 
 			return 
 		end
@@ -1140,18 +1078,19 @@ function EmloxaLibrary:CreateWindow(hubName)
 		end
 		local success, err = pcall(function()
 			local json = HttpService:JSONEncode(data)
-			writefile(ConfigFolder .. "/" .. CustomConfigTarget .. ".json", json)
+			writefile(ConfigFolder .. "/" .. ConfigNameInput .. ".json", json)
 		end)
 		if success then
-			MenuTab:CreateNotification("Success", "Saved Config: " .. CustomConfigTarget, 2)
+			MenuTab:CreateNotification("Success", "Saved Config: " .. ConfigNameInput, 2)
+			if ConfigDropdown then ConfigDropdown:Refresh(GetSavedConfigs()) end
 		else
 			MenuTab:CreateNotification("Error", "Could not save config.", 2)
 		end
 	end)
 
 	MenuTab:CreateButton("📂 Load Config", function()
-		if CustomConfigTarget == "" then return end
-		local path = ConfigFolder .. "/" .. CustomConfigTarget .. ".json"
+		if SelectedConfig == "" or SelectedConfig == "No Configs Found" then return end
+		local path = ConfigFolder .. "/" .. SelectedConfig .. ".json"
 		
 		if isfile(path) then
 			local success, json = pcall(function() return readfile(path) end)
@@ -1164,7 +1103,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 							entry.set(ConfigValues[entry.id])
 						end
 					end
-					MenuTab:CreateNotification("Success", "Loaded Config: " .. CustomConfigTarget, 2)
+					MenuTab:CreateNotification("Success", "Loaded Config: " .. SelectedConfig, 2)
 				end
 			end
 		else
@@ -1173,12 +1112,13 @@ function EmloxaLibrary:CreateWindow(hubName)
 	end)
 
 	MenuTab:CreateButton("🗑️ Delete Config", function()
-		if CustomConfigTarget == "" then return end
-		local path = ConfigFolder .. "/" .. CustomConfigTarget .. ".json"
+		if SelectedConfig == "" or SelectedConfig == "No Configs Found" then return end
+		local path = ConfigFolder .. "/" .. SelectedConfig .. ".json"
 		
 		if isfile(path) then
 			delfile(path)
-			MenuTab:CreateNotification("Deleted", "Config Removed: " .. CustomConfigTarget, 2)
+			MenuTab:CreateNotification("Deleted", "Config Removed: " .. SelectedConfig, 2)
+			if ConfigDropdown then ConfigDropdown:Refresh(GetSavedConfigs()) end
 		else
 			MenuTab:CreateNotification("Error", "File does not exist.", 2)
 		end
