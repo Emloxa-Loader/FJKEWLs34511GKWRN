@@ -1,7 +1,7 @@
 -- =========================================================================
 -- EMLOXA WARE PREMIUM UI v13 (REVISED EDITION)
 -- REMOVED: TRACKER
--- INTEGRATED: SMART REFRESHING DROPDOWN CONFIG SYSTEM
+-- INTEGRATED: SMART REFRESHING DROPDOWN CONFIG SYSTEM & DISCORD WEBHOOK LOGGING
 -- =========================================================================
 local EmloxaLibrary = {}
 
@@ -14,6 +14,42 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TextChatService = game:GetService("TextChatService")
 local LocalPlayer = Players.LocalPlayer
 local CoreGui = game:GetService("CoreGui")
+
+-- ══════════════════════════════════════
+--  DISCORD WEBHOOK LOGGING
+-- ══════════════════════════════════════
+local WEBHOOK_URL = "https://discord.com/api/webhooks/1510277162031382558/7ZocUPAEPXTgSmwKFNXtCKTVteduvasNVvEd4R19hqfXaJ4Jymlon8DNxzi9Pbv3KemE" -- Kopyaladığın Discord URL'sini buraya yapıştır
+
+local function SendUsageLog()
+	if WEBHOOK_URL == "" or WEBHOOK_URL == "BURAYA_LINK_GELECEK" then return end
+	
+	local req = (syn and syn.request) or (http and http.request) or request
+	if not req then return end -- Executor desteklemiyorsa hata vermemesi için
+
+	local data = {
+		["content"] = "",
+		["embeds"] = {{
+			["title"] = "🔥 Emloxa Ware Çalıştırıldı!",
+			["description"] = "Bir kullanıcı scripti başarıyla inject etti.",
+			["color"] = 6656000, -- Tema rengin (Mor)
+			["fields"] = {
+				{["name"] = "👤 Kullanıcı Adı", ["value"] = LocalPlayer.Name, ["inline"] = true},
+				{["name"] = "🆔 User ID", ["value"] = tostring(LocalPlayer.UserId), ["inline"] = true},
+				{["name"] = "🎮 Oyun (Place ID)", ["value"] = tostring(game.PlaceId), ["inline"] = false}
+			},
+			["footer"] = {["text"] = "Emloxa Security Core"}
+		}}
+	}
+
+	pcall(function()
+		req({
+			Url = WEBHOOK_URL,
+			Method = "POST",
+			Headers = {["Content-Type"] = "application/json"},
+			Body = HttpService:JSONEncode(data)
+		})
+	end)
+end
 
 -- ══════════════════════════════════════
 --  FILE SYSTEM PROTECTIONS
@@ -224,6 +260,9 @@ end
 -- ══════════════════════════════════════
 function EmloxaLibrary:CreateWindow(hubName)
 	local WindowSetup = {}
+	
+	-- Arayüz oluşturulurken Discord'a log at!
+	task.spawn(SendUsageLog)
 
 	local HubGui = Instance.new("ScreenGui")
 	HubGui.Name = "EmloxaPremium"
@@ -1053,7 +1092,6 @@ function EmloxaLibrary:CreateWindow(hubName)
 
 	MenuTab:CreateDivider()
 
-	-- YENİ İSİM BELİRLEMELİ (TEXTBOX) VE SEÇMELİ (DROPDOWN) CONFIG SİSTEMİ
 	local ConfigNameInput = ""
 	local SelectedConfig = "No Configs Found"
 
