@@ -1,6 +1,6 @@
 -- =========================================================================
 -- EMLOXA WARE: PROJECT AFTERNIGHT (PLACE: 13042495892)
--- ADVANCED VECTOR ENGINE + PLAYERGUI INTEL DETECTOR (1K to 18K)
+-- V14 NEBULA ENGINE - VECTOR & DYNAMIC MULTI-KEY OPTIMIZED
 -- =========================================================================
 local GameModule = {}
 
@@ -12,66 +12,53 @@ function GameModule:Init(Window)
     local LocalPlayer = Players.LocalPlayer
 
     -- ==========================================
-    -- 1. SIDE SELECTOR UI (YÖN SEÇİCİ ARAYÜZ)
+    -- 1. SIDE SELECTOR UI (ŞIK & MODERN)
     -- ==========================================
     local CurrentSide = "Right"
     local SideUI = Instance.new("ScreenGui")
     SideUI.Name = "EmloxaAfternightSideUI"
-    SideUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    SideUI.ResetOnSpawn = false
     
     local success = pcall(function() SideUI.Parent = game:GetService("CoreGui") end)
     if not success then SideUI.Parent = LocalPlayer.PlayerGui end
 
     local MainFrame = Instance.new("Frame")
-    MainFrame.Size = UDim2.new(0, 200, 0, 40)
-    MainFrame.Position = UDim2.new(0.5, -100, 0, 20)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+    MainFrame.Size = UDim2.new(0, 220, 0, 45)
+    MainFrame.Position = UDim2.new(0.5, -110, 0, 15)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
     MainFrame.BorderSizePixel = 0
     MainFrame.Parent = SideUI
 
     local UICorner = Instance.new("UICorner")
-    UICorner.CornerRadius = UDim.new(0, 8)
+    UICorner.CornerRadius = UDim.new(0, 10)
     UICorner.Parent = MainFrame
 
     local UIStroke = Instance.new("UIStroke")
     UIStroke.Color = Color3.fromRGB(102, 85, 255)
-    UIStroke.Thickness = 2
+    UIStroke.Thickness = 2.5
     UIStroke.Parent = MainFrame
 
     local SideText = Instance.new("TextLabel")
     SideText.Size = UDim2.new(1, 0, 1, 0)
     SideText.BackgroundTransparency = 1
     SideText.Font = Enum.Font.GothamBold
-    SideText.Text = "PLAYING: RIGHT [Y]"
+    SideText.Text = "EMLOXA: RIGHT [Y]"
     SideText.TextColor3 = Color3.fromRGB(255, 255, 255)
-    SideText.TextSize = 14
+    SideText.TextSize = 15
     SideText.Parent = MainFrame
 
     UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
         if input.KeyCode == Enum.KeyCode.Y then
-            if CurrentSide == "Right" then
-                CurrentSide = "Left"
-                SideText.Text = "PLAYING: LEFT [Y]"
-                UIStroke.Color = Color3.fromRGB(255, 85, 85)
-            else
-                CurrentSide = "Right"
-                SideText.Text = "PLAYING: RIGHT [Y]"
-                UIStroke.Color = Color3.fromRGB(102, 85, 255)
-            end
+            CurrentSide = (CurrentSide == "Right") and "Left" or "Right"
+            SideText.Text = "EMLOXA: " .. CurrentSide:upper() .. " [Y]"
+            UIStroke.Color = (CurrentSide == "Left") and Color3.fromRGB(255, 85, 85) or Color3.fromRGB(102, 85, 255)
         end
     end)
 
     -- ==========================================
-    -- 2. AUTO PLAYER (CORE MODCHART VECTOR ENGINE)
+    -- 2. DYNAMIC KEYMAPS (FOTOĞRAFLARA TAM UYUMLU)
     -- ==========================================
-    local AutoPlayerEnabled = false
-    local AutoplayMethod = "Hybrid"
-    
-    local ProjectTab = Window:CreateTab("Auto Player")
-    local AdvancedTab = Window:CreateTab("Advanced")
-
-    -- KUSURSUZ VE SIRA DOĞRULAMALI TUŞ HARİTALARI
     local KeyMaps = {
         [1] = {Enum.KeyCode.Space},
         [2] = {Enum.KeyCode.F, Enum.KeyCode.J},
@@ -81,10 +68,7 @@ function GameModule:Init(Window)
         [6] = {Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D, Enum.KeyCode.J, Enum.KeyCode.K, Enum.KeyCode.L},
         [7] = {Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D, Enum.KeyCode.Space, Enum.KeyCode.J, Enum.KeyCode.K, Enum.KeyCode.L},
         [8] = {Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D, Enum.KeyCode.F, Enum.KeyCode.H, Enum.KeyCode.J, Enum.KeyCode.K, Enum.KeyCode.L},
-        
-        -- 9K MODE: Tam senin belirttiğin kusursuz parmak sırası!
         [9] = {Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D, Enum.KeyCode.F, Enum.KeyCode.Space, Enum.KeyCode.H, Enum.KeyCode.J, Enum.KeyCode.K, Enum.KeyCode.L},
-        
         [10] = {Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D, Enum.KeyCode.F, Enum.KeyCode.V, Enum.KeyCode.B, Enum.KeyCode.H, Enum.KeyCode.J, Enum.KeyCode.K, Enum.KeyCode.L},
         [18] = {
             Enum.KeyCode.Q, Enum.KeyCode.W, Enum.KeyCode.E, Enum.KeyCode.R, Enum.KeyCode.T, Enum.KeyCode.Y,
@@ -92,247 +76,171 @@ function GameModule:Init(Window)
             Enum.KeyCode.D, Enum.KeyCode.F, Enum.KeyCode.G, Enum.KeyCode.H, Enum.KeyCode.J, Enum.KeyCode.K
         }
     }
-    
+
+    -- ==========================================
+    -- 3. CORE AUTO-PLAYER ENGINE
+    -- ==========================================
+    local AutoPlayerEnabled = false
+    local AutoplayMethod = "Hybrid"
     local TappedNotes = {}
     local LastPositions = {} 
     local LastNoteSeenTime = tick()
-    
     local CurrentlyDown = {}
-    local TapReleaseTimes = {}
-    for i = 1, 18 do
-        CurrentlyDown[i] = false
-        TapReleaseTimes[i] = 0
-    end
 
-    ProjectTab:CreateToggle("Enable God Mode (Vector Engine)", function(s) AutoPlayerEnabled = s end)
+    local ProjectTab = Window:CreateTab("Auto Player")
+    local AdvancedTab = Window:CreateTab("Advanced")
+
+    ProjectTab:CreateToggle("Enable Nebula Engine V14", function(s) AutoPlayerEnabled = s end)
     AdvancedTab:CreateDropdown("Autoplay Method", {"Calculate", "Rapid checks", "Hybrid"}, "Hybrid", function(val) AutoplayMethod = val end)
 
-    -- GELİŞMİŞ VEKTÖREL YÖRÜNGE TAHMİNİ
-    local function GetNoteLaneInfo(noteCenter, velocityVec, targetStrums)
-        local bestMatchScore = -math.huge
-        local bestLaneIndex = nil
-        local bestStrum = nil
-
-        for i, strum in ipairs(targetStrums) do
-            local strumCenter = Vector2.new(
-                strum.AbsolutePosition.X + (strum.AbsoluteSize.X / 2),
-                strum.AbsolutePosition.Y + (strum.AbsoluteSize.Y / 2)
-            )
-            
-            local dist = (noteCenter - strumCenter).Magnitude
-            
-            if dist < 25 then
-                return i, strum
-            end
-
-            if velocityVec.Magnitude > 10 then
-                local noteDirection = velocityVec.Unit
-                local directionToStrum = (strumCenter - noteCenter).Unit
-                local alignment = noteDirection:Dot(directionToStrum)
-                
-                local score = (alignment * 1000) - dist
-                if score > bestMatchScore then
-                    bestMatchScore = score
-                    bestLaneIndex = i
-                    bestStrum = strum
-                end
-            else
-                local fallbackScore = -dist
-                if fallbackScore > bestMatchScore then
-                    bestMatchScore = fallbackScore
-                    bestLaneIndex = i
-                    bestStrum = strum
-                end
+    -- Optimizasyon: Her karede Strum'ları aramak yerine, değiştikçe bul
+    local CachedStrums = {}
+    local function GetStrumData(MainGame)
+        local total = 0
+        local all = {}
+        for _, obj in pairs(MainGame:GetChildren()) do
+            if obj.Name:find("Strum") then
+                total = total + 1
+                table.insert(all, obj)
             end
         end
-        return bestLaneIndex, bestStrum
+        return total, all
+    end
+
+    -- Vektörel Hedefleme (Hangi lane'e ait olduğunu bulma)
+    local function FindTargetLane(noteCenter, velocity, targetStrums)
+        local bestIdx, bestStrum, minScore = nil, nil, 100000
+        for i, strum in ipairs(targetStrums) do
+            local strumPos = strum.AbsolutePosition + (strum.AbsoluteSize / 2)
+            local dist = (noteCenter - strumPos).Magnitude
+            
+            -- Modchart (Hareketli şerit) desteği: Hız vektörü ile strum arasındaki açıya bak
+            local score = dist
+            if velocity.Magnitude > 10 then
+                local alignment = velocity.Unit:Dot((strumPos - noteCenter).Unit)
+                score = dist - (alignment * 200) -- Eğer nota strum'a doğru uçuyorsa puanı artır (mesafeyi düşük gör)
+            end
+
+            if score < minScore then
+                minScore = score
+                bestIdx = i
+                bestStrum = strum
+            end
+        end
+        return bestIdx, bestStrum
     end
 
     -- ==========================================
-    -- MİLİSANİYELİK KUSURSUZ DÖNGÜ
+    -- 4. RENDER STEPPED (MİLİSANİYELİK REFLEKS)
     -- ==========================================
     RunService.RenderStepped:Connect(function(deltaTime)
         if not AutoPlayerEnabled then return end
         
         local MainUI = LocalPlayer.PlayerGui:FindFirstChild("Main")
-        if not MainUI or not MainUI:FindFirstChild("Game") then return end
-        local MainGame = MainUI.Game
+        local MainGame = MainUI and MainUI:FindFirstChild("Game")
+        if not MainGame then return end
 
-        -- KURAL 1: DOĞRUDAN PLAYERGUI İÇERİSİNDEKİ KLASÖRÜ BULUP MODU SAPTAMA
-        local keysPerSide = nil
-        for i = 1, 18 do
-            if LocalPlayer.PlayerGui:FindFirstChild(i .. "K") then
-                keysPerSide = i
-                break
-            end
-        end
+        -- 4K Klasörü gelse de gelmese de Strum sayısından modu otomatik bul
+        local totalStrums, allStrums = GetStrumData(MainGame)
+        local kps = math.floor(totalStrums / 2)
+        if kps == 0 then return end
         
-        if not keysPerSide then return end -- Klasör henüz sisteme düşmediyse bekle
-        
-        local currentKeyMap = KeyMaps[keysPerSide] or KeyMaps[4]
-
-        -- Sahnedeki fiili yüklü Strum nesnelerini indeks numaralarına göre çekelim
-        local availableStrums = {}
-        local totalAvailableStrums = 0
-        for _, obj in pairs(MainGame:GetChildren()) do
-            if obj.Name:find("Strum") then
-                local num = tonumber(obj.Name:match("%d+"))
-                if num then
-                    availableStrums[num] = obj
-                    totalAvailableStrums = totalAvailableStrums + 1
-                end
-            end
+        local currentMap = KeyMaps[kps] or KeyMaps[4]
+        local startIndex = (CurrentSide == "Left") and 0 or kps
+        local myStrums = {}
+        for i = 1, kps do
+            local s = MainGame:FindFirstChild("Strum" .. (startIndex + i - 1))
+            if s then table.insert(myStrums, s) end
         end
 
-        -- KURAL 2: AKILLI HARİTALANDIRMA (RAKİP GİZLİYSE TETİKLENİR)
-        local targetStrums = {}
-        
-        if totalAvailableStrums == keysPerSide then
-            -- Eğer yüklenen strum sayısı mod sayısına tam eşitse (örn: 9K modunda sadece 9 strum varsa)
-            -- Demek ki karşı taraf gizlenmiştir; eldeki tüm strumları sıralı olarak doğrudan senin tarafa bağla!
-            local sortedIndices = {}
-            for k in pairs(availableStrums) do table.insert(sortedIndices, k) end
-            table.sort(sortedIndices)
-            for _, idx in ipairs(sortedIndices) do
-                table.insert(targetStrums, availableStrums[idx])
-            end
-        else
-            -- Hem rakip hem bizim lane'ler mevcutsa normal indeks aralığını kullan (Sol=0'dan başlar, Sağ=keysPerSide'dan)
-            local startIndex = (CurrentSide == "Left") and 0 or keysPerSide
-            local endIndex = startIndex + keysPerSide - 1
-            for i = startIndex, endIndex do
-                local strum = availableStrums[i]
-                if strum then table.insert(targetStrums, strum) end
-            end
-        end
+        local anyNoteSeen = false
+        local holdActive = {}
+        for i = 1, kps do holdActive[i] = false end
 
-        local anyNoteSeenThisFrame = false
-        local holdActiveThisFrame = {}
-        for i = 1, keysPerSide do holdActiveThisFrame[i] = false end
-
-        -- 3. ADIM: NOTALARI ANALİZ ET VE VEKTÖREL ÇARPIŞTIR
+        -- Obje Havuzu Tarama
         for _, note in pairs(MainGame:GetChildren()) do
             if note:IsA("ImageLabel") and not note.Name:find("Strum") then
+                local noteCenter = note.AbsolutePosition + (note.AbsoluteSize / 2)
                 
-                local noteCenter = Vector2.new(
-                    note.AbsolutePosition.X + (note.AbsoluteSize.X / 2),
-                    note.AbsolutePosition.Y + (note.AbsoluteSize.Y / 2)
-                )
-
-                local velocityVec = Vector2.new(0, 0)
+                -- Hız ve Hareket Takibi
+                local velocity = Vector2.new(0, 0)
                 if LastPositions[note] then
-                    local moveDelta = (noteCenter - LastPositions[note])
-                    if moveDelta.Magnitude > 100 then
-                        TappedNotes[note] = nil 
-                    else
-                        velocityVec = moveDelta / deltaTime
-                    end
+                    local deltaPos = (noteCenter - LastPositions[note])
+                    if deltaPos.Magnitude > 80 then TappedNotes[note] = nil -- Işınlanma/Reset
+                    else velocity = deltaPos / deltaTime end
                 end
                 LastPositions[note] = noteCenter
 
-                -- Akıllı yörünge motorundan geçiş
-                local laneIndex, targetStrum = GetNoteLaneInfo(noteCenter, velocityVec, targetStrums)
+                -- Hedef Strum'u Belirle
+                local lIdx, targetS = FindTargetLane(noteCenter, velocity, myStrums)
                 
-                if laneIndex and targetStrum then
-                    anyNoteSeenThisFrame = true
+                if lIdx and targetS then
+                    anyNoteSeen = true
                     LastNoteSeenTime = tick()
-
-                    local laneKey = currentKeyMap[laneIndex]
-                    local strumCenter = Vector2.new(
-                        targetStrum.AbsolutePosition.X + (targetStrum.AbsoluteSize.X / 2),
-                        targetStrum.AbsolutePosition.Y + (targetStrum.AbsoluteSize.Y / 2)
-                    )
                     
-                    local dist = (noteCenter - strumCenter).Magnitude
-                    local isHoldNote = (note.AbsoluteSize.Y > note.AbsoluteSize.X * 1.5)
+                    local key = currentMap[lIdx]
+                    local sCenter = targetS.AbsolutePosition + (targetS.AbsoluteSize / 2)
+                    local dist = (noteCenter - sCenter).Magnitude
+                    local isHold = (note.AbsoluteSize.Y > note.AbsoluteSize.X * 1.5)
 
-                    if isHoldNote then
-                        -- 2D BOUNDING BOX HOLD KONTROLÜ
-                        local noteMinX = note.AbsolutePosition.X
-                        local noteMaxX = noteMinX + note.AbsoluteSize.X
-                        local noteMinY = note.AbsolutePosition.Y
-                        local noteMaxY = noteMinY + note.AbsoluteSize.Y
-
-                        local inX = (strumCenter.X >= noteMinX - 15) and (strumCenter.X <= noteMaxX + 15)
-                        local inY = (strumCenter.Y >= noteMinY - 15) and (strumCenter.Y <= noteMaxY + 15)
-
-                        if inX and inY then
-                            holdActiveThisFrame[laneIndex] = true
-                        end
+                    if isHold then
+                        -- Hold Note (Kuyruk) Algılama: Strum notanın içindeyse basılı tut
+                        local xMatch = math.abs(noteCenter.X - sCenter.X) < (note.AbsoluteSize.X / 2 + 10)
+                        local yMatch = math.abs(noteCenter.Y - sCenter.Y) < (note.AbsoluteSize.Y / 2 + 10)
+                        if xMatch and yMatch then holdActive[lIdx] = true end
                     else
-                        -- NORMAL TAP VURUŞU
-                        local shouldHit = false
-                        local frameTravel = velocityVec.Magnitude * deltaTime
+                        -- Tap Note (Kafa) Algılama
+                        local travel = velocity.Magnitude * deltaTime
+                        local threshold = (AutoplayMethod == "Rapid checks") and 5 or math.max(4, travel / 1.2)
                         
-                        if AutoplayMethod == "Rapid checks" then
-                            shouldHit = (dist <= 5) 
-                        elseif AutoplayMethod == "Calculate" then
-                            shouldHit = (dist <= math.max(2, frameTravel / 1.5))
-                        elseif AutoplayMethod == "Hybrid" then
-                            shouldHit = (dist <= math.max(4, frameTravel / 1.2))
-                        end
-
-                        if shouldHit and not TappedNotes[note] then
+                        if dist <= threshold and not TappedNotes[note] then
                             TappedNotes[note] = true
-                            TapReleaseTimes[laneIndex] = tick() + 0.035 
-                            
-                            VirtualInputManager:SendKeyEvent(false, laneKey, false, game)
-                            VirtualInputManager:SendKeyEvent(true, laneKey, false, game)
-                            CurrentlyDown[laneIndex] = true
+                            task.spawn(function()
+                                VirtualInputManager:SendKeyEvent(false, key, false, game) -- Temiz basış
+                                VirtualInputManager:SendKeyEvent(true, key, false, game)
+                                task.wait(0.035)
+                                if not holdActive[lIdx] then
+                                    VirtualInputManager:SendKeyEvent(false, key, false, game)
+                                end
+                            end)
                         end
                     end
                 end
             end
         end
 
-        -- ==========================================
-        -- DURUM GÜNCELLEMESİ (TÜM ŞERİTLERİ SÜRER)
-        -- ==========================================
-        for i = 1, keysPerSide do
-            local key = currentKeyMap[i]
-            if key then
-                local shouldBeDown = holdActiveThisFrame[i] or (tick() < TapReleaseTimes[i])
-                
-                if shouldBeDown and not CurrentlyDown[i] then
-                    CurrentlyDown[i] = true
-                    VirtualInputManager:SendKeyEvent(true, key, false, game)
-                elseif not shouldBeDown and CurrentlyDown[i] then
-                    CurrentlyDown[i] = false
-                    VirtualInputManager:SendKeyEvent(false, key, false, game)
+        -- Tuş Durumu Yönetimi
+        for i = 1, kps do
+            local k = currentMap[i]
+            if k then
+                if holdActive[i] and not CurrentlyDown[k] then
+                    CurrentlyDown[k] = true
+                    VirtualInputManager:SendKeyEvent(true, k, false, game)
+                elseif not holdActive[i] and CurrentlyDown[k] then
+                    CurrentlyDown[k] = false
+                    VirtualInputManager:SendKeyEvent(false, k, false, game)
                 end
             end
         end
 
-        -- Şarkı bitişinde hafızayı temizleme ve tuş bırakma
-        if not anyNoteSeenThisFrame and (tick() - LastNoteSeenTime > 2.5) then
+        -- Optimizasyon: Memory Leak'i Engelle (Giden notaları sil)
+        if tick() - LastNoteSeenTime > 2 then
             TappedNotes = {}
             LastPositions = {}
-            
-            for i = 1, 18 do
-                if CurrentlyDown[i] and currentKeyMap[i] then
-                    VirtualInputManager:SendKeyEvent(false, currentKeyMap[i], false, game)
-                end
-                CurrentlyDown[i] = false
-            end
             LastNoteSeenTime = tick()
         end
     end)
 
     -- ==========================================
-    -- 3. MISC & UNLOAD
+    -- 5. UNLOAD & CLEANUP
     -- ==========================================
     local MiscTab = Window:CreateTab("Misc")
-
-    MiscTab:CreateButton("Unload EMLOXA", function()
+    MiscTab:CreateButton("Unload Emloxa", function()
         AutoPlayerEnabled = false
         if SideUI then SideUI:Destroy() end
-        
-        for _, keys in pairs(KeyMaps) do
-            for _, key in ipairs(keys) do
-                VirtualInputManager:SendKeyEvent(false, key, false, game) 
-            end
+        for _, map in pairs(KeyMaps) do
+            for _, k in ipairs(map) do VirtualInputManager:SendKeyEvent(false, k, false, game) end
         end
-        
         local ui = game:GetService("CoreGui"):FindFirstChild("EmloxaWareUI") or LocalPlayer.PlayerGui:FindFirstChild("EmloxaWareUI")
         if ui then ui:Destroy() end
     end)
