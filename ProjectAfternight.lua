@@ -1,5 +1,6 @@
 -- =========================================================================
 -- EMLOXA WARE: PROJECT AFTERNIGHT (PLACE: 13042495892)
+-- MULTI-KEY DYNAMIC ENGINE (1K to 18K SUPPORTED)
 -- =========================================================================
 local GameModule = {}
 
@@ -46,7 +47,6 @@ function GameModule:Init(Window)
     SideText.TextSize = 14
     SideText.Parent = MainFrame
 
-    -- Y Tuşu ile Taraf Değiştirme
     UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
         if input.KeyCode == Enum.KeyCode.Y then
@@ -63,7 +63,7 @@ function GameModule:Init(Window)
     end)
 
     -- ==========================================
-    -- 2. AUTO PLAYER (HOLD NOTE ENGINE)
+    -- 2. AUTO PLAYER (DYNAMIC MULTI-KEY ENGINE)
     -- ==========================================
     local AutoPlayerEnabled = false
     local AutoplayMethod = "Hybrid"
@@ -71,46 +71,41 @@ function GameModule:Init(Window)
     local ProjectTab = Window:CreateTab("Auto Player")
     local AdvancedTab = Window:CreateTab("Advanced")
 
-    -- W A S D TUŞ DİZİLİMİ (Sol=A, Alt=S, Üst=W, Sağ=D)
-    local KeyMap = {Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.W, Enum.KeyCode.D}
+    -- GÖRSELLERDEN ÇIKARILAN BÜTÜN TUŞ DİZİLİMLERİ (1K - 10K + 18K)
+    local KeyMaps = {
+        [1] = {Enum.KeyCode.Space},
+        [2] = {Enum.KeyCode.F, Enum.KeyCode.J},
+        [3] = {Enum.KeyCode.F, Enum.KeyCode.Space, Enum.KeyCode.J},
+        [4] = {Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.W, Enum.KeyCode.D},
+        [5] = {Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.Space, Enum.KeyCode.W, Enum.KeyCode.D},
+        [6] = {Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D, Enum.KeyCode.J, Enum.KeyCode.K, Enum.KeyCode.L},
+        [7] = {Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D, Enum.KeyCode.Space, Enum.KeyCode.J, Enum.KeyCode.K, Enum.KeyCode.L},
+        [8] = {Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D, Enum.KeyCode.F, Enum.KeyCode.H, Enum.KeyCode.J, Enum.KeyCode.K, Enum.KeyCode.L},
+        [9] = {Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D, Enum.KeyCode.F, Enum.KeyCode.Space, Enum.KeyCode.H, Enum.KeyCode.J, Enum.KeyCode.K, Enum.KeyCode.L},
+        [10] = {Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D, Enum.KeyCode.F, Enum.KeyCode.V, Enum.KeyCode.B, Enum.KeyCode.H, Enum.KeyCode.J, Enum.KeyCode.K, Enum.KeyCode.L},
+        
+        -- 18K için varsayılan klavye yayılımı (İstersen buradaki tuşları kendi zevkine göre değiştirebilirsin)
+        [18] = {
+            Enum.KeyCode.Q, Enum.KeyCode.W, Enum.KeyCode.E, Enum.KeyCode.R, Enum.KeyCode.T, Enum.KeyCode.Y,
+            Enum.KeyCode.U, Enum.KeyCode.I, Enum.KeyCode.O, Enum.KeyCode.P, Enum.KeyCode.A, Enum.KeyCode.S,
+            Enum.KeyCode.D, Enum.KeyCode.F, Enum.KeyCode.G, Enum.KeyCode.H, Enum.KeyCode.J, Enum.KeyCode.K
+        }
+    }
     
     local TappedNotes = {}
     local LastYPositions = {} 
     local LastNoteSeenTime = tick()
     
-    -- Şerit Durumu (State) Değişkenleri
-    local CurrentlyDown = {false, false, false, false}
-    local TapReleaseTimes = {0, 0, 0, 0}
-
-    ProjectTab:CreateToggle("Enable God Mode (Advanced Hold Logic)", function(s) AutoPlayerEnabled = s end)
-    AdvancedTab:CreateDropdown("Autoplay Method", {"Calculate", "Rapid checks", "Hybrid"}, "Hybrid", function(val) AutoplayMethod = val end)
-
-    local function GetNoteLaneInfo(note, MainGame)
-        local strums = {}
-        if CurrentSide == "Left" then
-            strums = {
-                MainGame:FindFirstChild("Strum0"), MainGame:FindFirstChild("Strum1"),
-                MainGame:FindFirstChild("Strum2"), MainGame:FindFirstChild("Strum3")
-            }
-        else
-            strums = {
-                MainGame:FindFirstChild("Strum4"), MainGame:FindFirstChild("Strum5"),
-                MainGame:FindFirstChild("Strum6"), MainGame:FindFirstChild("Strum7")
-            }
-        end
-
-        for i, strum in ipairs(strums) do
-            if strum then
-                local noteX = note.AbsolutePosition.X + (note.AbsoluteSize.X / 2)
-                local strumX = strum.AbsolutePosition.X + (strum.AbsoluteSize.X / 2)
-                
-                if math.abs(noteX - strumX) < 30 then
-                    return i, strum
-                end
-            end
-        end
-        return nil, nil
+    -- Dinamik Şerit (State) Değişkenleri (En fazla 18K destekli)
+    local CurrentlyDown = {}
+    local TapReleaseTimes = {}
+    for i = 1, 18 do
+        CurrentlyDown[i] = false
+        TapReleaseTimes[i] = 0
     end
+
+    ProjectTab:CreateToggle("Enable God Mode (Multi-Key Dynamic)", function(s) AutoPlayerEnabled = s end)
+    AdvancedTab:CreateDropdown("Autoplay Method", {"Calculate", "Rapid checks", "Hybrid"}, "Hybrid", function(val) AutoplayMethod = val end)
 
     -- ==========================================
     -- MİLİSANİYELİK KUSURSUZ DÖNGÜ
@@ -122,20 +117,59 @@ function GameModule:Init(Window)
         if not MainUI or not MainUI:FindFirstChild("Game") then return end
         local MainGame = MainUI.Game
 
-        local anyNoteSeenThisFrame = false
-        local holdActiveThisFrame = {false, false, false, false}
+        -- 1. ADIM: EKRANDAKİ STRUM'LARI SAY VE MODU BUL (1K, 4K, 7K vb.)
+        local totalStrums = 0
+        for _, obj in pairs(MainGame:GetChildren()) do
+            if obj.Name:find("Strum") then totalStrums = totalStrums + 1 end
+        end
+        
+        local keysPerSide = math.floor(totalStrums / 2)
+        if keysPerSide == 0 then return end -- Şarkı henüz başlamadıysa bekle
+        
+        -- Hangi KeyMap'i kullanacağımızı belirle (Bilinmeyen modsa varsayılan olarak 4K kullan)
+        local currentKeyMap = KeyMaps[keysPerSide] or KeyMaps[4]
 
-        -- Tüm objeleri tara ve durumlarını değerlendir
+        -- 2. ADIM: SEÇİLEN TARAFA GÖRE (SOL/SAĞ) GEÇERLİ STRUM'LARI LİSTELE
+        local targetStrums = {}
+        local startIndex = (CurrentSide == "Left") and 0 or keysPerSide
+        local endIndex = startIndex + keysPerSide - 1
+
+        for i = startIndex, endIndex do
+            local strum = MainGame:FindFirstChild("Strum" .. i)
+            if strum then
+                table.insert(targetStrums, strum)
+            end
+        end
+
+        local anyNoteSeenThisFrame = false
+        
+        -- Bu frame'de hangi lane'lerde basılı tutulması gerektiğini tutan dinamik tablo
+        local holdActiveThisFrame = {}
+        for i = 1, keysPerSide do holdActiveThisFrame[i] = false end
+
+        -- 3. ADIM: EKRANDAKİ NOTALARI (IMAGELABEL) İŞLE
         for _, note in pairs(MainGame:GetChildren()) do
             if note:IsA("ImageLabel") and not note.Name:find("Strum") then
                 
-                local laneIndex, targetStrum = GetNoteLaneInfo(note, MainGame)
+                -- Notanın hangi lane'de olduğunu bul
+                local laneIndex = nil
+                local targetStrum = nil
+                local noteX = note.AbsolutePosition.X + (note.AbsoluteSize.X / 2)
+                
+                for i, strum in ipairs(targetStrums) do
+                    local strumX = strum.AbsolutePosition.X + (strum.AbsoluteSize.X / 2)
+                    if math.abs(noteX - strumX) < 30 then
+                        laneIndex = i
+                        targetStrum = strum
+                        break
+                    end
+                end
                 
                 if laneIndex and targetStrum then
                     anyNoteSeenThisFrame = true
                     LastNoteSeenTime = tick()
 
-                    local laneKey = KeyMap[laneIndex]
+                    local laneKey = currentKeyMap[laneIndex]
                     local laneCenterY = targetStrum.AbsolutePosition.Y + (targetStrum.AbsoluteSize.Y / 2)
 
                     local noteTop = note.AbsolutePosition.Y
@@ -160,7 +194,6 @@ function GameModule:Init(Window)
                         -- ===============================================
                         -- BAĞIMSIZ HOLD (KUYRUK) ALGILAMA SİSTEMİ
                         -- ===============================================
-                        -- Kuyruğun üst kısmı Strum'u geçmiş ve alt kısmı henüz Strum'dan çıkmamışsa:
                         if noteTop <= laneCenterY + 15 and noteBottom >= laneCenterY - 15 then
                             holdActiveThisFrame[laneIndex] = true
                         end
@@ -181,10 +214,8 @@ function GameModule:Init(Window)
 
                         if shouldHit and not TappedNotes[note] then
                             TappedNotes[note] = true
-                            -- Normal nota vurulduğunda çok kısa süreliğine tuşu basılı tutma süresi tanır
                             TapReleaseTimes[laneIndex] = tick() + 0.035 
                             
-                            -- Vuruşun %100 algılanması için tuşu tazele
                             VirtualInputManager:SendKeyEvent(false, laneKey, false, game)
                             VirtualInputManager:SendKeyEvent(true, laneKey, false, game)
                             CurrentlyDown[laneIndex] = true
@@ -197,18 +228,18 @@ function GameModule:Init(Window)
         -- ==========================================
         -- DURUM GÜNCELLEMESİ VE TUŞ KONTROLÜ
         -- ==========================================
-        -- Her şerit için basılı tutulup tutulmayacağına karar verilir.
-        for i = 1, 4 do
-            local key = KeyMap[i]
-            -- Eğer o şeritten bir kuyruk geçiyorsa VEYA normal bir notaya yeni basıldıysa tuş aşağıda kalmalıdır.
-            local shouldBeDown = holdActiveThisFrame[i] or (tick() < TapReleaseTimes[i])
-            
-            if shouldBeDown and not CurrentlyDown[i] then
-                CurrentlyDown[i] = true
-                VirtualInputManager:SendKeyEvent(true, key, false, game)
-            elseif not shouldBeDown and CurrentlyDown[i] then
-                CurrentlyDown[i] = false
-                VirtualInputManager:SendKeyEvent(false, key, false, game)
+        for i = 1, keysPerSide do
+            local key = currentKeyMap[i]
+            if key then
+                local shouldBeDown = holdActiveThisFrame[i] or (tick() < TapReleaseTimes[i])
+                
+                if shouldBeDown and not CurrentlyDown[i] then
+                    CurrentlyDown[i] = true
+                    VirtualInputManager:SendKeyEvent(true, key, false, game)
+                elseif not shouldBeDown and CurrentlyDown[i] then
+                    CurrentlyDown[i] = false
+                    VirtualInputManager:SendKeyEvent(false, key, false, game)
+                end
             end
         end
 
@@ -217,11 +248,11 @@ function GameModule:Init(Window)
             TappedNotes = {}
             LastYPositions = {}
             
-            for i = 1, 4 do
-                if CurrentlyDown[i] then
-                    VirtualInputManager:SendKeyEvent(false, KeyMap[i], false, game)
-                    CurrentlyDown[i] = false
+            for i = 1, 18 do
+                if CurrentlyDown[i] and currentKeyMap[i] then
+                    VirtualInputManager:SendKeyEvent(false, currentKeyMap[i], false, game)
                 end
+                CurrentlyDown[i] = false
             end
             LastNoteSeenTime = tick()
         end
@@ -236,8 +267,11 @@ function GameModule:Init(Window)
         AutoPlayerEnabled = false
         if SideUI then SideUI:Destroy() end
         
-        for _, key in pairs(KeyMap) do 
-            VirtualInputManager:SendKeyEvent(false, key, false, game) 
+        -- Kapatırken olası basılı tuşları temizle
+        for _, keys in pairs(KeyMaps) do
+            for _, key in ipairs(keys) do
+                VirtualInputManager:SendKeyEvent(false, key, false, game) 
+            end
         end
         
         local ui = game:GetService("CoreGui"):FindFirstChild("EmloxaWareUI") or LocalPlayer.PlayerGui:FindFirstChild("EmloxaWareUI")
