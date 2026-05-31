@@ -1,6 +1,6 @@
 -- =========================================================================
 -- EMLOXA WARE: PROJECT AFTERNIGHT (PLACE: 13042495892)
--- V15 CLASSIC PRECISION ENGINE (NO VECTOR, PURE X/Y ALIGNMENT)
+-- V16 ADAPTIVE PRECISION ENGINE (AUTO-MODE DETECTION & UI)
 -- =========================================================================
 local GameModule = {}
 
@@ -12,7 +12,7 @@ function GameModule:Init(Window)
     local LocalPlayer = Players.LocalPlayer
 
     -- ==========================================
-    -- 1. SIDE SELECTOR UI
+    -- 1. MODERN UI (ÜST: YÖN / ALT: MOD)
     -- ==========================================
     local CurrentSide = "Right"
     local SideUI = Instance.new("ScreenGui")
@@ -22,6 +22,7 @@ function GameModule:Init(Window)
     local success = pcall(function() SideUI.Parent = game:GetService("CoreGui") end)
     if not success then SideUI.Parent = LocalPlayer.PlayerGui end
 
+    -- Üst Panel (Yön Seçici)
     local MainFrame = Instance.new("Frame")
     MainFrame.Size = UDim2.new(0, 220, 0, 45)
     MainFrame.Position = UDim2.new(0.5, -110, 0, 15)
@@ -46,6 +47,32 @@ function GameModule:Init(Window)
     SideText.TextColor3 = Color3.fromRGB(255, 255, 255)
     SideText.TextSize = 15
     SideText.Parent = MainFrame
+
+    -- Alt Panel (Mod Algılayıcı)
+    local ModeFrame = Instance.new("Frame")
+    ModeFrame.Size = UDim2.new(0, 200, 0, 35)
+    ModeFrame.Position = UDim2.new(0.5, -100, 1, -50) -- Ekranın orta alt kısmı
+    ModeFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
+    ModeFrame.BorderSizePixel = 0
+    ModeFrame.Parent = SideUI
+
+    local UICornerMode = Instance.new("UICorner")
+    UICornerMode.CornerRadius = UDim.new(0, 8)
+    UICornerMode.Parent = ModeFrame
+
+    local UIStrokeMode = Instance.new("UIStroke")
+    UIStrokeMode.Color = Color3.fromRGB(0, 255, 150) -- Neon Yeşil
+    UIStrokeMode.Thickness = 2
+    UIStrokeMode.Parent = ModeFrame
+
+    local ModeText = Instance.new("TextLabel")
+    ModeText.Size = UDim2.new(1, 0, 1, 0)
+    ModeText.BackgroundTransparency = 1
+    ModeText.Font = Enum.Font.GothamBold
+    ModeText.Text = "WAITING FOR SONG..."
+    ModeText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ModeText.TextSize = 14
+    ModeText.Parent = ModeFrame
 
     UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
@@ -89,25 +116,24 @@ function GameModule:Init(Window)
     local ProjectTab = Window:CreateTab("Auto Player")
     local AdvancedTab = Window:CreateTab("Advanced")
 
-    ProjectTab:CreateToggle("Enable Precision Engine V15", function(s) AutoPlayerEnabled = s end)
+    ProjectTab:CreateToggle("Enable Precision Engine V16", function(s) AutoPlayerEnabled = s end)
     AdvancedTab:CreateDropdown("Autoplay Method", {"Calculate", "Rapid checks", "Hybrid"}, "Hybrid", function(val) AutoplayMethod = val end)
 
-    local function GetStrumData(MainGame)
-        local total = 0
-        local all = {}
-        for _, obj in pairs(MainGame:GetChildren()) do
-            if obj.Name:find("Strum") then
-                total = total + 1
-                table.insert(all, obj)
+    -- Klasör ve Mod Tarayıcı (Senin istediğin özel mantık)
+    local function GetTargetFolderAndMode(MainGame)
+        for _, child in pairs(MainGame:GetChildren()) do
+            -- İsmi 5K, 6K, 9K vb. olan bir obje bulursa direkt o modu ve klasörü döndür
+            local matchStr = string.match(child.Name, "^(%d+)K")
+            if matchStr then
+                return tonumber(matchStr), child
             end
         end
-        return total, all
+        -- Eğer hiçbir #K klasörü bulamazsa, demek ki oyun 4K modunda ve notalar ana dizinde.
+        return 4, MainGame
     end
 
-    -- TAM İSTEDİĞİN MANTIK: "Yönü boşver, X ekseninde hangisine yakınsa onundur"
     local function FindTargetLaneByX(noteX, targetStrums)
-        local bestIdx, bestStrum, minDist = nil, nil, 50 -- 50 piksel hata payı
-        
+        local bestIdx, bestStrum, minDist = nil, nil, 50 
         for i, strum in ipairs(targetStrums) do
             local strumX = strum.AbsolutePosition.X + (strum.AbsoluteSize.X / 2)
             local dist = math.abs(noteX - strumX)
@@ -129,17 +155,26 @@ function GameModule:Init(Window)
         
         local MainUI = LocalPlayer.PlayerGui:FindFirstChild("Main")
         local MainGame = MainUI and MainUI:FindFirstChild("Game")
-        if not MainGame then return end
+        if not MainGame then 
+            ModeText.Text = "WAITING FOR SONG..."
+            return 
+        end
 
-        local totalStrums, allStrums = GetStrumData(MainGame)
-        local kps = math.floor(totalStrums / 2)
-        if kps == 0 then return end
+        -- Modu ve hedef klasörü bul
+        local kps, targetFolder = GetTargetFolderAndMode(MainGame)
+        
+        -- UI'ı anında güncelle
+        if ModeText.Text ~= "DETECTED MODE: " .. kps .. "K" then
+            ModeText.Text = "DETECTED MODE: " .. kps .. "K"
+        end
         
         local currentMap = KeyMaps[kps] or KeyMaps[4]
         local startIndex = (CurrentSide == "Left") and 0 or kps
         local myStrums = {}
+        
+        -- Strum'ları hedef klasörün (targetFolder) içinden çek
         for i = 1, kps do
-            local s = MainGame:FindFirstChild("Strum" .. (startIndex + i - 1))
+            local s = targetFolder:FindFirstChild("Strum" .. (startIndex + i - 1))
             if s then table.insert(myStrums, s) end
         end
 
@@ -147,12 +182,11 @@ function GameModule:Init(Window)
         local holdActive = {}
         for i = 1, kps do holdActive[i] = false end
 
-        for _, note in pairs(MainGame:GetChildren()) do
+        -- Notaları da hedef klasörün (targetFolder) içinden tara
+        for _, note in pairs(targetFolder:GetChildren()) do
             if note:IsA("ImageLabel") and not note.Name:find("Strum") then
                 
                 local noteX = note.AbsolutePosition.X + (note.AbsoluteSize.X / 2)
-                
-                -- Notaların şeritlerini düz X koordinatı ile bul (0 kafa karışıklığı)
                 local lIdx, targetS = FindTargetLaneByX(noteX, myStrums)
                 
                 if lIdx and targetS then
@@ -167,27 +201,22 @@ function GameModule:Init(Window)
                     local isHold = (note.AbsoluteSize.Y > note.AbsoluteSize.X * 1.5)
 
                     if isHold then
-                        -- Hold Note (Kuyruk) Algılama: Kuyruğun ucu ve başı strum'un içindeyse basılı tut
                         local noteTop = note.AbsolutePosition.Y
                         local noteBottom = noteTop + note.AbsoluteSize.Y
                         
-                        -- Kuyruk hedefin içine girdiyse bas, çıkana kadar bırakma
                         if noteTop <= sCenterY + 15 and noteBottom >= sCenterY - 15 then 
                             holdActive[lIdx] = true 
                         end
                     else
-                        -- Tap Note (Normal Kafa) Algılama
                         local hitThreshold = (AutoplayMethod == "Rapid checks") and 10 or 15
                         
                         if distY <= hitThreshold and not TappedNotes[note] then
                             TappedNotes[note] = true
                             
-                            -- Vuruşun %100 algılanması için sağlam Task mantığı
                             task.spawn(function()
                                 VirtualInputManager:SendKeyEvent(false, key, false, game)
                                 VirtualInputManager:SendKeyEvent(true, key, false, game)
                                 task.wait(0.02)
-                                -- Eğer o şeritte aktif bir hold (kuyruk) yoksa tuşu bırak
                                 if not holdActive[lIdx] then
                                     VirtualInputManager:SendKeyEvent(false, key, false, game)
                                 end
@@ -198,7 +227,6 @@ function GameModule:Init(Window)
             end
         end
 
-        -- Hold (Basılı Tutma) Tuş Durumu Yönetimi
         for i = 1, kps do
             local k = currentMap[i]
             if k then
@@ -212,7 +240,6 @@ function GameModule:Init(Window)
             end
         end
 
-        -- Şarkı bitince veya nota gelmeyince hafızayı sıfırla (Kaçırmayı önler)
         if not anyNoteSeen and (tick() - LastNoteSeenTime > 1.5) then
             TappedNotes = {}
             for i = 1, 18 do
