@@ -1,6 +1,6 @@
 -- =========================================================================
 -- EMLOXA WARE: PROJECT AFTERNIGHT (PLACE: 13042495892)
--- V16 ADAPTIVE PRECISION ENGINE (AUTO-MODE DETECTION & UI)
+-- V17 ULTIMATE PRECISION ENGINE (CLASSIC DETECTION + DYNAMIC KEYS)
 -- =========================================================================
 local GameModule = {}
 
@@ -12,7 +12,7 @@ function GameModule:Init(Window)
     local LocalPlayer = Players.LocalPlayer
 
     -- ==========================================
-    -- 1. MODERN UI (ÜST: YÖN / ALT: MOD)
+    -- 1. EKRAN UI (YÖN SEÇİCİ & MOD ALGILAYICI)
     -- ==========================================
     local CurrentSide = "Right"
     local SideUI = Instance.new("ScreenGui")
@@ -22,7 +22,6 @@ function GameModule:Init(Window)
     local success = pcall(function() SideUI.Parent = game:GetService("CoreGui") end)
     if not success then SideUI.Parent = LocalPlayer.PlayerGui end
 
-    -- Üst Panel (Yön Seçici)
     local MainFrame = Instance.new("Frame")
     MainFrame.Size = UDim2.new(0, 220, 0, 45)
     MainFrame.Position = UDim2.new(0.5, -110, 0, 15)
@@ -48,10 +47,9 @@ function GameModule:Init(Window)
     SideText.TextSize = 15
     SideText.Parent = MainFrame
 
-    -- Alt Panel (Mod Algılayıcı)
     local ModeFrame = Instance.new("Frame")
     ModeFrame.Size = UDim2.new(0, 200, 0, 35)
-    ModeFrame.Position = UDim2.new(0.5, -100, 1, -50) -- Ekranın orta alt kısmı
+    ModeFrame.Position = UDim2.new(0.5, -100, 1, -50)
     ModeFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
     ModeFrame.BorderSizePixel = 0
     ModeFrame.Parent = SideUI
@@ -61,7 +59,7 @@ function GameModule:Init(Window)
     UICornerMode.Parent = ModeFrame
 
     local UIStrokeMode = Instance.new("UIStroke")
-    UIStrokeMode.Color = Color3.fromRGB(0, 255, 150) -- Neon Yeşil
+    UIStrokeMode.Color = Color3.fromRGB(0, 255, 150)
     UIStrokeMode.Thickness = 2
     UIStrokeMode.Parent = ModeFrame
 
@@ -77,14 +75,20 @@ function GameModule:Init(Window)
     UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
         if input.KeyCode == Enum.KeyCode.Y then
-            CurrentSide = (CurrentSide == "Right") and "Left" or "Right"
-            SideText.Text = "EMLOXA: " .. CurrentSide:upper() .. " [Y]"
-            UIStroke.Color = (CurrentSide == "Left") and Color3.fromRGB(255, 85, 85) or Color3.fromRGB(102, 85, 255)
+            if CurrentSide == "Right" then
+                CurrentSide = "Left"
+                SideText.Text = "EMLOXA: LEFT [Y]"
+                UIStroke.Color = Color3.fromRGB(255, 85, 85)
+            else
+                CurrentSide = "Right"
+                SideText.Text = "EMLOXA: RIGHT [Y]"
+                UIStroke.Color = Color3.fromRGB(102, 85, 255)
+            end
         end
     end)
 
     -- ==========================================
-    -- 2. DYNAMIC KEYMAPS
+    -- 2. DYNAMIC KEYMAPS (1K - 18K)
     -- ==========================================
     local KeyMaps = {
         [1] = {Enum.KeyCode.Space},
@@ -105,52 +109,56 @@ function GameModule:Init(Window)
     }
 
     -- ==========================================
-    -- 3. CORE AUTO-PLAYER ENGINE
+    -- 3. AUTO PLAYER (SENİN VERDİĞİN MANTIK)
     -- ==========================================
     local AutoPlayerEnabled = false
     local AutoplayMethod = "Hybrid"
-    local TappedNotes = {}
-    local LastNoteSeenTime = tick()
-    local CurrentlyDown = {}
-
+    
     local ProjectTab = Window:CreateTab("Auto Player")
     local AdvancedTab = Window:CreateTab("Advanced")
 
-    ProjectTab:CreateToggle("Enable Precision Engine V16", function(s) AutoPlayerEnabled = s end)
+    ProjectTab:CreateToggle("Enable God Mode (Classic V17)", function(s) AutoPlayerEnabled = s end)
     AdvancedTab:CreateDropdown("Autoplay Method", {"Calculate", "Rapid checks", "Hybrid"}, "Hybrid", function(val) AutoplayMethod = val end)
 
-    -- Klasör ve Mod Tarayıcı (Senin istediğin özel mantık)
+    local TappedNotes = {}
+    local LastYPositions = {} 
+    local LastNoteSeenTime = tick()
+    
+    -- Şerit Durumu (State) Değişkenleri (18K'ya kadar dinamik destekler)
+    local CurrentlyDown = {}
+    local TapReleaseTimes = {}
+    for i = 1, 18 do
+        CurrentlyDown[i] = false
+        TapReleaseTimes[i] = 0
+    end
+
+    -- KLASÖR BULUCU (Otomatik Mod Tespiti)
     local function GetTargetFolderAndMode(MainGame)
         for _, child in pairs(MainGame:GetChildren()) do
-            -- İsmi 5K, 6K, 9K vb. olan bir obje bulursa direkt o modu ve klasörü döndür
             local matchStr = string.match(child.Name, "^(%d+)K")
-            if matchStr then
-                return tonumber(matchStr), child
-            end
+            if matchStr then return tonumber(matchStr), child end
         end
-        -- Eğer hiçbir #K klasörü bulamazsa, demek ki oyun 4K modunda ve notalar ana dizinde.
         return 4, MainGame
     end
 
-    local function FindTargetLaneByX(noteX, targetStrums)
-        local bestIdx, bestStrum, minDist = nil, nil, 50 
+    -- SENİN YAZDIĞIN KUSURSUZ ŞERİT BULMA MANTIĞI (< 30px)
+    local function GetNoteLaneInfo(note, targetStrums)
+        local noteX = note.AbsolutePosition.X + (note.AbsoluteSize.X / 2)
         for i, strum in ipairs(targetStrums) do
-            local strumX = strum.AbsolutePosition.X + (strum.AbsoluteSize.X / 2)
-            local dist = math.abs(noteX - strumX)
-            
-            if dist < minDist then
-                minDist = dist
-                bestIdx = i
-                bestStrum = strum
+            if strum then
+                local strumX = strum.AbsolutePosition.X + (strum.AbsoluteSize.X / 2)
+                if math.abs(noteX - strumX) < 30 then
+                    return i, strum
+                end
             end
         end
-        return bestIdx, bestStrum
+        return nil, nil
     end
 
     -- ==========================================
-    -- 4. RENDER STEPPED (PÜRÜZSÜZ DÖNGÜ)
+    -- MİLİSANİYELİK KUSURSUZ DÖNGÜ
     -- ==========================================
-    RunService.RenderStepped:Connect(function()
+    RunService.RenderStepped:Connect(function(deltaTime)
         if not AutoPlayerEnabled then return end
         
         local MainUI = LocalPlayer.PlayerGui:FindFirstChild("Main")
@@ -160,108 +168,131 @@ function GameModule:Init(Window)
             return 
         end
 
-        -- Modu ve hedef klasörü bul
         local kps, targetFolder = GetTargetFolderAndMode(MainGame)
         
-        -- UI'ı anında güncelle
         if ModeText.Text ~= "DETECTED MODE: " .. kps .. "K" then
             ModeText.Text = "DETECTED MODE: " .. kps .. "K"
         end
-        
+
         local currentMap = KeyMaps[kps] or KeyMaps[4]
         local startIndex = (CurrentSide == "Left") and 0 or kps
         local myStrums = {}
-        
-        -- Strum'ları hedef klasörün (targetFolder) içinden çek
         for i = 1, kps do
             local s = targetFolder:FindFirstChild("Strum" .. (startIndex + i - 1))
             if s then table.insert(myStrums, s) end
         end
 
-        local anyNoteSeen = false
-        local holdActive = {}
-        for i = 1, kps do holdActive[i] = false end
+        local anyNoteSeenThisFrame = false
+        local holdActiveThisFrame = {}
+        for i = 1, kps do holdActiveThisFrame[i] = false end
 
-        -- Notaları da hedef klasörün (targetFolder) içinden tara
+        -- SENİN VERDİĞİN HIZ VE VURUŞ MANTIĞI
         for _, note in pairs(targetFolder:GetChildren()) do
             if note:IsA("ImageLabel") and not note.Name:find("Strum") then
                 
-                local noteX = note.AbsolutePosition.X + (note.AbsoluteSize.X / 2)
-                local lIdx, targetS = FindTargetLaneByX(noteX, myStrums)
+                local laneIndex, targetStrum = GetNoteLaneInfo(note, myStrums)
                 
-                if lIdx and targetS then
-                    anyNoteSeen = true
+                if laneIndex and targetStrum then
+                    anyNoteSeenThisFrame = true
                     LastNoteSeenTime = tick()
-                    
-                    local key = currentMap[lIdx]
-                    local sCenterY = targetS.AbsolutePosition.Y + (targetS.AbsoluteSize.Y / 2)
-                    local noteCenterY = note.AbsolutePosition.Y + (note.AbsoluteSize.Y / 2)
-                    
-                    local distY = math.abs(noteCenterY - sCenterY)
-                    local isHold = (note.AbsoluteSize.Y > note.AbsoluteSize.X * 1.5)
 
-                    if isHold then
-                        local noteTop = note.AbsolutePosition.Y
-                        local noteBottom = noteTop + note.AbsoluteSize.Y
-                        
-                        if noteTop <= sCenterY + 15 and noteBottom >= sCenterY - 15 then 
-                            holdActive[lIdx] = true 
+                    local laneKey = currentMap[laneIndex]
+                    local laneCenterY = targetStrum.AbsolutePosition.Y + (targetStrum.AbsoluteSize.Y / 2)
+
+                    local noteTop = note.AbsolutePosition.Y
+                    local noteBottom = noteTop + note.AbsoluteSize.Y
+                    local noteCenterY = noteTop + (note.AbsoluteSize.Y / 2)
+                    local dist = math.abs(noteCenterY - laneCenterY)
+                    
+                    if LastYPositions[note] and math.abs(noteCenterY - LastYPositions[note]) > 50 then
+                        TappedNotes[note] = nil
+                    end
+                    
+                    local noteVelocity = 0
+                    if LastYPositions[note] then
+                        noteVelocity = math.abs(noteCenterY - LastYPositions[note]) / deltaTime
+                    end
+                    LastYPositions[note] = noteCenterY
+
+                    local isHoldNote = (note.AbsoluteSize.Y > note.AbsoluteSize.X * 1.5)
+
+                    if isHoldNote then
+                        -- BAĞIMSIZ HOLD (KUYRUK) ALGILAMA SİSTEMİ
+                        if noteTop <= laneCenterY + 15 and noteBottom >= laneCenterY - 15 then
+                            holdActiveThisFrame[laneIndex] = true
                         end
                     else
-                        local hitThreshold = (AutoplayMethod == "Rapid checks") and 10 or 15
+                        -- NORMAL KAFA (HEAD) NOTASI VURUŞU
+                        local shouldHit = false
+                        local frameTravel = noteVelocity * deltaTime
                         
-                        if distY <= hitThreshold and not TappedNotes[note] then
+                        if AutoplayMethod == "Rapid checks" then
+                            shouldHit = (dist <= 5) 
+                        elseif AutoplayMethod == "Calculate" then
+                            shouldHit = (dist <= math.max(2, frameTravel / 1.5))
+                        elseif AutoplayMethod == "Hybrid" then
+                            shouldHit = (dist <= math.max(4, frameTravel / 1.2))
+                        end
+
+                        if shouldHit and not TappedNotes[note] then
                             TappedNotes[note] = true
+                            TapReleaseTimes[laneIndex] = tick() + 0.035 
                             
-                            task.spawn(function()
-                                VirtualInputManager:SendKeyEvent(false, key, false, game)
-                                VirtualInputManager:SendKeyEvent(true, key, false, game)
-                                task.wait(0.02)
-                                if not holdActive[lIdx] then
-                                    VirtualInputManager:SendKeyEvent(false, key, false, game)
-                                end
-                            end)
+                            VirtualInputManager:SendKeyEvent(false, laneKey, false, game)
+                            VirtualInputManager:SendKeyEvent(true, laneKey, false, game)
+                            CurrentlyDown[laneIndex] = true
                         end
                     end
                 end
             end
         end
 
+        -- ==========================================
+        -- DURUM GÜNCELLEMESİ VE TUŞ KONTROLÜ
+        -- ==========================================
         for i = 1, kps do
-            local k = currentMap[i]
-            if k then
-                if holdActive[i] and not CurrentlyDown[k] then
-                    CurrentlyDown[k] = true
-                    VirtualInputManager:SendKeyEvent(true, k, false, game)
-                elseif not holdActive[i] and CurrentlyDown[k] then
-                    CurrentlyDown[k] = false
-                    VirtualInputManager:SendKeyEvent(false, k, false, game)
+            local key = currentMap[i]
+            if key then
+                local shouldBeDown = holdActiveThisFrame[i] or (tick() < TapReleaseTimes[i])
+                
+                if shouldBeDown and not CurrentlyDown[i] then
+                    CurrentlyDown[i] = true
+                    VirtualInputManager:SendKeyEvent(true, key, false, game)
+                elseif not shouldBeDown and CurrentlyDown[i] then
+                    CurrentlyDown[i] = false
+                    VirtualInputManager:SendKeyEvent(false, key, false, game)
                 end
             end
         end
 
-        if not anyNoteSeen and (tick() - LastNoteSeenTime > 1.5) then
+        -- Şarkı bittiğinde her şeyi sıfırla
+        if not anyNoteSeenThisFrame and (tick() - LastNoteSeenTime > 2.5) then
             TappedNotes = {}
+            LastYPositions = {}
+            
             for i = 1, 18 do
                 if CurrentlyDown[i] and currentMap[i] then
                     VirtualInputManager:SendKeyEvent(false, currentMap[i], false, game)
+                    CurrentlyDown[i] = false
                 end
-                CurrentlyDown[i] = false
             end
             LastNoteSeenTime = tick()
         end
     end)
 
     -- ==========================================
-    -- 5. UNLOAD & CLEANUP
+    -- 4. MISC & UNLOAD
     -- ==========================================
     local MiscTab = Window:CreateTab("Misc")
-    MiscTab:CreateButton("Unload Emloxa", function()
+
+    MiscTab:CreateButton("Unload EMLOXA", function()
         AutoPlayerEnabled = false
         if SideUI then SideUI:Destroy() end
+        
         for _, map in pairs(KeyMaps) do
             for _, k in ipairs(map) do VirtualInputManager:SendKeyEvent(false, k, false, game) end
         end
+        
         local ui = game:GetService("CoreGui"):FindFirstChild("EmloxaWareUI") or LocalPlayer.PlayerGui:FindFirstChild("EmloxaWareUI")
         if ui then ui:Destroy() end
     end)
