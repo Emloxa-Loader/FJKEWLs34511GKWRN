@@ -1,6 +1,6 @@
 -- =========================================================================
 -- EMLOXA WARE: PROJECT AFTERNIGHT (PLACE: 13042495892)
--- MULTI-KEY DYNAMIC ENGINE (1K to 18K SUPPORTED)
+-- VECTOR-BASED MODCHART ENGINE (1K to 18K SUPPORTED)
 -- =========================================================================
 local GameModule = {}
 
@@ -12,7 +12,7 @@ function GameModule:Init(Window)
     local LocalPlayer = Players.LocalPlayer
 
     -- ==========================================
-    -- 1. EKRANIN ÜST ORTASINA SIDE SELECTOR UI
+    -- 1. SIDE SELECTOR UI (YÖN SEÇİCİ)
     -- ==========================================
     local CurrentSide = "Right"
     local SideUI = Instance.new("ScreenGui")
@@ -63,7 +63,7 @@ function GameModule:Init(Window)
     end)
 
     -- ==========================================
-    -- 2. AUTO PLAYER (DYNAMIC MULTI-KEY ENGINE)
+    -- 2. AUTO PLAYER (VECTOR-BASED MODCHART ENGINE)
     -- ==========================================
     local AutoPlayerEnabled = false
     local AutoplayMethod = "Hybrid"
@@ -71,7 +71,7 @@ function GameModule:Init(Window)
     local ProjectTab = Window:CreateTab("Auto Player")
     local AdvancedTab = Window:CreateTab("Advanced")
 
-    -- GÖRSELLERDEN ÇIKARILAN BÜTÜN TUŞ DİZİLİMLERİ (1K - 10K + 18K)
+   -- GÖRSELLERDEN ÇIKARILAN KUSURSUZ TUŞ DİZİLİMLERİ (1K - 10K + 18K)
     local KeyMaps = {
         [1] = {Enum.KeyCode.Space},
         [2] = {Enum.KeyCode.F, Enum.KeyCode.J},
@@ -81,10 +81,13 @@ function GameModule:Init(Window)
         [6] = {Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D, Enum.KeyCode.J, Enum.KeyCode.K, Enum.KeyCode.L},
         [7] = {Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D, Enum.KeyCode.Space, Enum.KeyCode.J, Enum.KeyCode.K, Enum.KeyCode.L},
         [8] = {Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D, Enum.KeyCode.F, Enum.KeyCode.H, Enum.KeyCode.J, Enum.KeyCode.K, Enum.KeyCode.L},
+        
+        -- 9K MODE: Tam senin belirttiğin sıra!
         [9] = {Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D, Enum.KeyCode.F, Enum.KeyCode.Space, Enum.KeyCode.H, Enum.KeyCode.J, Enum.KeyCode.K, Enum.KeyCode.L},
+        
         [10] = {Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D, Enum.KeyCode.F, Enum.KeyCode.V, Enum.KeyCode.B, Enum.KeyCode.H, Enum.KeyCode.J, Enum.KeyCode.K, Enum.KeyCode.L},
         
-        -- 18K için varsayılan klavye yayılımı (İstersen buradaki tuşları kendi zevkine göre değiştirebilirsin)
+        -- 18K için varsayılan klavye yayılımı
         [18] = {
             Enum.KeyCode.Q, Enum.KeyCode.W, Enum.KeyCode.E, Enum.KeyCode.R, Enum.KeyCode.T, Enum.KeyCode.Y,
             Enum.KeyCode.U, Enum.KeyCode.I, Enum.KeyCode.O, Enum.KeyCode.P, Enum.KeyCode.A, Enum.KeyCode.S,
@@ -93,10 +96,9 @@ function GameModule:Init(Window)
     }
     
     local TappedNotes = {}
-    local LastYPositions = {} 
+    local LastPositions = {} -- Artık sadece Y değil, X ve Y tutuluyor (Vector2)
     local LastNoteSeenTime = tick()
     
-    -- Dinamik Şerit (State) Değişkenleri (En fazla 18K destekli)
     local CurrentlyDown = {}
     local TapReleaseTimes = {}
     for i = 1, 18 do
@@ -104,8 +106,55 @@ function GameModule:Init(Window)
         TapReleaseTimes[i] = 0
     end
 
-    ProjectTab:CreateToggle("Enable God Mode (Multi-Key Dynamic)", function(s) AutoPlayerEnabled = s end)
+    ProjectTab:CreateToggle("Enable God Mode (Vector Engine)", function(s) AutoPlayerEnabled = s end)
     AdvancedTab:CreateDropdown("Autoplay Method", {"Calculate", "Rapid checks", "Hybrid"}, "Hybrid", function(val) AutoplayMethod = val end)
+
+    -- KUSURSUZ YÖRÜNGE TAHMİNİ (TRAJECTORY PREDICTION)
+    local function GetNoteLaneInfo(noteCenter, velocityVec, targetStrums)
+        local bestMatchScore = -math.huge
+        local bestLaneIndex = nil
+        local bestStrum = nil
+
+        for i, strum in ipairs(targetStrums) do
+            local strumCenter = Vector2.new(
+                strum.AbsolutePosition.X + (strum.AbsoluteSize.X / 2),
+                strum.AbsolutePosition.Y + (strum.AbsoluteSize.Y / 2)
+            )
+            
+            local dist = (noteCenter - strumCenter).Magnitude
+            
+            -- 1. Şart: Nota hedefle iç içeyse hiç hesap yapmadan direkt vur
+            if dist < 25 then
+                return i, strum
+            end
+
+            -- 2. Şart: Vektörel Hedefleme (Nota nereye uçuyor?)
+            -- Dot Product mantığı: Notanın yönü ile Strum'un konumu birbiriyle eşleşiyorsa skor 1'e yaklaşır.
+            if velocityVec.Magnitude > 10 then
+                local noteDirection = velocityVec.Unit
+                local directionToStrum = (strumCenter - noteCenter).Unit
+                local alignment = noteDirection:Dot(directionToStrum)
+                
+                -- Uzaklığa ve Gidiş Yönüne dayalı Puanlama Sistemi
+                local score = (alignment * 1000) - dist
+                
+                if score > bestMatchScore then
+                    bestMatchScore = score
+                    bestLaneIndex = i
+                    bestStrum = strum
+                end
+            else
+                -- Eğer hız yoksa (daha yeni doğduysa) klasik X ve Y yakınlığına bak
+                local fallbackScore = -dist
+                if fallbackScore > bestMatchScore then
+                    bestMatchScore = fallbackScore
+                    bestLaneIndex = i
+                    bestStrum = strum
+                end
+            end
+        end
+        return bestLaneIndex, bestStrum
+    end
 
     -- ==========================================
     -- MİLİSANİYELİK KUSURSUZ DÖNGÜ
@@ -117,92 +166,89 @@ function GameModule:Init(Window)
         if not MainUI or not MainUI:FindFirstChild("Game") then return end
         local MainGame = MainUI.Game
 
-        -- 1. ADIM: EKRANDAKİ STRUM'LARI SAY VE MODU BUL (1K, 4K, 7K vb.)
         local totalStrums = 0
         for _, obj in pairs(MainGame:GetChildren()) do
             if obj.Name:find("Strum") then totalStrums = totalStrums + 1 end
         end
         
         local keysPerSide = math.floor(totalStrums / 2)
-        if keysPerSide == 0 then return end -- Şarkı henüz başlamadıysa bekle
+        if keysPerSide == 0 then return end 
         
-        -- Hangi KeyMap'i kullanacağımızı belirle (Bilinmeyen modsa varsayılan olarak 4K kullan)
         local currentKeyMap = KeyMaps[keysPerSide] or KeyMaps[4]
 
-        -- 2. ADIM: SEÇİLEN TARAFA GÖRE (SOL/SAĞ) GEÇERLİ STRUM'LARI LİSTELE
         local targetStrums = {}
         local startIndex = (CurrentSide == "Left") and 0 or keysPerSide
         local endIndex = startIndex + keysPerSide - 1
 
         for i = startIndex, endIndex do
             local strum = MainGame:FindFirstChild("Strum" .. i)
-            if strum then
-                table.insert(targetStrums, strum)
-            end
+            if strum then table.insert(targetStrums, strum) end
         end
 
         local anyNoteSeenThisFrame = false
-        
-        -- Bu frame'de hangi lane'lerde basılı tutulması gerektiğini tutan dinamik tablo
         local holdActiveThisFrame = {}
         for i = 1, keysPerSide do holdActiveThisFrame[i] = false end
 
-        -- 3. ADIM: EKRANDAKİ NOTALARI (IMAGELABEL) İŞLE
         for _, note in pairs(MainGame:GetChildren()) do
             if note:IsA("ImageLabel") and not note.Name:find("Strum") then
                 
-                -- Notanın hangi lane'de olduğunu bul
-                local laneIndex = nil
-                local targetStrum = nil
-                local noteX = note.AbsolutePosition.X + (note.AbsoluteSize.X / 2)
-                
-                for i, strum in ipairs(targetStrums) do
-                    local strumX = strum.AbsolutePosition.X + (strum.AbsoluteSize.X / 2)
-                    if math.abs(noteX - strumX) < 30 then
-                        laneIndex = i
-                        targetStrum = strum
-                        break
+                -- Notanın 2D Merkez Noktasını Al
+                local noteCenter = Vector2.new(
+                    note.AbsolutePosition.X + (note.AbsoluteSize.X / 2),
+                    note.AbsolutePosition.Y + (note.AbsoluteSize.Y / 2)
+                )
+
+                -- Teleport Algılayıcı ve Hız (Velocity) Hesaplama
+                local velocityVec = Vector2.new(0, 0)
+                if LastPositions[note] then
+                    local moveDelta = (noteCenter - LastPositions[note])
+                    if moveDelta.Magnitude > 100 then
+                        TappedNotes[note] = nil -- Işınlanma tespit edildi, sıfırla
+                    else
+                        velocityVec = moveDelta / deltaTime
                     end
                 end
+                LastPositions[note] = noteCenter
+
+                -- Yörünge Motorunu Çalıştır ve Hangi Şeride Ait Olduğunu Bul
+                local laneIndex, targetStrum = GetNoteLaneInfo(noteCenter, velocityVec, targetStrums)
                 
                 if laneIndex and targetStrum then
                     anyNoteSeenThisFrame = true
                     LastNoteSeenTime = tick()
 
                     local laneKey = currentKeyMap[laneIndex]
-                    local laneCenterY = targetStrum.AbsolutePosition.Y + (targetStrum.AbsoluteSize.Y / 2)
-
-                    local noteTop = note.AbsolutePosition.Y
-                    local noteBottom = noteTop + note.AbsoluteSize.Y
-                    local noteCenterY = noteTop + (note.AbsoluteSize.Y / 2)
-                    local dist = math.abs(noteCenterY - laneCenterY)
+                    local strumCenter = Vector2.new(
+                        targetStrum.AbsolutePosition.X + (targetStrum.AbsoluteSize.X / 2),
+                        targetStrum.AbsolutePosition.Y + (targetStrum.AbsoluteSize.Y / 2)
+                    )
                     
-                    if LastYPositions[note] and math.abs(noteCenterY - LastYPositions[note]) > 50 then
-                        TappedNotes[note] = nil
-                    end
-                    
-                    local noteVelocity = 0
-                    if LastYPositions[note] then
-                        noteVelocity = math.abs(noteCenterY - LastYPositions[note]) / deltaTime
-                    end
-                    LastYPositions[note] = noteCenterY
-
-                    -- Eğer boyu, eninin 1.5 katından büyükse bu bağımsız bir Hold Body (Kuyruk)
+                    -- Kuş Uçuşu (2D) Gerçek Mesafe
+                    local dist = (noteCenter - strumCenter).Magnitude
                     local isHoldNote = (note.AbsoluteSize.Y > note.AbsoluteSize.X * 1.5)
 
                     if isHoldNote then
                         -- ===============================================
-                        -- BAĞIMSIZ HOLD (KUYRUK) ALGILAMA SİSTEMİ
+                        -- 2D BOUNDING BOX (SINIR KUTUSU) HOLD KONTROLÜ
                         -- ===============================================
-                        if noteTop <= laneCenterY + 15 and noteBottom >= laneCenterY - 15 then
+                        -- Nota ne yöne kayarsa kaysın (sağa, sola, çapraza), Strum merkezi notanın içine girmiş mi?
+                        local noteMinX = note.AbsolutePosition.X
+                        local noteMaxX = noteMinX + note.AbsoluteSize.X
+                        local noteMinY = note.AbsolutePosition.Y
+                        local noteMaxY = noteMinY + note.AbsoluteSize.Y
+
+                        local inX = (strumCenter.X >= noteMinX - 15) and (strumCenter.X <= noteMaxX + 15)
+                        local inY = (strumCenter.Y >= noteMinY - 15) and (strumCenter.Y <= noteMaxY + 15)
+
+                        if inX and inY then
                             holdActiveThisFrame[laneIndex] = true
                         end
                     else
                         -- ===============================================
-                        -- NORMAL KAFA (HEAD) NOTASI VURUŞU
+                        -- 2D NORMAL NOTA VURUŞU (HEAD TAP)
                         -- ===============================================
                         local shouldHit = false
-                        local frameTravel = noteVelocity * deltaTime
+                        local frameTravel = velocityVec.Magnitude * deltaTime
                         
                         if AutoplayMethod == "Rapid checks" then
                             shouldHit = (dist <= 5) 
@@ -226,7 +272,7 @@ function GameModule:Init(Window)
         end
 
         -- ==========================================
-        -- DURUM GÜNCELLEMESİ VE TUŞ KONTROLÜ
+        -- DURUM GÜNCELLEMESİ (TÜM TUŞLARI YÖNETİR)
         -- ==========================================
         for i = 1, keysPerSide do
             local key = currentKeyMap[i]
@@ -243,10 +289,9 @@ function GameModule:Init(Window)
             end
         end
 
-        -- Şarkı bittiğinde her şeyi sıfırla
         if not anyNoteSeenThisFrame and (tick() - LastNoteSeenTime > 2.5) then
             TappedNotes = {}
-            LastYPositions = {}
+            LastPositions = {}
             
             for i = 1, 18 do
                 if CurrentlyDown[i] and currentKeyMap[i] then
@@ -258,16 +303,12 @@ function GameModule:Init(Window)
         end
     end)
 
-    -- ==========================================
-    -- 3. MISC & UNLOAD
-    -- ==========================================
     local MiscTab = Window:CreateTab("Misc")
 
     MiscTab:CreateButton("Unload EMLOXA", function()
         AutoPlayerEnabled = false
         if SideUI then SideUI:Destroy() end
         
-        -- Kapatırken olası basılı tuşları temizle
         for _, keys in pairs(KeyMaps) do
             for _, key in ipairs(keys) do
                 VirtualInputManager:SendKeyEvent(false, key, false, game) 
