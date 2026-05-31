@@ -71,8 +71,8 @@ function GameModule:Init(Window)
     local ProjectTab = Window:CreateTab("Auto Player")
     local AdvancedTab = Window:CreateTab("Advanced")
 
-    -- Sadece 4K Tuş Dizilimi
-    local KeyMap = {Enum.KeyCode.Left, Enum.KeyCode.Down, Enum.KeyCode.Up, Enum.KeyCode.Right}
+    -- W A S D TUŞ DİZİLİMİ (Sol=A, Alt=S, Üst=W, Sağ=D)
+    local KeyMap = {Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.W, Enum.KeyCode.D}
     
     local ActiveHolds = {}
     local TappedNotes = {}
@@ -199,8 +199,6 @@ function GameModule:Init(Window)
                     
                     -- Hold Notası Kuyruk Bırakma
                     if isHoldNote and TappedNotes[note] then
-                        -- Afternight'ta notalar aşağıdan yukarı mı, yukarıdan aşağı mı kayıyor kontrolü:
-                        -- Eğere Strum üstteyse (Y'si düşükse) nota yukarı gidiyordur. Notanın alt kısmı strum'u geçince bırak.
                         if noteBottom < laneCenterY - 10 then 
                             if ActiveHolds[note] then
                                 task.spawn(function()
