@@ -1,6 +1,6 @@
 -- =========================================================================
 -- EMLOXA WARE: PROJECT AFTERNIGHT (PLACE: 13042495892)
--- V17 ULTIMATE PRECISION ENGINE (CLASSIC DETECTION + DYNAMIC KEYS)
+-- V18 ULTIMATE PRECISION ENGINE (FLAWLESS MODE DETECTOR)
 -- =========================================================================
 local GameModule = {}
 
@@ -109,7 +109,7 @@ function GameModule:Init(Window)
     }
 
     -- ==========================================
-    -- 3. AUTO PLAYER (SENİN VERDİĞİN MANTIK)
+    -- 3. AUTO PLAYER 
     -- ==========================================
     local AutoPlayerEnabled = false
     local AutoplayMethod = "Hybrid"
@@ -117,14 +117,13 @@ function GameModule:Init(Window)
     local ProjectTab = Window:CreateTab("Auto Player")
     local AdvancedTab = Window:CreateTab("Advanced")
 
-    ProjectTab:CreateToggle("Enable God Mode (Classic V17)", function(s) AutoPlayerEnabled = s end)
+    ProjectTab:CreateToggle("Enable God Mode (Classic V18)", function(s) AutoPlayerEnabled = s end)
     AdvancedTab:CreateDropdown("Autoplay Method", {"Calculate", "Rapid checks", "Hybrid"}, "Hybrid", function(val) AutoplayMethod = val end)
 
     local TappedNotes = {}
     local LastYPositions = {} 
     local LastNoteSeenTime = tick()
     
-    -- Şerit Durumu (State) Değişkenleri (18K'ya kadar dinamik destekler)
     local CurrentlyDown = {}
     local TapReleaseTimes = {}
     for i = 1, 18 do
@@ -132,16 +131,22 @@ function GameModule:Init(Window)
         TapReleaseTimes[i] = 0
     end
 
-    -- KLASÖR BULUCU (Otomatik Mod Tespiti)
+    -- ==========================================
+    -- HATA DÜZELTMESİ: GELİŞMİŞ KLASÖR BULUCU
+    -- ==========================================
     local function GetTargetFolderAndMode(MainGame)
         for _, child in pairs(MainGame:GetChildren()) do
-            local matchStr = string.match(child.Name, "^(%d+)K")
-            if matchStr then return tonumber(matchStr), child end
+            -- İsmin içindeki harfleri büyüt (küçük 'k' yazıldıysa bile yakalar)
+            -- Ve ismin neresinde olursa olsun rakam ve K'yi arar (Örn: "Mode_9K" -> 9)
+            local matchStr = string.match(string.upper(child.Name), "(%d+)K")
+            if matchStr then 
+                return tonumber(matchStr), child 
+            end
         end
+        -- Eğer döngü biter ve hiçbirinde K yazmazsa, direkt 4K modundadır.
         return 4, MainGame
     end
 
-    -- SENİN YAZDIĞIN KUSURSUZ ŞERİT BULMA MANTIĞI (< 30px)
     local function GetNoteLaneInfo(note, targetStrums)
         local noteX = note.AbsolutePosition.X + (note.AbsoluteSize.X / 2)
         for i, strum in ipairs(targetStrums) do
@@ -186,7 +191,6 @@ function GameModule:Init(Window)
         local holdActiveThisFrame = {}
         for i = 1, kps do holdActiveThisFrame[i] = false end
 
-        -- SENİN VERDİĞİN HIZ VE VURUŞ MANTIĞI
         for _, note in pairs(targetFolder:GetChildren()) do
             if note:IsA("ImageLabel") and not note.Name:find("Strum") then
                 
@@ -217,12 +221,10 @@ function GameModule:Init(Window)
                     local isHoldNote = (note.AbsoluteSize.Y > note.AbsoluteSize.X * 1.5)
 
                     if isHoldNote then
-                        -- BAĞIMSIZ HOLD (KUYRUK) ALGILAMA SİSTEMİ
                         if noteTop <= laneCenterY + 15 and noteBottom >= laneCenterY - 15 then
                             holdActiveThisFrame[laneIndex] = true
                         end
                     else
-                        -- NORMAL KAFA (HEAD) NOTASI VURUŞU
                         local shouldHit = false
                         local frameTravel = noteVelocity * deltaTime
                         
@@ -247,9 +249,6 @@ function GameModule:Init(Window)
             end
         end
 
-        -- ==========================================
-        -- DURUM GÜNCELLEMESİ VE TUŞ KONTROLÜ
-        -- ==========================================
         for i = 1, kps do
             local key = currentMap[i]
             if key then
@@ -265,7 +264,6 @@ function GameModule:Init(Window)
             end
         end
 
-        -- Şarkı bittiğinde her şeyi sıfırla
         if not anyNoteSeenThisFrame and (tick() - LastNoteSeenTime > 2.5) then
             TappedNotes = {}
             LastYPositions = {}
