@@ -13,7 +13,7 @@ function GameModule:Init(Window)
     -- ==========================================
     -- 1. EKRANIN ÜST ORTASINA SIDE SELECTOR UI
     -- ==========================================
-    local CurrentSide = "Right" -- Varsayılan taraf
+    local CurrentSide = "Right"
     local SideUI = Instance.new("ScreenGui")
     SideUI.Name = "EmloxaAfternightSideUI"
     SideUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
@@ -53,17 +53,17 @@ function GameModule:Init(Window)
             if CurrentSide == "Right" then
                 CurrentSide = "Left"
                 SideText.Text = "PLAYING: LEFT [Y]"
-                UIStroke.Color = Color3.fromRGB(255, 85, 85) -- Sola geçince kırmızımsı
+                UIStroke.Color = Color3.fromRGB(255, 85, 85)
             else
                 CurrentSide = "Right"
                 SideText.Text = "PLAYING: RIGHT [Y]"
-                UIStroke.Color = Color3.fromRGB(102, 85, 255) -- Sağa geçince mor
+                UIStroke.Color = Color3.fromRGB(102, 85, 255)
             end
         end
     end)
 
     -- ==========================================
-    -- 2. AUTO PLAYER (PERFECT ENGINE)
+    -- 2. AUTO PLAYER (HOLD NOTE ENGINE)
     -- ==========================================
     local AutoPlayerEnabled = false
     local AutoplayMethod = "Hybrid"
@@ -74,15 +74,17 @@ function GameModule:Init(Window)
     -- W A S D TUŞ DİZİLİMİ (Sol=A, Alt=S, Üst=W, Sağ=D)
     local KeyMap = {Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.W, Enum.KeyCode.D}
     
-    local ActiveHolds = {}
     local TappedNotes = {}
     local LastYPositions = {} 
     local LastNoteSeenTime = tick()
+    
+    -- Şerit Durumu (State) Değişkenleri
+    local CurrentlyDown = {false, false, false, false}
+    local TapReleaseTimes = {0, 0, 0, 0}
 
-    ProjectTab:CreateToggle("Enable God Mode (Afternight V1)", function(s) AutoPlayerEnabled = s end)
+    ProjectTab:CreateToggle("Enable God Mode (Advanced Hold Logic)", function(s) AutoPlayerEnabled = s end)
     AdvancedTab:CreateDropdown("Autoplay Method", {"Calculate", "Rapid checks", "Hybrid"}, "Hybrid", function(val) AutoplayMethod = val end)
 
-    -- Hangi notanın hangi lane'de olduğunu X koordinatından bulma fonksiyonu
     local function GetNoteLaneInfo(note, MainGame)
         local strums = {}
         if CurrentSide == "Left" then
@@ -102,7 +104,6 @@ function GameModule:Init(Window)
                 local noteX = note.AbsolutePosition.X + (note.AbsoluteSize.X / 2)
                 local strumX = strum.AbsolutePosition.X + (strum.AbsoluteSize.X / 2)
                 
-                -- Eğer notanın merkezi ile Strum'un merkezi X ekseninde yakınsa (hata payı 30px)
                 if math.abs(noteX - strumX) < 30 then
                     return i, strum
                 end
@@ -122,14 +123,14 @@ function GameModule:Init(Window)
         local MainGame = MainUI.Game
 
         local anyNoteSeenThisFrame = false
+        local holdActiveThisFrame = {false, false, false, false}
 
+        -- Tüm objeleri tara ve durumlarını değerlendir
         for _, note in pairs(MainGame:GetChildren()) do
-            -- Tüm ImageLabel'ları tara (Strum'ları es geç)
             if note:IsA("ImageLabel") and not note.Name:find("Strum") then
                 
                 local laneIndex, targetStrum = GetNoteLaneInfo(note, MainGame)
                 
-                -- Sadece bizim seçtiğimiz taraftaki bir lane'e aitse işle
                 if laneIndex and targetStrum then
                     anyNoteSeenThisFrame = true
                     LastNoteSeenTime = tick()
@@ -142,97 +143,86 @@ function GameModule:Init(Window)
                     local noteCenterY = noteTop + (note.AbsoluteSize.Y / 2)
                     local dist = math.abs(noteCenterY - laneCenterY)
                     
-                    -- KUSURSUZ HAFIZA SİLİCİ (TELEPORT ALGILAYICI)
                     if LastYPositions[note] and math.abs(noteCenterY - LastYPositions[note]) > 50 then
                         TappedNotes[note] = nil
-                        ActiveHolds[note] = nil
                     end
                     
-                    -- Hız Hesaplama
                     local noteVelocity = 0
                     if LastYPositions[note] then
                         noteVelocity = math.abs(noteCenterY - LastYPositions[note]) / deltaTime
                     end
                     LastYPositions[note] = noteCenterY
 
-                    -- Hold Notası Tespiti (Görsel uzunluğa göre)
+                    -- Eğer boyu, eninin 1.5 katından büyükse bu bağımsız bir Hold Body (Kuyruk)
                     local isHoldNote = (note.AbsoluteSize.Y > note.AbsoluteSize.X * 1.5)
 
-                    -- Kusursuz Merkez (Sick) Matematiği
-                    local shouldHit = false
-                    local frameTravel = noteVelocity * deltaTime
-                    
-                    if AutoplayMethod == "Rapid checks" then
-                        shouldHit = (dist <= 5) 
-                    elseif AutoplayMethod == "Calculate" then
-                        shouldHit = (dist <= math.max(2, frameTravel / 1.5))
-                    elseif AutoplayMethod == "Hybrid" then
-                        shouldHit = (dist <= math.max(4, frameTravel / 1.2))
-                    end
-
-                    -- VURUŞ İŞLEMLERİ (Şoklama)
-                    if shouldHit and not TappedNotes[note] then
-                        TappedNotes[note] = true
-                        
-                        if isHoldNote then
-                            ActiveHolds[note] = laneKey
-                            task.spawn(function()
-                                VirtualInputManager:SendKeyEvent(true, laneKey, false, game)
-                            end)
-                        else
-                            task.spawn(function()
-                                VirtualInputManager:SendKeyEvent(false, laneKey, false, game)
-                                VirtualInputManager:SendKeyEvent(true, laneKey, false, game)
-                                
-                                task.wait(0.01)
-                                
-                                local isHolding = false
-                                for hNote, k in pairs(ActiveHolds) do
-                                    if k == laneKey and hNote.Parent then isHolding = true break end
-                                end
-                                if not isHolding then
-                                    VirtualInputManager:SendKeyEvent(false, laneKey, false, game)
-                                end
-                            end)
+                    if isHoldNote then
+                        -- ===============================================
+                        -- BAĞIMSIZ HOLD (KUYRUK) ALGILAMA SİSTEMİ
+                        -- ===============================================
+                        -- Kuyruğun üst kısmı Strum'u geçmiş ve alt kısmı henüz Strum'dan çıkmamışsa:
+                        if noteTop <= laneCenterY + 15 and noteBottom >= laneCenterY - 15 then
+                            holdActiveThisFrame[laneIndex] = true
                         end
-                    end
-                    
-                    -- Hold Notası Kuyruk Bırakma
-                    if isHoldNote and TappedNotes[note] then
-                        if noteBottom < laneCenterY - 10 then 
-                            if ActiveHolds[note] then
-                                task.spawn(function()
-                                    VirtualInputManager:SendKeyEvent(false, laneKey, false, game)
-                                end)
-                                ActiveHolds[note] = nil
-                            end
+                    else
+                        -- ===============================================
+                        -- NORMAL KAFA (HEAD) NOTASI VURUŞU
+                        -- ===============================================
+                        local shouldHit = false
+                        local frameTravel = noteVelocity * deltaTime
+                        
+                        if AutoplayMethod == "Rapid checks" then
+                            shouldHit = (dist <= 5) 
+                        elseif AutoplayMethod == "Calculate" then
+                            shouldHit = (dist <= math.max(2, frameTravel / 1.5))
+                        elseif AutoplayMethod == "Hybrid" then
+                            shouldHit = (dist <= math.max(4, frameTravel / 1.2))
+                        end
+
+                        if shouldHit and not TappedNotes[note] then
+                            TappedNotes[note] = true
+                            -- Normal nota vurulduğunda çok kısa süreliğine tuşu basılı tutma süresi tanır
+                            TapReleaseTimes[laneIndex] = tick() + 0.035 
+                            
+                            -- Vuruşun %100 algılanması için tuşu tazele
+                            VirtualInputManager:SendKeyEvent(false, laneKey, false, game)
+                            VirtualInputManager:SendKeyEvent(true, laneKey, false, game)
+                            CurrentlyDown[laneIndex] = true
                         end
                     end
                 end
             end
         end
 
-        -- Hata Payı Temizliği (Silinen hold notaları)
-        for holdNote, key in pairs(ActiveHolds) do
-            if not holdNote.Parent then 
-                task.spawn(function()
-                    VirtualInputManager:SendKeyEvent(false, key, false, game)
-                end)
-                ActiveHolds[holdNote] = nil
+        -- ==========================================
+        -- DURUM GÜNCELLEMESİ VE TUŞ KONTROLÜ
+        -- ==========================================
+        -- Her şerit için basılı tutulup tutulmayacağına karar verilir.
+        for i = 1, 4 do
+            local key = KeyMap[i]
+            -- Eğer o şeritten bir kuyruk geçiyorsa VEYA normal bir notaya yeni basıldıysa tuş aşağıda kalmalıdır.
+            local shouldBeDown = holdActiveThisFrame[i] or (tick() < TapReleaseTimes[i])
+            
+            if shouldBeDown and not CurrentlyDown[i] then
+                CurrentlyDown[i] = true
+                VirtualInputManager:SendKeyEvent(true, key, false, game)
+            elseif not shouldBeDown and CurrentlyDown[i] then
+                CurrentlyDown[i] = false
+                VirtualInputManager:SendKeyEvent(false, key, false, game)
             end
         end
 
-        -- ==========================================
-        -- OTOMATİK SIFIRLAMA (Şarkı Bitişi)
-        -- ==========================================
+        -- Şarkı bittiğinde her şeyi sıfırla
         if not anyNoteSeenThisFrame and (tick() - LastNoteSeenTime > 2.5) then
             TappedNotes = {}
             LastYPositions = {}
             
-            for holdNote, key in pairs(ActiveHolds) do
-                VirtualInputManager:SendKeyEvent(false, key, false, game)
+            for i = 1, 4 do
+                if CurrentlyDown[i] then
+                    VirtualInputManager:SendKeyEvent(false, KeyMap[i], false, game)
+                    CurrentlyDown[i] = false
+                end
             end
-            ActiveHolds = {}
             LastNoteSeenTime = tick()
         end
     end)
