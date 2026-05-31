@@ -1,6 +1,6 @@
 -- =========================================================================
 -- EMLOXA WARE: PROJECT AFTERNIGHT (PLACE: 13042495892)
--- V14 NEBULA ENGINE - VECTOR & DYNAMIC MULTI-KEY OPTIMIZED
+-- V15 CLASSIC PRECISION ENGINE (NO VECTOR, PURE X/Y ALIGNMENT)
 -- =========================================================================
 local GameModule = {}
 
@@ -12,7 +12,7 @@ function GameModule:Init(Window)
     local LocalPlayer = Players.LocalPlayer
 
     -- ==========================================
-    -- 1. SIDE SELECTOR UI (ŞIK & MODERN)
+    -- 1. SIDE SELECTOR UI
     -- ==========================================
     local CurrentSide = "Right"
     local SideUI = Instance.new("ScreenGui")
@@ -57,7 +57,7 @@ function GameModule:Init(Window)
     end)
 
     -- ==========================================
-    -- 2. DYNAMIC KEYMAPS (FOTOĞRAFLARA TAM UYUMLU)
+    -- 2. DYNAMIC KEYMAPS
     -- ==========================================
     local KeyMaps = {
         [1] = {Enum.KeyCode.Space},
@@ -83,18 +83,15 @@ function GameModule:Init(Window)
     local AutoPlayerEnabled = false
     local AutoplayMethod = "Hybrid"
     local TappedNotes = {}
-    local LastPositions = {} 
     local LastNoteSeenTime = tick()
     local CurrentlyDown = {}
 
     local ProjectTab = Window:CreateTab("Auto Player")
     local AdvancedTab = Window:CreateTab("Advanced")
 
-    ProjectTab:CreateToggle("Enable Nebula Engine V14", function(s) AutoPlayerEnabled = s end)
+    ProjectTab:CreateToggle("Enable Precision Engine V15", function(s) AutoPlayerEnabled = s end)
     AdvancedTab:CreateDropdown("Autoplay Method", {"Calculate", "Rapid checks", "Hybrid"}, "Hybrid", function(val) AutoplayMethod = val end)
 
-    -- Optimizasyon: Her karede Strum'ları aramak yerine, değiştikçe bul
-    local CachedStrums = {}
     local function GetStrumData(MainGame)
         local total = 0
         local all = {}
@@ -107,22 +104,16 @@ function GameModule:Init(Window)
         return total, all
     end
 
-    -- Vektörel Hedefleme (Hangi lane'e ait olduğunu bulma)
-    local function FindTargetLane(noteCenter, velocity, targetStrums)
-        local bestIdx, bestStrum, minScore = nil, nil, 100000
+    -- TAM İSTEDİĞİN MANTIK: "Yönü boşver, X ekseninde hangisine yakınsa onundur"
+    local function FindTargetLaneByX(noteX, targetStrums)
+        local bestIdx, bestStrum, minDist = nil, nil, 50 -- 50 piksel hata payı
+        
         for i, strum in ipairs(targetStrums) do
-            local strumPos = strum.AbsolutePosition + (strum.AbsoluteSize / 2)
-            local dist = (noteCenter - strumPos).Magnitude
+            local strumX = strum.AbsolutePosition.X + (strum.AbsoluteSize.X / 2)
+            local dist = math.abs(noteX - strumX)
             
-            -- Modchart (Hareketli şerit) desteği: Hız vektörü ile strum arasındaki açıya bak
-            local score = dist
-            if velocity.Magnitude > 10 then
-                local alignment = velocity.Unit:Dot((strumPos - noteCenter).Unit)
-                score = dist - (alignment * 200) -- Eğer nota strum'a doğru uçuyorsa puanı artır (mesafeyi düşük gör)
-            end
-
-            if score < minScore then
-                minScore = score
+            if dist < minDist then
+                minDist = dist
                 bestIdx = i
                 bestStrum = strum
             end
@@ -131,16 +122,15 @@ function GameModule:Init(Window)
     end
 
     -- ==========================================
-    -- 4. RENDER STEPPED (MİLİSANİYELİK REFLEKS)
+    -- 4. RENDER STEPPED (PÜRÜZSÜZ DÖNGÜ)
     -- ==========================================
-    RunService.RenderStepped:Connect(function(deltaTime)
+    RunService.RenderStepped:Connect(function()
         if not AutoPlayerEnabled then return end
         
         local MainUI = LocalPlayer.PlayerGui:FindFirstChild("Main")
         local MainGame = MainUI and MainUI:FindFirstChild("Game")
         if not MainGame then return end
 
-        -- 4K Klasörü gelse de gelmese de Strum sayısından modu otomatik bul
         local totalStrums, allStrums = GetStrumData(MainGame)
         local kps = math.floor(totalStrums / 2)
         if kps == 0 then return end
@@ -157,48 +147,47 @@ function GameModule:Init(Window)
         local holdActive = {}
         for i = 1, kps do holdActive[i] = false end
 
-        -- Obje Havuzu Tarama
         for _, note in pairs(MainGame:GetChildren()) do
             if note:IsA("ImageLabel") and not note.Name:find("Strum") then
-                local noteCenter = note.AbsolutePosition + (note.AbsoluteSize / 2)
                 
-                -- Hız ve Hareket Takibi
-                local velocity = Vector2.new(0, 0)
-                if LastPositions[note] then
-                    local deltaPos = (noteCenter - LastPositions[note])
-                    if deltaPos.Magnitude > 80 then TappedNotes[note] = nil -- Işınlanma/Reset
-                    else velocity = deltaPos / deltaTime end
-                end
-                LastPositions[note] = noteCenter
-
-                -- Hedef Strum'u Belirle
-                local lIdx, targetS = FindTargetLane(noteCenter, velocity, myStrums)
+                local noteX = note.AbsolutePosition.X + (note.AbsoluteSize.X / 2)
+                
+                -- Notaların şeritlerini düz X koordinatı ile bul (0 kafa karışıklığı)
+                local lIdx, targetS = FindTargetLaneByX(noteX, myStrums)
                 
                 if lIdx and targetS then
                     anyNoteSeen = true
                     LastNoteSeenTime = tick()
                     
                     local key = currentMap[lIdx]
-                    local sCenter = targetS.AbsolutePosition + (targetS.AbsoluteSize / 2)
-                    local dist = (noteCenter - sCenter).Magnitude
+                    local sCenterY = targetS.AbsolutePosition.Y + (targetS.AbsoluteSize.Y / 2)
+                    local noteCenterY = note.AbsolutePosition.Y + (note.AbsoluteSize.Y / 2)
+                    
+                    local distY = math.abs(noteCenterY - sCenterY)
                     local isHold = (note.AbsoluteSize.Y > note.AbsoluteSize.X * 1.5)
 
                     if isHold then
-                        -- Hold Note (Kuyruk) Algılama: Strum notanın içindeyse basılı tut
-                        local xMatch = math.abs(noteCenter.X - sCenter.X) < (note.AbsoluteSize.X / 2 + 10)
-                        local yMatch = math.abs(noteCenter.Y - sCenter.Y) < (note.AbsoluteSize.Y / 2 + 10)
-                        if xMatch and yMatch then holdActive[lIdx] = true end
-                    else
-                        -- Tap Note (Kafa) Algılama
-                        local travel = velocity.Magnitude * deltaTime
-                        local threshold = (AutoplayMethod == "Rapid checks") and 5 or math.max(4, travel / 1.2)
+                        -- Hold Note (Kuyruk) Algılama: Kuyruğun ucu ve başı strum'un içindeyse basılı tut
+                        local noteTop = note.AbsolutePosition.Y
+                        local noteBottom = noteTop + note.AbsoluteSize.Y
                         
-                        if dist <= threshold and not TappedNotes[note] then
+                        -- Kuyruk hedefin içine girdiyse bas, çıkana kadar bırakma
+                        if noteTop <= sCenterY + 15 and noteBottom >= sCenterY - 15 then 
+                            holdActive[lIdx] = true 
+                        end
+                    else
+                        -- Tap Note (Normal Kafa) Algılama
+                        local hitThreshold = (AutoplayMethod == "Rapid checks") and 10 or 15
+                        
+                        if distY <= hitThreshold and not TappedNotes[note] then
                             TappedNotes[note] = true
+                            
+                            -- Vuruşun %100 algılanması için sağlam Task mantığı
                             task.spawn(function()
-                                VirtualInputManager:SendKeyEvent(false, key, false, game) -- Temiz basış
+                                VirtualInputManager:SendKeyEvent(false, key, false, game)
                                 VirtualInputManager:SendKeyEvent(true, key, false, game)
-                                task.wait(0.035)
+                                task.wait(0.02)
+                                -- Eğer o şeritte aktif bir hold (kuyruk) yoksa tuşu bırak
                                 if not holdActive[lIdx] then
                                     VirtualInputManager:SendKeyEvent(false, key, false, game)
                                 end
@@ -209,7 +198,7 @@ function GameModule:Init(Window)
             end
         end
 
-        -- Tuş Durumu Yönetimi
+        -- Hold (Basılı Tutma) Tuş Durumu Yönetimi
         for i = 1, kps do
             local k = currentMap[i]
             if k then
@@ -223,10 +212,15 @@ function GameModule:Init(Window)
             end
         end
 
-        -- Optimizasyon: Memory Leak'i Engelle (Giden notaları sil)
-        if tick() - LastNoteSeenTime > 2 then
+        -- Şarkı bitince veya nota gelmeyince hafızayı sıfırla (Kaçırmayı önler)
+        if not anyNoteSeen and (tick() - LastNoteSeenTime > 1.5) then
             TappedNotes = {}
-            LastPositions = {}
+            for i = 1, 18 do
+                if CurrentlyDown[i] and currentMap[i] then
+                    VirtualInputManager:SendKeyEvent(false, currentMap[i], false, game)
+                end
+                CurrentlyDown[i] = false
+            end
             LastNoteSeenTime = tick()
         end
     end)
