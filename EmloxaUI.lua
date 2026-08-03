@@ -1,7 +1,7 @@
 -- =========================================================================
--- EMLOXA WARE PREMIUM UI v15 (UNIVERSAL HYBRID ENGINE)
--- FIXED: GUI NAMING ISSUES FOR EVADE UNLOAD/LOAD COMPATIBILITY
--- ADDED: TRUE PREMIUM TOGGLES, STACKABLE TIME SUBSCRIPTION & DEVPRODUCTS
+-- EMLOXA WARE PREMIUM UI v16 (UNIVERSAL HYBRID ENGINE)
+-- FIXED: ZINDEX MODAL ISSUES, TOPBAR OVERLAPPING, FULL ENGLISH
+-- ADDED: GAMEPASS (LIFETIME) & DEVPRODUCT DYNAMIC ROUTING SYSTEM
 -- =========================================================================
 local EmloxaLibrary = {}
 
@@ -16,6 +16,20 @@ local RbxAnalyticsService = game:GetService("RbxAnalyticsService")
 local LocalPlayer = Players.LocalPlayer
 
 -- ══════════════════════════════════════
+--  ULTRA-RANDOM OBFUSCATED STRING GEN
+-- ══════════════════════════════════════
+local CHARSET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?"
+local function GenerateRandomString(length)
+	length = length or math.random(28, 48)
+	local str = {}
+	for i = 1, length do
+		local r = math.random(1, #CHARSET)
+		str[i] = string.sub(CHARSET, r, r)
+	end
+	return table.concat(str)
+end
+
+-- ══════════════════════════════════════
 --  AUTOMATIC HUI PARENT SELECTOR
 -- ══════════════════════════════════════
 local function GetSafeParent()
@@ -25,6 +39,29 @@ local function GetSafeParent()
 	if successCore and core then return core end
 	return LocalPlayer:WaitForChild("PlayerGui")
 end
+
+-- ══════════════════════════════════════
+--  AUTOMATIC METATABLE NAME SPOOFER
+-- ══════════════════════════════════════
+local SpoofedName = GenerateRandomString(18)
+local SpoofedDisplayName = GenerateRandomString(20)
+
+pcall(function()
+	local rawMeta = getrawmetatable(game)
+	if setreadonly then setreadonly(rawMeta, false) end
+	local oldIndex = rawMeta.__index
+	rawMeta.__index = newcclosure(function(self, key)
+		if not checkcaller() and self == LocalPlayer then
+			if key == "Name" or key == "name" then
+				return SpoofedName
+			elseif key == "DisplayName" or key == "displayName" then
+				return SpoofedDisplayName
+			end
+		end
+		return oldIndex(self, key)
+	end)
+	if setreadonly then setreadonly(rawMeta, true) end
+end)
 
 -- ══════════════════════════════════════
 --  ADVANCED DISCORD WEBHOOK LOGGING
@@ -116,7 +153,7 @@ local function GetSavedConfigs()
 end
 
 -- ══════════════════════════════════════
---  HWID & DAILY 2-HOUR LIMIT SYSTEM
+--  HWID & DAILY TIME LIMIT SYSTEM
 -- ══════════════════════════════════════
 local function GetHWID()
 	local clientID = ""
@@ -128,12 +165,6 @@ local function GetHWID()
 end
 
 local TimeDataFile = ConfigFolder .. "/.sys_limit.json"
-local DevProducts = {
-	[3613048307] = 3600,        -- 1 Hour
-	[3613048436] = 5 * 3600,    -- 5 Hours
-	[3613048476] = 10 * 3600,   -- 10 Hours
-	[1931252522] = "LIFETIME"   -- Lifetime
-}
 
 local CurrentHWIDData = {
 	HWID = GetHWID(),
@@ -167,6 +198,17 @@ local function SaveTimeData()
 end
 
 LoadTimeData()
+
+-- INITIAL LIFETIME GAMEPASS CHECK (If user already owns it)
+task.spawn(function()
+	local success, hasPass = pcall(function()
+		return MarketplaceService:UserOwnsGamePassAsync(LocalPlayer.UserId, 1931252522)
+	end)
+	if success and hasPass then
+		CurrentHWIDData.IsLifetime = true
+		SaveTimeData()
+	end
+end)
 
 -- ══════════════════════════════════════
 --  THEMES
@@ -278,7 +320,6 @@ function EmloxaLibrary:CreateWindow(hubName)
 	
 	task.spawn(SendUsageLog)
 
-	-- IMPORTANT: Fixed name strictly to "EmloxaWareUI" for Evade script compatibility!
 	local SafeParent = GetSafeParent()
 	if SafeParent:FindFirstChild("EmloxaWareUI") then SafeParent.EmloxaWareUI:Destroy() end
 
@@ -442,12 +483,15 @@ function EmloxaLibrary:CreateWindow(hubName)
 	topCover.BorderSizePixel = 0
 	registerThemeable(TopBar, {BackgroundColor3 = "Panel"})
 
+	-- ==========================================
+	-- FIX: PROPER TOPBAR LAYOUT (NO OVERLAPPING)
+	-- ==========================================
 	local Title = Instance.new("TextLabel")
 	Title.Text = " "..hubName
 	Title.Font = Enum.Font.GothamBlack
 	Title.TextSize = 15
 	Title.TextXAlignment = Enum.TextXAlignment.Left
-	Title.Size = UDim2.new(0, 160, 1, 0)
+	Title.Size = UDim2.new(0, 180, 1, 0)
 	Title.Position = UDim2.new(0, 15, 0, 0)
 	Title.BackgroundTransparency = 1
 	Title.Parent = TopBar
@@ -455,11 +499,22 @@ function EmloxaLibrary:CreateWindow(hubName)
 		Title.TextColor3 = Color3.fromHSV(tick()%5/5,0.9,1)
 	end)
 
-	-- ══════════════════════════════════════
-	--  HIGH-END TIME WIDGET & RECHARGE MODAL
-	-- ══════════════════════════════════════
+	local CreditsText = Instance.new("TextLabel")
+	CreditsText.Text = "Made by Emloxa"
+	CreditsText.Font = Enum.Font.GothamSemibold
+	CreditsText.TextSize = 11
+	CreditsText.TextColor3 = CurrentTheme.SubTextColor
+	CreditsText.TextXAlignment = Enum.TextXAlignment.Right
+	CreditsText.Size = UDim2.new(0, 100, 1, 0)
+	-- Placed safely to the left of the TimeContainer (-415 offset)
+	CreditsText.Position = UDim2.new(1, -415, 0, 0)
+	CreditsText.BackgroundTransparency = 1
+	CreditsText.Parent = TopBar
+	registerThemeable(CreditsText, {TextColor3 = "SubTextColor"})
+
 	local TimeContainer = Instance.new("Frame")
 	TimeContainer.Size = UDim2.new(0, 200, 0, 32)
+	-- Perfectly fits next to the Controls block (-100 to -300)
 	TimeContainer.Position = UDim2.new(1, -305, 0.5, -16)
 	TimeContainer.BackgroundColor3 = CurrentTheme.PanelLight
 	TimeContainer.Parent = TopBar
@@ -467,6 +522,15 @@ function EmloxaLibrary:CreateWindow(hubName)
 	local timeStroke = createStroke(TimeContainer, CurrentTheme.Primary, 1)
 	registerThemeable(TimeContainer, {BackgroundColor3 = "PanelLight"})
 
+	local Controls = Instance.new("Frame")
+	Controls.Size = UDim2.new(0, 90, 1, 0)
+	Controls.Position = UDim2.new(1, -100, 0, 0)
+	Controls.BackgroundTransparency = 1
+	Controls.Parent = TopBar
+
+	-- ══════════════════════════════════════
+	--  TIME WIDGET & RECHARGE MODAL LOGIC
+	-- ══════════════════════════════════════
 	local TimeIcon = Instance.new("TextLabel")
 	TimeIcon.Size = UDim2.new(0, 24, 1, 0)
 	TimeIcon.Position = UDim2.new(0, 6, 0, 0)
@@ -489,18 +553,18 @@ function EmloxaLibrary:CreateWindow(hubName)
 	registerThemeable(TimeLabel, {TextColor3 = "Primary"})
 
 	local PlusBtn = Instance.new("TextButton")
-	PlusBtn.Size = UDim2.new(0, 26, 0, 24)
-	PlusBtn.Position = UDim2.new(1, -29, 0.5, -12)
+	PlusBtn.Size = UDim2.new(0, 24, 0, 24)
+	PlusBtn.Position = UDim2.new(1, -30, 0.5, -12)
 	PlusBtn.BackgroundColor3 = CurrentTheme.Primary
 	PlusBtn.Text = "+"
 	PlusBtn.Font = Enum.Font.GothamBlack
-	PlusBtn.TextSize = 16
+	PlusBtn.TextSize = 18
 	PlusBtn.TextColor3 = Color3.new(1,1,1)
+	PlusBtn.ZIndex = 5
 	PlusBtn.Parent = TimeContainer
 	createCorner(PlusBtn, 6)
 	registerThemeable(PlusBtn, {BackgroundColor3 = "Primary"})
 
-	-- Live Time Reduction Loop
 	task.spawn(function()
 		while task.wait(1) do
 			if not CurrentHWIDData.IsLifetime then
@@ -519,19 +583,21 @@ function EmloxaLibrary:CreateWindow(hubName)
 		end
 	end)
 
-	-- Recharge Modal Builder
 	local function OpenRechargeModal()
+		-- Parented directly to HubGui so it overlaps everything else!
 		local Overlay = Instance.new("Frame")
 		Overlay.Size = UDim2.new(1,0,1,0)
 		Overlay.BackgroundColor3 = Color3.new(0,0,0)
 		Overlay.BackgroundTransparency = 0.5
 		Overlay.Active = true
-		Overlay.Parent = MainFrame
+		Overlay.ZIndex = 100
+		Overlay.Parent = HubGui
 
 		local Modal = Instance.new("Frame")
 		Modal.Size = UDim2.new(0, 500, 0, 330)
 		Modal.Position = UDim2.new(0.5, -250, 0.5, -165)
 		Modal.BackgroundColor3 = CurrentTheme.Panel
+		Modal.ZIndex = 101
 		Modal.Parent = Overlay
 		createCorner(Modal, 12)
 		createStroke(Modal, CurrentTheme.Primary, 2)
@@ -543,13 +609,14 @@ function EmloxaLibrary:CreateWindow(hubName)
 		MTitle.TextColor3 = CurrentTheme.Primary
 		MTitle.Size = UDim2.new(1,-40,0,30); MTitle.Position = UDim2.new(0,18,0,12)
 		MTitle.BackgroundTransparency = 1; MTitle.TextXAlignment = Enum.TextXAlignment.Left
-		MTitle.Parent = Modal
+		MTitle.ZIndex = 102; MTitle.Parent = Modal
 		registerThemeable(MTitle, {TextColor3 = "Primary"})
 
 		local MClose = Instance.new("TextButton")
 		MClose.Size = UDim2.new(0,28,0,28); MClose.Position = UDim2.new(1,-36,0,12)
 		MClose.Text = "X"; MClose.Font = Enum.Font.GothamBold; MClose.TextColor3 = CurrentTheme.Accent
-		MClose.BackgroundColor3 = CurrentTheme.PanelLight; MClose.Parent = Modal
+		MClose.BackgroundColor3 = CurrentTheme.PanelLight
+		MClose.ZIndex = 102; MClose.Parent = Modal
 		createCorner(MClose,6)
 		registerThemeable(MClose, {BackgroundColor3 = "PanelLight"})
 
@@ -557,23 +624,24 @@ function EmloxaLibrary:CreateWindow(hubName)
 
 		local Grid = Instance.new("Frame")
 		Grid.Size = UDim2.new(1,-36,1,-60); Grid.Position = UDim2.new(0,18,0,50)
-		Grid.BackgroundTransparency = 1; Grid.Parent = Modal
+		Grid.BackgroundTransparency = 1
+		Grid.ZIndex = 102; Grid.Parent = Modal
 
 		local Layout = Instance.new("UIGridLayout", Grid)
 		Layout.CellSize = UDim2.new(0, 222, 0, 120)
 		Layout.CellPadding = UDim2.new(0, 18, 0, 18)
 
 		local Options = {
-			{Name = "1 Hour Pass", Price = "10 Robux", Sale = "%20 SALE", ProductId = 3613048307},
-			{Name = "5 Hours Pass", Price = "35 Robux", Sale = "%30 SALE", ProductId = 3613048436},
-			{Name = "10 Hours Pass", Price = "55 Robux", Sale = "%45 SALE", ProductId = 3613048476},
-			{Name = "LIFETIME VIP", Price = "500 Robux", Sale = "%70 BEST VALUE", ProductId = 1931252522}
+			{Name = "1 Hour Pass", Price = "10 Robux", Sale = "20% SALE", ID = 3613048307, Type = "Product"},
+			{Name = "5 Hours Pass", Price = "35 Robux", Sale = "30% SALE", ID = 3613048436, Type = "Product"},
+			{Name = "10 Hours Pass", Price = "55 Robux", Sale = "45% SALE", ID = 3613048476, Type = "Product"},
+			{Name = "LIFETIME VIP", Price = "500 Robux", Sale = "70% BEST VALUE", ID = 1931252522, Type = "GamePass"}
 		}
 
 		for _, opt in ipairs(Options) do
 			local Card = Instance.new("Frame")
 			Card.BackgroundColor3 = CurrentTheme.PanelLight
-			Card.Parent = Grid
+			Card.ZIndex = 103; Card.Parent = Grid
 			createCorner(Card, 8)
 			createStroke(Card, CurrentTheme.Primary, 1)
 
@@ -581,24 +649,31 @@ function EmloxaLibrary:CreateWindow(hubName)
 			CName.Text = opt.Name; CName.Font = Enum.Font.GothamBold; CName.TextSize = 13
 			CName.TextColor3 = CurrentTheme.TextColor; CName.Size = UDim2.new(1,-10,0,24)
 			CName.Position = UDim2.new(0,8,0,6); CName.BackgroundTransparency = 1
-			CName.TextXAlignment = Enum.TextXAlignment.Left; CName.Parent = Card
+			CName.TextXAlignment = Enum.TextXAlignment.Left
+			CName.ZIndex = 104; CName.Parent = Card
 
 			local CSale = Instance.new("TextLabel")
 			CSale.Text = opt.Sale; CSale.Font = Enum.Font.GothamBlack; CSale.TextSize = 10
 			CSale.TextColor3 = CurrentTheme.Accent; CSale.Size = UDim2.new(1,-10,0,18)
 			CSale.Position = UDim2.new(0,8,0,30); CSale.BackgroundTransparency = 1
-			CSale.TextXAlignment = Enum.TextXAlignment.Left; CSale.Parent = Card
+			CSale.TextXAlignment = Enum.TextXAlignment.Left
+			CSale.ZIndex = 104; CSale.Parent = Card
 
 			local BuyBtn = Instance.new("TextButton")
 			BuyBtn.Size = UDim2.new(1,-16,0,34); BuyBtn.Position = UDim2.new(0,8,1,-42)
 			BuyBtn.BackgroundColor3 = CurrentTheme.Primary; BuyBtn.Text = "Buy " .. opt.Price
 			BuyBtn.Font = Enum.Font.GothamBold; BuyBtn.TextColor3 = Color3.new(1,1,1)
-			BuyBtn.TextSize = 12; BuyBtn.Parent = Card
+			BuyBtn.TextSize = 12
+			BuyBtn.ZIndex = 105; BuyBtn.Parent = Card
 			createCorner(BuyBtn, 6)
 
 			BuyBtn.MouseButton1Click:Connect(function()
 				pcall(function()
-					MarketplaceService:PromptProductPurchase(LocalPlayer, opt.ProductId)
+					if opt.Type == "Product" then
+						MarketplaceService:PromptProductPurchase(LocalPlayer, opt.ID)
+					elseif opt.Type == "GamePass" then
+						MarketplaceService:PromptGamePassPurchase(LocalPlayer, opt.ID)
+					end
 				end)
 			end)
 		end
@@ -606,39 +681,33 @@ function EmloxaLibrary:CreateWindow(hubName)
 
 	PlusBtn.MouseButton1Click:Connect(OpenRechargeModal)
 
-	-- DevProduct Purchase Processor
+	-- DevProduct AND GamePass Listeners
 	MarketplaceService.PromptProductPurchaseFinished:Connect(function(userId, productId, isPurchased)
 		if isPurchased and userId == LocalPlayer.UserId then
-			if DevProducts[productId] then
-				if DevProducts[productId] == "LIFETIME" then
-					CurrentHWIDData.IsLifetime = true
-				else
-					CurrentHWIDData.RemainingSeconds = CurrentHWIDData.RemainingSeconds + DevProducts[productId]
-					CurrentHWIDData.ExtraBonusSeconds = (CurrentHWIDData.ExtraBonusSeconds or 0) + DevProducts[productId]
-				end
-				SaveTimeData()
+			if productId == 3613048307 then
+				CurrentHWIDData.RemainingSeconds = CurrentHWIDData.RemainingSeconds + 3600
+				CurrentHWIDData.ExtraBonusSeconds = CurrentHWIDData.ExtraBonusSeconds + 3600
+			elseif productId == 3613048436 then
+				CurrentHWIDData.RemainingSeconds = CurrentHWIDData.RemainingSeconds + 18000
+				CurrentHWIDData.ExtraBonusSeconds = CurrentHWIDData.ExtraBonusSeconds + 18000
+			elseif productId == 3613048476 then
+				CurrentHWIDData.RemainingSeconds = CurrentHWIDData.RemainingSeconds + 36000
+				CurrentHWIDData.ExtraBonusSeconds = CurrentHWIDData.ExtraBonusSeconds + 36000
 			end
+			SaveTimeData()
 		end
 	end)
 
-	local CreditsText = Instance.new("TextLabel")
-	CreditsText.Text = "Made by Emloxa"
-	CreditsText.Font = Enum.Font.GothamSemibold
-	CreditsText.TextSize = 11
-	CreditsText.TextColor3 = CurrentTheme.SubTextColor
-	CreditsText.TextXAlignment = Enum.TextXAlignment.Right
-	CreditsText.Size = UDim2.new(0, 90, 1, 0)
-	CreditsText.Position = UDim2.new(1, -195, 0, 0)
-	CreditsText.BackgroundTransparency = 1
-	CreditsText.Parent = TopBar
-	registerThemeable(CreditsText, {TextColor3 = "SubTextColor"})
+	MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player, gamePassId, isPurchased)
+		if isPurchased and player == LocalPlayer and gamePassId == 1931252522 then
+			CurrentHWIDData.IsLifetime = true
+			SaveTimeData()
+		end
+	end)
 
-	local Controls = Instance.new("Frame")
-	Controls.Size = UDim2.new(0, 90, 1, 0)
-	Controls.Position = UDim2.new(1, -100, 0, 0)
-	Controls.BackgroundTransparency = 1
-	Controls.Parent = TopBar
-
+	-- ══════════════════════════════════════
+	--  WINDOW CONTROLS (MINIMIZE / CLOSE)
+	-- ══════════════════════════════════════
 	local MinBtn = Instance.new("TextButton")
 	MinBtn.Size = UDim2.new(0,32,0,32)
 	MinBtn.Position = UDim2.new(0,0,0.5,-16)
@@ -863,7 +932,6 @@ function EmloxaLibrary:CreateWindow(hubName)
 			return baseName .. "_" .. elementCounter
 		end
 
-		-- Standard Toggle
 		function TabSetup:CreateToggle(name, callback)
 			local id = generateId("toggle_" .. name)
 			local ToggleFrame = Instance.new("Frame")
@@ -927,7 +995,6 @@ function EmloxaLibrary:CreateWindow(hubName)
 			end)
 		end
 
-		-- Premium Styled Toggle (MANDATORY FOR EVADE SCRIPT)
 		function TabSetup:CreatePremiumToggle(name, callback)
 			local id = generateId("prem_toggle_" .. name)
 			local ToggleFrame = Instance.new("Frame")
@@ -942,7 +1009,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 			local Label = Instance.new("TextLabel")
 			Label.Size = UDim2.new(1,-110,1,0)
 			Label.Position = UDim2.new(0,15,0,0)
-			Label.Text = name -- No extra characters here to prevent breaking name-based checks
+			Label.Text = name 
 			Label.Font = Enum.Font.GothamBold
 			Label.TextSize = 14
 			Label.TextColor3 = CurrentTheme.TextColor
