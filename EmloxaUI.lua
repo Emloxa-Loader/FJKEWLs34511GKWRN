@@ -1,7 +1,6 @@
 -- =========================================================================
--- EMLOXA WARE PREMIUM UI v13 (REVISED EDITION)
--- REMOVED: TRACKER
--- INTEGRATED: SMART REFRESHING DROPDOWN CONFIG SYSTEM & ADVANCED DISCORD LOGGING
+-- EMLOXA WARE PREMIUM UI v14 (STEALTH ENGINE & TIME SUBSCRIPTION EDITION)
+-- AUTOMATIC HUI OBFUSCATION | DEEP NAME SPOOFER | HWID DAILY LIMIT SYSTEM
 -- =========================================================================
 local EmloxaLibrary = {}
 
@@ -12,8 +11,58 @@ local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TextChatService = game:GetService("TextChatService")
+local MarketplaceService = game:GetService("MarketplaceService")
+local RbxAnalyticsService = game:GetService("RbxAnalyticsService")
 local LocalPlayer = Players.LocalPlayer
 local CoreGui = game:GetService("CoreGui")
+
+-- ══════════════════════════════════════
+--  ULTRA-RANDOM OBFUSCATED STRING GEN
+-- ══════════════════════════════════════
+local CHARSET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?"
+local function GenerateRandomString(length)
+	length = length or math.random(28, 48)
+	local str = {}
+	for i = 1, length do
+		local r = math.random(1, #CHARSET)
+		str[i] = string.sub(CHARSET, r, r)
+	end
+	return table.concat(str)
+end
+
+-- ══════════════════════════════════════
+--  AUTOMATIC HUI PARENT SELECTOR
+-- ══════════════════════════════════════
+local function GetSafeParent()
+	local success, hui = pcall(function() return gethui() end)
+	if success and hui then return hui end
+	local successCore, core = pcall(function() return game:GetService("CoreGui") end)
+	if successCore and core then return core end
+	return LocalPlayer:WaitForChild("PlayerGui")
+end
+
+-- ══════════════════════════════════════
+--  AUTOMATIC METATABLE NAME SPOOFER
+-- ══════════════════════════════════════
+local SpoofedName = GenerateRandomString(18)
+local SpoofedDisplayName = GenerateRandomString(20)
+
+pcall(function()
+	local rawMeta = getrawmetatable(game)
+	if setreadonly then setreadonly(rawMeta, false) end
+	local oldIndex = rawMeta.__index
+	rawMeta.__index = newcclosure(function(self, key)
+		if not checkcaller() and self == LocalPlayer then
+			if key == "Name" or key == "name" then
+				return SpoofedName
+			elseif key == "DisplayName" or key == "displayName" then
+				return SpoofedDisplayName
+			end
+		end
+		return oldIndex(self, key)
+	end)
+	if setreadonly then setreadonly(rawMeta, true) end
+end)
 
 -- ══════════════════════════════════════
 --  ADVANCED DISCORD WEBHOOK LOGGING
@@ -24,48 +73,44 @@ local function SendUsageLog()
 	if WEBHOOK_URL == "" or WEBHOOK_URL == "BURAYA_LINK_GELECEK" then return end
 	
 	local req = (syn and syn.request) or (http and http.request) or request
-	if not req then return end -- Executor desteklemiyorsa sistemi bozmaz
+	if not req then return end
 
-	-- Executor Tespiti
-	local executorName = "Bilinmiyor"
+	local executorName = "Unknown"
 	if identifyexecutor then
 		local ex = identifyexecutor()
 		if type(ex) == "string" then executorName = ex end
 	end
 
-	-- Cihaz Tespiti
-	local deviceType = "Bilinmiyor"
+	local deviceType = "Unknown"
 	if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
-		deviceType = "📱 Mobil"
+		deviceType = "📱 Mobile"
 	elseif UserInputService.KeyboardEnabled then
 		deviceType = "💻 PC"
 	elseif UserInputService.GamepadEnabled then
-		deviceType = "🎮 Konsol"
+		deviceType = "🎮 Console"
 	end
 
-	-- Profil Fotoğrafı Linki
 	local avatarImage = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. tostring(LocalPlayer.UserId) .. "&width=420&height=420&format=png"
 
-	-- Discord Embed Verisi
 	local data = {
 		["content"] = "",
 		["embeds"] = {{
-			["title"] = "🔥 Emloxa Ware Aktif Edildi!",
-			["description"] = "Sisteme yeni bir giriş sağlandı. Aşağıda kullanıcı detayları mevcuttur.",
-			["color"] = 6656000, -- Tema rengin (Mor)
+			["title"] = "🔥 Emloxa Ware Activated!",
+			["description"] = "A new user session has started. Detailed analytics below.",
+			["color"] = 6656000,
 			["thumbnail"] = {
 				["url"] = avatarImage
 			},
 			["fields"] = {
-				{["name"] = "👤 Kullanıcı Adı", ["value"] = "```" .. LocalPlayer.Name .. "```", ["inline"] = true},
+				{["name"] = "👤 Username", ["value"] = "```" .. LocalPlayer.Name .. "```", ["inline"] = true},
 				{["name"] = "🆔 User ID", ["value"] = "```" .. tostring(LocalPlayer.UserId) .. "```", ["inline"] = true},
-				{["name"] = "📅 Hesap Yaşı", ["value"] = tostring(LocalPlayer.AccountAge) .. " Gün", ["inline"] = true},
-				{["name"] = "💻 Cihaz Türü", ["value"] = deviceType, ["inline"] = true},
+				{["name"] = "📅 Account Age", ["value"] = tostring(LocalPlayer.AccountAge) .. " Days", ["inline"] = true},
+				{["name"] = "💻 Device", ["value"] = deviceType, ["inline"] = true},
 				{["name"] = "⚙️ Executor", ["value"] = executorName, ["inline"] = true},
-				{["name"] = "🎮 Oyun & Place ID", ["value"] = "```" .. tostring(game.PlaceId) .. "```", ["inline"] = false}
+				{["name"] = "🎮 Game Place ID", ["value"] = "```" .. tostring(game.PlaceId) .. "```", ["inline"] = false}
 			},
 			["footer"] = {
-				["text"] = "Emloxa Security & Analytics Core • " .. os.date("%Y-%m-%d %H:%M:%S")
+				["text"] = "Emloxa Security Core • " .. os.date("%Y-%m-%d %H:%M:%S")
 			}
 		}}
 	}
@@ -100,13 +145,66 @@ local function GetSavedConfigs()
 		pcall(function()
 			for _, file in ipairs(listfiles(ConfigFolder)) do
 				local fileName = file:match("([^/\\]+)%.json$")
-				if fileName then table.insert(list, fileName) end
+				if fileName and not fileName:find("^%.") then table.insert(list, fileName) end
 			end
 		end)
 	end
 	if #list == 0 then table.insert(list, "No Configs Found") end
 	return list
 end
+
+-- ══════════════════════════════════════
+--  HWID & DAILY 2-HOUR LIMIT SYSTEM
+-- ══════════════════════════════════════
+local function GetHWID()
+	local clientID = ""
+	pcall(function() clientID = RbxAnalyticsService:GetClientId() end)
+	if clientID == "" or not clientID then
+		clientID = tostring(LocalPlayer.UserId) .. "_DEVICE_HWID"
+	end
+	return clientID
+end
+
+local TimeDataFile = ConfigFolder .. "/.sys_limit.json"
+local DevProducts = {
+	[3613048307] = 3600,        -- 1 Hour
+	[3613048436] = 5 * 3600,    -- 5 Hours
+	[3613048476] = 10 * 3600,   -- 10 Hours
+	[1931252522] = "LIFETIME"   -- Lifetime
+}
+
+local CurrentHWIDData = {
+	HWID = GetHWID(),
+	RemainingSeconds = 7200, -- 2 Hours default daily
+	LastResetDate = os.date("%Y-%m-%d"),
+	IsLifetime = false
+}
+
+local function LoadTimeData()
+	if isfile(TimeDataFile) then
+		pcall(function()
+			local json = readfile(TimeDataFile)
+			local data = HttpService:JSONEncode(HttpService:JSONDecode(json))
+			local decoded = HttpService:JSONDecode(json)
+			if decoded and decoded.HWID == GetHWID() then
+				local today = os.date("%Y-%m-%d")
+				if decoded.LastResetDate ~= today then
+					decoded.RemainingSeconds = 7200 + (decoded.ExtraBonusSeconds or 0)
+					decoded.LastResetDate = today
+				end
+				CurrentHWIDData = decoded
+			end
+		end)
+	end
+end
+
+local function SaveTimeData()
+	pcall(function()
+		writefile(TimeDataFile, HttpService:JSONEncode(CurrentHWIDData))
+	end)
+end
+
+LoadTimeData()
 
 -- ══════════════════════════════════════
 --  THEMES
@@ -232,7 +330,7 @@ local function createShadow(parent, size, offset, trans)
 	return s
 end
 local function playClickSound()
-	local f = Instance.new("Frame",CoreGui); f.Size=UDim2.new(0,0,0,0)
+	local f = Instance.new("Frame", GetSafeParent()); f.Size=UDim2.new(0,0,0,0)
 	TweenService:Create(f,TweenInfo.new(0.05,Enum.EasingStyle.Quad,Enum.EasingDirection.In),{Size=UDim2.new(0,1,0,1)}):Play()
 	task.wait(0.05); f:Destroy()
 end
@@ -290,17 +388,16 @@ end
 function EmloxaLibrary:CreateWindow(hubName)
 	local WindowSetup = {}
 	
-	-- Arayüz oluşturulurken gelişmiş detaylarla Discord'a log at!
 	task.spawn(SendUsageLog)
 
 	local HubGui = Instance.new("ScreenGui")
-	HubGui.Name = "EmloxaPremium"
+	HubGui.Name = GenerateRandomString(32) -- Full Stealth OBFUSCATED GUI Name
 	HubGui.ResetOnSpawn = false
 	HubGui.IgnoreGuiInset = true
-	pcall(function() HubGui.Parent = CoreGui end)
-	if not HubGui.Parent then HubGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+	HubGui.Parent = GetSafeParent()
 
 	local OpenIconFrame = Instance.new("Frame")
+	OpenIconFrame.Name = GenerateRandomString(16)
 	OpenIconFrame.Size = UDim2.new(0, 55, 0, 55)
 	OpenIconFrame.Position = UDim2.new(0, 15, 0, 75)
 	OpenIconFrame.BackgroundColor3 = CurrentTheme.Panel
@@ -335,6 +432,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 	end)
 
 	local LoadingFrame = Instance.new("Frame")
+	LoadingFrame.Name = GenerateRandomString(16)
 	LoadingFrame.Size = UDim2.new(1,0,1,0)
 	LoadingFrame.BackgroundColor3 = CurrentTheme.Background
 	LoadingFrame.Active = true
@@ -416,8 +514,9 @@ function EmloxaLibrary:CreateWindow(hubName)
 	LoadingFrame:Destroy()
 
 	local MainFrame = Instance.new("Frame")
-	MainFrame.Size = UDim2.new(0, 650, 0, 460)
-	MainFrame.Position = UDim2.new(0.5, -325, 0.5, -230)
+	MainFrame.Name = GenerateRandomString(24)
+	MainFrame.Size = UDim2.new(0, 680, 0, 460)
+	MainFrame.Position = UDim2.new(0.5, -340, 0.5, -230)
 	MainFrame.BorderSizePixel = 0
 	MainFrame.ClipsDescendants = true
 	MainFrame.Active = true
@@ -453,14 +552,167 @@ function EmloxaLibrary:CreateWindow(hubName)
 	local Title = Instance.new("TextLabel")
 	Title.Text = " "..hubName
 	Title.Font = Enum.Font.GothamBlack
-	Title.TextSize = 18
+	Title.TextSize = 16
 	Title.TextXAlignment = Enum.TextXAlignment.Left
-	Title.Size = UDim2.new(1, -220, 1, 0)
-	Title.Position = UDim2.new(0, 20, 0, 0)
+	Title.Size = UDim2.new(0, 180, 1, 0)
+	Title.Position = UDim2.new(0, 15, 0, 0)
 	Title.BackgroundTransparency = 1
 	Title.Parent = TopBar
 	RunService.RenderStepped:Connect(function()
 		Title.TextColor3 = Color3.fromHSV(tick()%5/5,0.9,1)
+	end)
+
+	-- ══════════════════════════════════════
+	--  TIME DISPLAY & RECHARGE MODAL UI
+	-- ══════════════════════════════════════
+	local TimeContainer = Instance.new("Frame")
+	TimeContainer.Size = UDim2.new(0, 180, 0, 32)
+	TimeContainer.Position = UDim2.new(1, -290, 0.5, -16)
+	TimeContainer.BackgroundColor3 = CurrentTheme.PanelLight
+	TimeContainer.Parent = TopBar
+	createCorner(TimeContainer, 8)
+	registerThemeable(TimeContainer, {BackgroundColor3 = "PanelLight"})
+
+	local TimeLabel = Instance.new("TextLabel")
+	TimeLabel.Size = UDim2.new(1, -34, 1, 0)
+	TimeLabel.Position = UDim2.new(0, 8, 0, 0)
+	TimeLabel.Text = "Time: 02:00:00"
+	TimeLabel.Font = Enum.Font.GothamBold
+	TimeLabel.TextSize = 12
+	TimeLabel.TextColor3 = CurrentTheme.Primary
+	TimeLabel.TextXAlignment = Enum.TextXAlignment.Left
+	TimeLabel.BackgroundTransparency = 1
+	TimeLabel.Parent = TimeContainer
+	registerThemeable(TimeLabel, {TextColor3 = "Primary"})
+
+	local PlusBtn = Instance.new("TextButton")
+	PlusBtn.Size = UDim2.new(0, 24, 0, 24)
+	PlusBtn.Position = UDim2.new(1, -28, 0.5, -12)
+	PlusBtn.BackgroundColor3 = CurrentTheme.Primary
+	PlusBtn.Text = "+"
+	PlusBtn.Font = Enum.Font.GothamBlack
+	PlusBtn.TextSize = 16
+	PlusBtn.TextColor3 = Color3.new(1,1,1)
+	PlusBtn.Parent = TimeContainer
+	createCorner(PlusBtn, 6)
+	registerThemeable(PlusBtn, {BackgroundColor3 = "Primary"})
+
+	-- Live Countdown Loop
+	task.spawn(function()
+		while task.wait(1) do
+			if not CurrentHWIDData.IsLifetime then
+				if CurrentHWIDData.RemainingSeconds > 0 then
+					CurrentHWIDData.RemainingSeconds = CurrentHWIDData.RemainingSeconds - 1
+					SaveTimeData()
+				end
+				local hrs = math.floor(CurrentHWIDData.RemainingSeconds / 3600)
+				local mins = math.floor((CurrentHWIDData.RemainingSeconds % 3600) / 60)
+				local secs = CurrentHWIDData.RemainingSeconds % 60
+				TimeLabel.Text = string.format("Time: %02d:%02d:%02d", hrs, mins, secs)
+			else
+				TimeLabel.Text = "Time: LIFETIME"
+				TimeLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
+			end
+		end
+	end)
+
+	-- Recharge Modal Builder
+	local function OpenRechargeModal()
+		local Overlay = Instance.new("Frame")
+		Overlay.Size = UDim2.new(1,0,1,0)
+		Overlay.BackgroundColor3 = Color3.new(0,0,0)
+		Overlay.BackgroundTransparency = 0.5
+		Overlay.Active = true
+		Overlay.Parent = MainFrame
+
+		local Modal = Instance.new("Frame")
+		Modal.Size = UDim2.new(0, 480, 0, 320)
+		Modal.Position = UDim2.new(0.5, -240, 0.5, -160)
+		Modal.BackgroundColor3 = CurrentTheme.Panel
+		Modal.Parent = Overlay
+		createCorner(Modal, 12)
+		createStroke(Modal, CurrentTheme.Primary, 2)
+		registerThemeable(Modal, {BackgroundColor3 = "Panel"})
+
+		local MTitle = Instance.new("TextLabel")
+		MTitle.Text = "⚡ Extend Subscription Time"
+		MTitle.Font = Enum.Font.GothamBlack; MTitle.TextSize = 16
+		MTitle.TextColor3 = CurrentTheme.Primary
+		MTitle.Size = UDim2.new(1,-40,0,30); MTitle.Position = UDim2.new(0,15,0,10)
+		MTitle.BackgroundTransparency = 1; MTitle.TextXAlignment = Enum.TextXAlignment.Left
+		MTitle.Parent = Modal
+		registerThemeable(MTitle, {TextColor3 = "Primary"})
+
+		local MClose = Instance.new("TextButton")
+		MClose.Size = UDim2.new(0,26,0,26); MClose.Position = UDim2.new(1,-34,0,10)
+		MClose.Text = "X"; MClose.Font = Enum.Font.GothamBold; MClose.TextColor3 = CurrentTheme.Accent
+		MClose.BackgroundColor3 = CurrentTheme.PanelLight; MClose.Parent = Modal
+		createCorner(MClose,6)
+
+		MClose.MouseButton1Click:Connect(function() Overlay:Destroy() end)
+
+		local Grid = Instance.new("Frame")
+		Grid.Size = UDim2.new(1,-30,1,-60); Grid.Position = UDim2.new(0,15,0,50)
+		Grid.BackgroundTransparency = 1; Grid.Parent = Modal
+
+		local Layout = Instance.new("UIGridLayout", Grid)
+		Layout.CellSize = UDim2.new(0, 215, 0, 115)
+		Layout.CellPadding = UDim2.new(0, 15, 0, 15)
+
+		local Options = {
+			{Name = "1 Hour", Price = "10 Robux", Sale = "%20 OFF", ProductId = 3613048307},
+			{Name = "5 Hours", Price = "35 Robux", Sale = "%30 OFF", ProductId = 3613048436},
+			{Name = "10 Hours", Price = "55 Robux", Sale = "%45 OFF", ProductId = 3613048476},
+			{Name = "LIFETIME", Price = "500 Robux", Sale = "%70 BEST VALUE", ProductId = 1931252522}
+		}
+
+		for _, opt in ipairs(Options) do
+			local Card = Instance.new("Frame")
+			Card.BackgroundColor3 = CurrentTheme.PanelLight
+			Card.Parent = Grid
+			createCorner(Card, 8)
+			createStroke(Card, CurrentTheme.Primary, 1)
+
+			local CName = Instance.new("TextLabel")
+			CName.Text = opt.Name; CName.Font = Enum.Font.GothamBold; CName.TextSize = 14
+			CName.TextColor3 = CurrentTheme.TextColor; CName.Size = UDim2.new(1,-10,0,24)
+			CName.Position = UDim2.new(0,8,0,6); CName.BackgroundTransparency = 1
+			CName.TextXAlignment = Enum.TextXAlignment.Left; CName.Parent = Card
+
+			local CSale = Instance.new("TextLabel")
+			CSale.Text = opt.Sale; CSale.Font = Enum.Font.GothamBlack; CSale.TextSize = 10
+			CSale.TextColor3 = CurrentTheme.Accent; CSale.Size = UDim2.new(1,-10,0,18)
+			CSale.Position = UDim2.new(0,8,0,30); CSale.BackgroundTransparency = 1
+			CSale.TextXAlignment = Enum.TextXAlignment.Left; CSale.Parent = Card
+
+			local BuyBtn = Instance.new("TextButton")
+			BuyBtn.Size = UDim2.new(1,-16,0,32); BuyBtn.Position = UDim2.new(0,8,1,-40)
+			BuyBtn.BackgroundColor3 = CurrentTheme.Primary; BuyBtn.Text = opt.Price
+			BuyBtn.Font = Enum.Font.GothamBold; BuyBtn.TextColor3 = Color3.new(1,1,1)
+			BuyBtn.TextSize = 12; BuyBtn.Parent = Card
+			createCorner(BuyBtn, 6)
+
+			BuyBtn.MouseButton1Click:Connect(function()
+				MarketplaceService:PromptProductPurchase(LocalPlayer, opt.ProductId)
+			end)
+		end
+	end
+
+	PlusBtn.MouseButton1Click:Connect(OpenRechargeModal)
+
+	-- Developer Product Listener (Time Stacking)
+	MarketplaceService.PromptProductPurchaseFinished:Connect(function(userId, productId, isPurchased)
+		if isPurchased and userId == LocalPlayer.UserId then
+			if DevProducts[productId] then
+				if DevProducts[productId] == "LIFETIME" then
+					CurrentHWIDData.IsLifetime = true
+				else
+					CurrentHWIDData.RemainingSeconds = CurrentHWIDData.RemainingSeconds + DevProducts[productId]
+					CurrentHWIDData.ExtraBonusSeconds = (CurrentHWIDData.ExtraBonusSeconds or 0) + DevProducts[productId]
+				end
+				SaveTimeData()
+			end
+		end
 	end)
 
 	local CreditsText = Instance.new("TextLabel")
@@ -469,8 +721,8 @@ function EmloxaLibrary:CreateWindow(hubName)
 	CreditsText.TextSize = 12
 	CreditsText.TextColor3 = CurrentTheme.SubTextColor
 	CreditsText.TextXAlignment = Enum.TextXAlignment.Right
-	CreditsText.Size = UDim2.new(0, 100, 1, 0)
-	CreditsText.Position = UDim2.new(1, -210, 0, 0)
+	CreditsText.Size = UDim2.new(0, 90, 1, 0)
+	CreditsText.Position = UDim2.new(1, -200, 0, 0)
 	CreditsText.BackgroundTransparency = 1
 	CreditsText.Parent = TopBar
 	registerThemeable(CreditsText, {TextColor3 = "SubTextColor"})
@@ -525,7 +777,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 	MinBtn.MouseButton1Click:Connect(function()
 		isMinimized = not isMinimized
 		playClickSound()
-		animateWindow(isMinimized and UDim2.new(0,650,0,50) or UDim2.new(0,650,0,460))
+		animateWindow(isMinimized and UDim2.new(0,680,0,50) or UDim2.new(0,680,0,460))
 		TweenService:Create(MinBtn, TweenInfo.new(0.2), {TextColor3 = isMinimized and CurrentTheme.Primary or Color3.new(1,1,1)}):Play()
 	end)
 
@@ -545,7 +797,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 		task.wait(0.25)
 		OpenIconFrame.Visible = false
 		MainFrame.Visible = true
-		animateWindow(isMinimized and UDim2.new(0,650,0,50) or UDim2.new(0,650,0,460))
+		animateWindow(isMinimized and UDim2.new(0,680,0,50) or UDim2.new(0,680,0,460))
 	end)
 
 	local dragging, dragStart, startPos = false, nil, nil
@@ -609,7 +861,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 	local Tabs = {}
 
 	local function resizeTabs()
-		local availableWidth = 650 - 10
+		local availableWidth = 680 - 10
 		local totalTabs = #Tabs
 		local tabWidth = math.min(130, math.floor(availableWidth / totalTabs))
 		for _, tab in ipairs(Tabs) do
@@ -1111,7 +1363,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 	end
 
 	-- ══════════════════════════════════════
-	--  YENİ EMLOXA MENU & CUSTOM CONFIG ALTYAPISI
+	--  MENU TAB & CUSTOM CONFIG SYSTEM
 	-- ══════════════════════════════════════
 	local MenuTab = CreateTabInternal("Menu", 9999)
 	
