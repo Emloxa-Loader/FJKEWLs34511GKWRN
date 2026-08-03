@@ -118,9 +118,7 @@ function GameModule:Init(Window)
     local AdvancedTab = Window:CreateTab("Advanced")
 
     ProjectTab:CreateToggle("Enable God Mode (Classic V19)", function(s) AutoPlayerEnabled = s end)
-    
-    -- "Hybrid" is free, "Calculate" and "Rapid checks" are Premium.
-    AdvancedTab:CreateDropdown("Autoplay Method", {"Hybrid", "Calculate", "Rapid checks"}, "Hybrid", {"Calculate", "Rapid checks"}, function(val) AutoplayMethod = val end)
+    AdvancedTab:CreateDropdown("Autoplay Method", {"Calculate", "Rapid checks", "Hybrid"}, "Hybrid", function(val) AutoplayMethod = val end)
 
     local TappedNotes = {}
     local LastYPositions = {} 
@@ -137,6 +135,7 @@ function GameModule:Init(Window)
     -- YENİ SİSTEM: IMAGELABEL STRUM SAYACI
     -- ==========================================
     local function GetTargetFolderAndMode(MainGame)
+        -- 1. Önce eski sistemdeki gibi klasör ismi var mı diye bakar (Uyumluluk için)
         for _, child in pairs(MainGame:GetChildren()) do
             local matchStr = string.match(string.upper(child.Name), "(%d+)K")
             if matchStr then 
@@ -144,6 +143,7 @@ function GameModule:Init(Window)
             end
         end
         
+        -- 2. KLASÖR YOKSA: Direkt MainGame içindeki Strum adlı ImageLabel'ları sayar
         local strumCount = 0
         for _, child in pairs(MainGame:GetChildren()) do
             if child:IsA("ImageLabel") and string.find(child.Name, "Strum") then
@@ -151,11 +151,13 @@ function GameModule:Init(Window)
             end
         end
         
+        -- Toplam strum sayısını ikiye bölersek güncel modu (K değerini) buluruz
         local kps = math.floor(strumCount / 2)
         if kps > 0 then
             return kps, MainGame
         end
 
+        -- Eğer şarkı henüz yüklenmediyse varsayılan olarak 4K beklemesinde kalır
         return 4, MainGame
     end
 
@@ -185,6 +187,7 @@ function GameModule:Init(Window)
             return 
         end
 
+        -- Artık mod sayısını (örn: 9K, 6K) direkt Strum ImageLabel'larını sayarak anında yakalayacak
         local kps, targetFolder = GetTargetFolderAndMode(MainGame)
         
         if ModeText.Text ~= "DETECTED MODE: " .. kps .. "K" then
@@ -197,6 +200,7 @@ function GameModule:Init(Window)
         
         for i = 1, kps do
             local s = targetFolder:FindFirstChild("Strum" .. (startIndex + i - 1))
+            -- Strum'ların ImageLabel olduğunu doğrulayarak tabloya ekliyoruz
             if s and s:IsA("ImageLabel") then 
                 table.insert(myStrums, s) 
             end
@@ -207,6 +211,7 @@ function GameModule:Init(Window)
         for i = 1, kps do holdActiveThisFrame[i] = false end
 
         for _, note in pairs(targetFolder:GetChildren()) do
+            -- Hem ImageLabel olduğunu hem de isminde Strum OLMADIĞINI teyit ediyoruz (Böylece sadece notaları yakalar)
             if note:IsA("ImageLabel") and not string.find(note.Name, "Strum") then
                 
                 local laneIndex, targetStrum = GetNoteLaneInfo(note, myStrums)
