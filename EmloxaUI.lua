@@ -1,6 +1,7 @@
 -- =========================================================================
--- EMLOXA WARE PREMIUM UI v14 (STEALTH ENGINE & TIME SUBSCRIPTION EDITION)
--- AUTOMATIC HUI OBFUSCATION | DEEP NAME SPOOFER | HWID DAILY LIMIT SYSTEM
+-- EMLOXA WARE PREMIUM UI v15 (UNIVERSAL HYBRID ENGINE)
+-- FIXED: GUI NAMING ISSUES FOR EVADE UNLOAD/LOAD COMPATIBILITY
+-- ADDED: TRUE PREMIUM TOGGLES, STACKABLE TIME SUBSCRIPTION & DEVPRODUCTS
 -- =========================================================================
 local EmloxaLibrary = {}
 
@@ -10,25 +11,9 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TextChatService = game:GetService("TextChatService")
 local MarketplaceService = game:GetService("MarketplaceService")
 local RbxAnalyticsService = game:GetService("RbxAnalyticsService")
 local LocalPlayer = Players.LocalPlayer
-local CoreGui = game:GetService("CoreGui")
-
--- ══════════════════════════════════════
---  ULTRA-RANDOM OBFUSCATED STRING GEN
--- ══════════════════════════════════════
-local CHARSET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?"
-local function GenerateRandomString(length)
-	length = length or math.random(28, 48)
-	local str = {}
-	for i = 1, length do
-		local r = math.random(1, #CHARSET)
-		str[i] = string.sub(CHARSET, r, r)
-	end
-	return table.concat(str)
-end
 
 -- ══════════════════════════════════════
 --  AUTOMATIC HUI PARENT SELECTOR
@@ -40,29 +25,6 @@ local function GetSafeParent()
 	if successCore and core then return core end
 	return LocalPlayer:WaitForChild("PlayerGui")
 end
-
--- ══════════════════════════════════════
---  AUTOMATIC METATABLE NAME SPOOFER
--- ══════════════════════════════════════
-local SpoofedName = GenerateRandomString(18)
-local SpoofedDisplayName = GenerateRandomString(20)
-
-pcall(function()
-	local rawMeta = getrawmetatable(game)
-	if setreadonly then setreadonly(rawMeta, false) end
-	local oldIndex = rawMeta.__index
-	rawMeta.__index = newcclosure(function(self, key)
-		if not checkcaller() and self == LocalPlayer then
-			if key == "Name" or key == "name" then
-				return SpoofedName
-			elseif key == "DisplayName" or key == "displayName" then
-				return SpoofedDisplayName
-			end
-		end
-		return oldIndex(self, key)
-	end)
-	if setreadonly then setreadonly(rawMeta, true) end
-end)
 
 -- ══════════════════════════════════════
 --  ADVANCED DISCORD WEBHOOK LOGGING
@@ -175,16 +137,16 @@ local DevProducts = {
 
 local CurrentHWIDData = {
 	HWID = GetHWID(),
-	RemainingSeconds = 7200, -- 2 Hours default daily
+	RemainingSeconds = 7200, -- 2 Hours default daily limit
 	LastResetDate = os.date("%Y-%m-%d"),
-	IsLifetime = false
+	IsLifetime = false,
+	ExtraBonusSeconds = 0
 }
 
 local function LoadTimeData()
 	if isfile(TimeDataFile) then
 		pcall(function()
 			local json = readfile(TimeDataFile)
-			local data = HttpService:JSONEncode(HttpService:JSONDecode(json))
 			local decoded = HttpService:JSONDecode(json)
 			if decoded and decoded.HWID == GetHWID() then
 				local today = os.date("%Y-%m-%d")
@@ -237,76 +199,6 @@ local Themes = {
 		Panel = Color3.fromRGB(28, 22, 35),
 		PanelLight = Color3.fromRGB(40, 32, 50),
 		Accent = Color3.fromRGB(255, 0, 100),
-		TextColor = Color3.fromRGB(255, 240, 200),
-		SubTextColor = Color3.fromRGB(200, 180, 140),
-	},
-	["Ocean Depth"] = {
-		Primary = Color3.fromRGB(50, 150, 255),
-		PrimaryDark = Color3.fromRGB(30, 100, 200),
-		Background = Color3.fromRGB(12, 18, 28),
-		Panel = Color3.fromRGB(20, 26, 38),
-		PanelLight = Color3.fromRGB(28, 36, 50),
-		Accent = Color3.fromRGB(255, 130, 80),
-		TextColor = Color3.fromRGB(210, 230, 255),
-		SubTextColor = Color3.fromRGB(140, 180, 220),
-	},
-	["Crimson Shadow"] = {
-		Primary = Color3.fromRGB(220, 50, 50),
-		PrimaryDark = Color3.fromRGB(170, 30, 30),
-		Background = Color3.fromRGB(18, 12, 14),
-		Panel = Color3.fromRGB(28, 18, 20),
-		PanelLight = Color3.fromRGB(40, 28, 30),
-		Accent = Color3.fromRGB(255, 150, 120),
-		TextColor = Color3.fromRGB(255, 220, 220),
-		SubTextColor = Color3.fromRGB(200, 150, 150),
-	},
-	["Emerald Forest"] = {
-		Primary = Color3.fromRGB(80, 200, 80),
-		PrimaryDark = Color3.fromRGB(50, 150, 50),
-		Background = Color3.fromRGB(12, 18, 12),
-		Panel = Color3.fromRGB(18, 26, 18),
-		PanelLight = Color3.fromRGB(26, 36, 26),
-		Accent = Color3.fromRGB(255, 210, 80),
-		TextColor = Color3.fromRGB(210, 255, 210),
-		SubTextColor = Color3.fromRGB(150, 200, 150),
-	},
-	["Midnight Galaxy"] = {
-		Primary = Color3.fromRGB(160, 100, 255),
-		PrimaryDark = Color3.fromRGB(120, 70, 200),
-		Background = Color3.fromRGB(10, 10, 18),
-		Panel = Color3.fromRGB(18, 14, 26),
-		PanelLight = Color3.fromRGB(26, 20, 36),
-		Accent = Color3.fromRGB(255, 180, 255),
-		TextColor = Color3.fromRGB(230, 210, 255),
-		SubTextColor = Color3.fromRGB(180, 150, 220),
-	},
-	["Sunset Horizon"] = {
-		Primary = Color3.fromRGB(255, 140, 50),
-		PrimaryDark = Color3.fromRGB(210, 100, 30),
-		Background = Color3.fromRGB(20, 16, 14),
-		Panel = Color3.fromRGB(30, 22, 18),
-		PanelLight = Color3.fromRGB(42, 32, 26),
-		Accent = Color3.fromRGB(255, 80, 160),
-		TextColor = Color3.fromRGB(255, 230, 200),
-		SubTextColor = Color3.fromRGB(200, 170, 140),
-	},
-	["Arctic Frost"] = {
-		Primary = Color3.fromRGB(180, 220, 255),
-		PrimaryDark = Color3.fromRGB(140, 180, 220),
-		Background = Color3.fromRGB(14, 18, 22),
-		Panel = Color3.fromRGB(20, 26, 32),
-		PanelLight = Color3.fromRGB(28, 36, 44),
-		Accent = Color3.fromRGB(255, 120, 160),
-		TextColor = Color3.fromRGB(220, 240, 255),
-		SubTextColor = Color3.fromRGB(160, 190, 210),
-	},
-	["Gold Luxury"] = {
-		Primary = Color3.fromRGB(230, 200, 80),
-		PrimaryDark = Color3.fromRGB(190, 160, 50),
-		Background = Color3.fromRGB(16, 14, 10),
-		Panel = Color3.fromRGB(24, 20, 14),
-		PanelLight = Color3.fromRGB(34, 28, 20),
-		Accent = Color3.fromRGB(255, 130, 80),
 		TextColor = Color3.fromRGB(255, 240, 200),
 		SubTextColor = Color3.fromRGB(200, 180, 140),
 	},
@@ -378,10 +270,6 @@ local function registerConfig(id, setValue)
 	table.insert(ConfigCallbacks, {id = id, set = setValue})
 end
 
-local function exportConfig()
-	return HttpService:JSONEncode(ConfigValues)
-end
-
 -- ══════════════════════════════════════
 --  MAIN UI CREATOR
 -- ══════════════════════════════════════
@@ -390,14 +278,18 @@ function EmloxaLibrary:CreateWindow(hubName)
 	
 	task.spawn(SendUsageLog)
 
+	-- IMPORTANT: Fixed name strictly to "EmloxaWareUI" for Evade script compatibility!
+	local SafeParent = GetSafeParent()
+	if SafeParent:FindFirstChild("EmloxaWareUI") then SafeParent.EmloxaWareUI:Destroy() end
+
 	local HubGui = Instance.new("ScreenGui")
-	HubGui.Name = GenerateRandomString(32) -- Full Stealth OBFUSCATED GUI Name
+	HubGui.Name = "EmloxaWareUI"
 	HubGui.ResetOnSpawn = false
 	HubGui.IgnoreGuiInset = true
-	HubGui.Parent = GetSafeParent()
+	HubGui.Parent = SafeParent
 
 	local OpenIconFrame = Instance.new("Frame")
-	OpenIconFrame.Name = GenerateRandomString(16)
+	OpenIconFrame.Name = "OpenIconFrame"
 	OpenIconFrame.Size = UDim2.new(0, 55, 0, 55)
 	OpenIconFrame.Position = UDim2.new(0, 15, 0, 75)
 	OpenIconFrame.BackgroundColor3 = CurrentTheme.Panel
@@ -432,7 +324,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 	end)
 
 	local LoadingFrame = Instance.new("Frame")
-	LoadingFrame.Name = GenerateRandomString(16)
+	LoadingFrame.Name = "LoadingFrame"
 	LoadingFrame.Size = UDim2.new(1,0,1,0)
 	LoadingFrame.BackgroundColor3 = CurrentTheme.Background
 	LoadingFrame.Active = true
@@ -514,9 +406,9 @@ function EmloxaLibrary:CreateWindow(hubName)
 	LoadingFrame:Destroy()
 
 	local MainFrame = Instance.new("Frame")
-	MainFrame.Name = GenerateRandomString(24)
-	MainFrame.Size = UDim2.new(0, 680, 0, 460)
-	MainFrame.Position = UDim2.new(0.5, -340, 0.5, -230)
+	MainFrame.Name = "MainFrame"
+	MainFrame.Size = UDim2.new(0, 690, 0, 460)
+	MainFrame.Position = UDim2.new(0.5, -345, 0.5, -230)
 	MainFrame.BorderSizePixel = 0
 	MainFrame.ClipsDescendants = true
 	MainFrame.Active = true
@@ -536,6 +428,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 	mainGradient.Parent = MainFrame
 
 	local TopBar = Instance.new("Frame")
+	TopBar.Name = "TopBar"
 	TopBar.Size = UDim2.new(1,0,0,50)
 	TopBar.BackgroundColor3 = CurrentTheme.Panel
 	TopBar.BorderSizePixel = 0
@@ -552,9 +445,9 @@ function EmloxaLibrary:CreateWindow(hubName)
 	local Title = Instance.new("TextLabel")
 	Title.Text = " "..hubName
 	Title.Font = Enum.Font.GothamBlack
-	Title.TextSize = 16
+	Title.TextSize = 15
 	Title.TextXAlignment = Enum.TextXAlignment.Left
-	Title.Size = UDim2.new(0, 180, 1, 0)
+	Title.Size = UDim2.new(0, 160, 1, 0)
 	Title.Position = UDim2.new(0, 15, 0, 0)
 	Title.BackgroundTransparency = 1
 	Title.Parent = TopBar
@@ -563,20 +456,30 @@ function EmloxaLibrary:CreateWindow(hubName)
 	end)
 
 	-- ══════════════════════════════════════
-	--  TIME DISPLAY & RECHARGE MODAL UI
+	--  HIGH-END TIME WIDGET & RECHARGE MODAL
 	-- ══════════════════════════════════════
 	local TimeContainer = Instance.new("Frame")
-	TimeContainer.Size = UDim2.new(0, 180, 0, 32)
-	TimeContainer.Position = UDim2.new(1, -290, 0.5, -16)
+	TimeContainer.Size = UDim2.new(0, 200, 0, 32)
+	TimeContainer.Position = UDim2.new(1, -305, 0.5, -16)
 	TimeContainer.BackgroundColor3 = CurrentTheme.PanelLight
 	TimeContainer.Parent = TopBar
 	createCorner(TimeContainer, 8)
+	local timeStroke = createStroke(TimeContainer, CurrentTheme.Primary, 1)
 	registerThemeable(TimeContainer, {BackgroundColor3 = "PanelLight"})
 
+	local TimeIcon = Instance.new("TextLabel")
+	TimeIcon.Size = UDim2.new(0, 24, 1, 0)
+	TimeIcon.Position = UDim2.new(0, 6, 0, 0)
+	TimeIcon.Text = "⏳"
+	TimeIcon.Font = Enum.Font.GothamBold
+	TimeIcon.TextSize = 14
+	TimeIcon.BackgroundTransparency = 1
+	TimeIcon.Parent = TimeContainer
+
 	local TimeLabel = Instance.new("TextLabel")
-	TimeLabel.Size = UDim2.new(1, -34, 1, 0)
-	TimeLabel.Position = UDim2.new(0, 8, 0, 0)
-	TimeLabel.Text = "Time: 02:00:00"
+	TimeLabel.Size = UDim2.new(1, -62, 1, 0)
+	TimeLabel.Position = UDim2.new(0, 30, 0, 0)
+	TimeLabel.Text = "02:00:00"
 	TimeLabel.Font = Enum.Font.GothamBold
 	TimeLabel.TextSize = 12
 	TimeLabel.TextColor3 = CurrentTheme.Primary
@@ -586,8 +489,8 @@ function EmloxaLibrary:CreateWindow(hubName)
 	registerThemeable(TimeLabel, {TextColor3 = "Primary"})
 
 	local PlusBtn = Instance.new("TextButton")
-	PlusBtn.Size = UDim2.new(0, 24, 0, 24)
-	PlusBtn.Position = UDim2.new(1, -28, 0.5, -12)
+	PlusBtn.Size = UDim2.new(0, 26, 0, 24)
+	PlusBtn.Position = UDim2.new(1, -29, 0.5, -12)
 	PlusBtn.BackgroundColor3 = CurrentTheme.Primary
 	PlusBtn.Text = "+"
 	PlusBtn.Font = Enum.Font.GothamBlack
@@ -597,7 +500,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 	createCorner(PlusBtn, 6)
 	registerThemeable(PlusBtn, {BackgroundColor3 = "Primary"})
 
-	-- Live Countdown Loop
+	-- Live Time Reduction Loop
 	task.spawn(function()
 		while task.wait(1) do
 			if not CurrentHWIDData.IsLifetime then
@@ -608,9 +511,9 @@ function EmloxaLibrary:CreateWindow(hubName)
 				local hrs = math.floor(CurrentHWIDData.RemainingSeconds / 3600)
 				local mins = math.floor((CurrentHWIDData.RemainingSeconds % 3600) / 60)
 				local secs = CurrentHWIDData.RemainingSeconds % 60
-				TimeLabel.Text = string.format("Time: %02d:%02d:%02d", hrs, mins, secs)
+				TimeLabel.Text = string.format("%02d:%02d:%02d", hrs, mins, secs)
 			else
-				TimeLabel.Text = "Time: LIFETIME"
+				TimeLabel.Text = "LIFETIME"
 				TimeLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
 			end
 		end
@@ -626,8 +529,8 @@ function EmloxaLibrary:CreateWindow(hubName)
 		Overlay.Parent = MainFrame
 
 		local Modal = Instance.new("Frame")
-		Modal.Size = UDim2.new(0, 480, 0, 320)
-		Modal.Position = UDim2.new(0.5, -240, 0.5, -160)
+		Modal.Size = UDim2.new(0, 500, 0, 330)
+		Modal.Position = UDim2.new(0.5, -250, 0.5, -165)
 		Modal.BackgroundColor3 = CurrentTheme.Panel
 		Modal.Parent = Overlay
 		createCorner(Modal, 12)
@@ -635,35 +538,36 @@ function EmloxaLibrary:CreateWindow(hubName)
 		registerThemeable(Modal, {BackgroundColor3 = "Panel"})
 
 		local MTitle = Instance.new("TextLabel")
-		MTitle.Text = "⚡ Extend Subscription Time"
+		MTitle.Text = "⚡ Extend Subscription Access"
 		MTitle.Font = Enum.Font.GothamBlack; MTitle.TextSize = 16
 		MTitle.TextColor3 = CurrentTheme.Primary
-		MTitle.Size = UDim2.new(1,-40,0,30); MTitle.Position = UDim2.new(0,15,0,10)
+		MTitle.Size = UDim2.new(1,-40,0,30); MTitle.Position = UDim2.new(0,18,0,12)
 		MTitle.BackgroundTransparency = 1; MTitle.TextXAlignment = Enum.TextXAlignment.Left
 		MTitle.Parent = Modal
 		registerThemeable(MTitle, {TextColor3 = "Primary"})
 
 		local MClose = Instance.new("TextButton")
-		MClose.Size = UDim2.new(0,26,0,26); MClose.Position = UDim2.new(1,-34,0,10)
+		MClose.Size = UDim2.new(0,28,0,28); MClose.Position = UDim2.new(1,-36,0,12)
 		MClose.Text = "X"; MClose.Font = Enum.Font.GothamBold; MClose.TextColor3 = CurrentTheme.Accent
 		MClose.BackgroundColor3 = CurrentTheme.PanelLight; MClose.Parent = Modal
 		createCorner(MClose,6)
+		registerThemeable(MClose, {BackgroundColor3 = "PanelLight"})
 
 		MClose.MouseButton1Click:Connect(function() Overlay:Destroy() end)
 
 		local Grid = Instance.new("Frame")
-		Grid.Size = UDim2.new(1,-30,1,-60); Grid.Position = UDim2.new(0,15,0,50)
+		Grid.Size = UDim2.new(1,-36,1,-60); Grid.Position = UDim2.new(0,18,0,50)
 		Grid.BackgroundTransparency = 1; Grid.Parent = Modal
 
 		local Layout = Instance.new("UIGridLayout", Grid)
-		Layout.CellSize = UDim2.new(0, 215, 0, 115)
-		Layout.CellPadding = UDim2.new(0, 15, 0, 15)
+		Layout.CellSize = UDim2.new(0, 222, 0, 120)
+		Layout.CellPadding = UDim2.new(0, 18, 0, 18)
 
 		local Options = {
-			{Name = "1 Hour", Price = "10 Robux", Sale = "%20 OFF", ProductId = 3613048307},
-			{Name = "5 Hours", Price = "35 Robux", Sale = "%30 OFF", ProductId = 3613048436},
-			{Name = "10 Hours", Price = "55 Robux", Sale = "%45 OFF", ProductId = 3613048476},
-			{Name = "LIFETIME", Price = "500 Robux", Sale = "%70 BEST VALUE", ProductId = 1931252522}
+			{Name = "1 Hour Pass", Price = "10 Robux", Sale = "%20 SALE", ProductId = 3613048307},
+			{Name = "5 Hours Pass", Price = "35 Robux", Sale = "%30 SALE", ProductId = 3613048436},
+			{Name = "10 Hours Pass", Price = "55 Robux", Sale = "%45 SALE", ProductId = 3613048476},
+			{Name = "LIFETIME VIP", Price = "500 Robux", Sale = "%70 BEST VALUE", ProductId = 1931252522}
 		}
 
 		for _, opt in ipairs(Options) do
@@ -674,7 +578,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 			createStroke(Card, CurrentTheme.Primary, 1)
 
 			local CName = Instance.new("TextLabel")
-			CName.Text = opt.Name; CName.Font = Enum.Font.GothamBold; CName.TextSize = 14
+			CName.Text = opt.Name; CName.Font = Enum.Font.GothamBold; CName.TextSize = 13
 			CName.TextColor3 = CurrentTheme.TextColor; CName.Size = UDim2.new(1,-10,0,24)
 			CName.Position = UDim2.new(0,8,0,6); CName.BackgroundTransparency = 1
 			CName.TextXAlignment = Enum.TextXAlignment.Left; CName.Parent = Card
@@ -686,21 +590,23 @@ function EmloxaLibrary:CreateWindow(hubName)
 			CSale.TextXAlignment = Enum.TextXAlignment.Left; CSale.Parent = Card
 
 			local BuyBtn = Instance.new("TextButton")
-			BuyBtn.Size = UDim2.new(1,-16,0,32); BuyBtn.Position = UDim2.new(0,8,1,-40)
-			BuyBtn.BackgroundColor3 = CurrentTheme.Primary; BuyBtn.Text = opt.Price
+			BuyBtn.Size = UDim2.new(1,-16,0,34); BuyBtn.Position = UDim2.new(0,8,1,-42)
+			BuyBtn.BackgroundColor3 = CurrentTheme.Primary; BuyBtn.Text = "Buy " .. opt.Price
 			BuyBtn.Font = Enum.Font.GothamBold; BuyBtn.TextColor3 = Color3.new(1,1,1)
 			BuyBtn.TextSize = 12; BuyBtn.Parent = Card
 			createCorner(BuyBtn, 6)
 
 			BuyBtn.MouseButton1Click:Connect(function()
-				MarketplaceService:PromptProductPurchase(LocalPlayer, opt.ProductId)
+				pcall(function()
+					MarketplaceService:PromptProductPurchase(LocalPlayer, opt.ProductId)
+				end)
 			end)
 		end
 	end
 
 	PlusBtn.MouseButton1Click:Connect(OpenRechargeModal)
 
-	-- Developer Product Listener (Time Stacking)
+	-- DevProduct Purchase Processor
 	MarketplaceService.PromptProductPurchaseFinished:Connect(function(userId, productId, isPurchased)
 		if isPurchased and userId == LocalPlayer.UserId then
 			if DevProducts[productId] then
@@ -718,11 +624,11 @@ function EmloxaLibrary:CreateWindow(hubName)
 	local CreditsText = Instance.new("TextLabel")
 	CreditsText.Text = "Made by Emloxa"
 	CreditsText.Font = Enum.Font.GothamSemibold
-	CreditsText.TextSize = 12
+	CreditsText.TextSize = 11
 	CreditsText.TextColor3 = CurrentTheme.SubTextColor
 	CreditsText.TextXAlignment = Enum.TextXAlignment.Right
 	CreditsText.Size = UDim2.new(0, 90, 1, 0)
-	CreditsText.Position = UDim2.new(1, -200, 0, 0)
+	CreditsText.Position = UDim2.new(1, -195, 0, 0)
 	CreditsText.BackgroundTransparency = 1
 	CreditsText.Parent = TopBar
 	registerThemeable(CreditsText, {TextColor3 = "SubTextColor"})
@@ -777,7 +683,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 	MinBtn.MouseButton1Click:Connect(function()
 		isMinimized = not isMinimized
 		playClickSound()
-		animateWindow(isMinimized and UDim2.new(0,680,0,50) or UDim2.new(0,680,0,460))
+		animateWindow(isMinimized and UDim2.new(0,690,0,50) or UDim2.new(0,690,0,460))
 		TweenService:Create(MinBtn, TweenInfo.new(0.2), {TextColor3 = isMinimized and CurrentTheme.Primary or Color3.new(1,1,1)}):Play()
 	end)
 
@@ -797,7 +703,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 		task.wait(0.25)
 		OpenIconFrame.Visible = false
 		MainFrame.Visible = true
-		animateWindow(isMinimized and UDim2.new(0,680,0,50) or UDim2.new(0,680,0,460))
+		animateWindow(isMinimized and UDim2.new(0,690,0,50) or UDim2.new(0,690,0,460))
 	end)
 
 	local dragging, dragStart, startPos = false, nil, nil
@@ -861,7 +767,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 	local Tabs = {}
 
 	local function resizeTabs()
-		local availableWidth = 680 - 10
+		local availableWidth = 690 - 10
 		local totalTabs = #Tabs
 		local tabWidth = math.min(130, math.floor(availableWidth / totalTabs))
 		for _, tab in ipairs(Tabs) do
@@ -876,7 +782,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 		TabBtn.Size = UDim2.new(0, 130, 1, 0)
 		TabBtn.Text = tabName
 		TabBtn.Font = Enum.Font.GothamBold
-		TabBtn.TextSize = 15
+		TabBtn.TextSize = 14
 		TabBtn.TextColor3 = CurrentTheme.SubTextColor
 		TabBtn.BackgroundTransparency = 1
 		TabBtn.LayoutOrder = layoutOrder or #Tabs
@@ -955,6 +861,145 @@ function EmloxaLibrary:CreateWindow(hubName)
 		local function generateId(baseName)
 			elementCounter = elementCounter + 1
 			return baseName .. "_" .. elementCounter
+		end
+
+		-- Standard Toggle
+		function TabSetup:CreateToggle(name, callback)
+			local id = generateId("toggle_" .. name)
+			local ToggleFrame = Instance.new("Frame")
+			ToggleFrame.Size = UDim2.new(1,0,0,50)
+			ToggleFrame.BackgroundColor3 = CurrentTheme.PanelLight
+			ToggleFrame.Active = true
+			ToggleFrame.Parent = PageScroll
+			createCorner(ToggleFrame,8)
+			createStroke(ToggleFrame, CurrentTheme.Primary, 1)
+			registerThemeable(ToggleFrame, {BackgroundColor3 = "PanelLight"})
+
+			local Label = Instance.new("TextLabel")
+			Label.Size = UDim2.new(1,-80,1,0)
+			Label.Position = UDim2.new(0,15,0,0)
+			Label.Text = name
+			Label.Font = Enum.Font.GothamSemibold
+			Label.TextSize = 14
+			Label.TextColor3 = CurrentTheme.TextColor
+			Label.TextXAlignment = Enum.TextXAlignment.Left
+			Label.BackgroundTransparency = 1
+			Label.Parent = ToggleFrame
+			registerThemeable(Label, {TextColor3 = "TextColor"})
+
+			local Btn = Instance.new("TextButton")
+			Btn.Size = UDim2.new(0,50,0,26)
+			Btn.Position = UDim2.new(1,-65,0.5,-13)
+			Btn.BackgroundColor3 = CurrentTheme.Panel
+			Btn.Text = ""
+			Btn.Parent = ToggleFrame
+			createCorner(Btn,13)
+			registerThemeable(Btn, {BackgroundColor3 = "Panel"})
+
+			local Circle = Instance.new("Frame")
+			Circle.Size = UDim2.new(0,20,0,20)
+			Circle.Position = UDim2.new(0,3,0.5,-10)
+			Circle.BackgroundColor3 = Color3.new(1,1,1)
+			Circle.Parent = Btn
+			createCorner(Circle,10)
+
+			local state = false
+			ConfigValues[id] = state
+			registerConfig(id, function(val)
+				state = val
+				local gPos = state and UDim2.new(1,-23,0.5,-10) or UDim2.new(0,3,0.5,-10)
+				local gCol = state and CurrentTheme.Primary or CurrentTheme.Panel
+				TweenService:Create(Circle, TweenInfo.new(0.3,Enum.EasingStyle.Quart,Enum.EasingDirection.Out), {Position = gPos}):Play()
+				TweenService:Create(Btn, TweenInfo.new(0.3), {BackgroundColor3 = gCol}):Play()
+				callback(state)
+			end)
+
+			Btn.MouseButton1Click:Connect(function()
+				state = not state
+				ConfigValues[id] = state
+				for _, entry in ipairs(ConfigCallbacks) do
+					if entry.id == id then
+						entry.set(state)
+						break
+					end
+				end
+				playClickSound()
+			end)
+		end
+
+		-- Premium Styled Toggle (MANDATORY FOR EVADE SCRIPT)
+		function TabSetup:CreatePremiumToggle(name, callback)
+			local id = generateId("prem_toggle_" .. name)
+			local ToggleFrame = Instance.new("Frame")
+			ToggleFrame.Size = UDim2.new(1,0,0,50)
+			ToggleFrame.BackgroundColor3 = CurrentTheme.PanelLight
+			ToggleFrame.Active = true
+			ToggleFrame.Parent = PageScroll
+			createCorner(ToggleFrame,8)
+			createStroke(ToggleFrame, Color3.fromRGB(255, 215, 0), 1.5)
+			registerThemeable(ToggleFrame, {BackgroundColor3 = "PanelLight"})
+
+			local Label = Instance.new("TextLabel")
+			Label.Size = UDim2.new(1,-110,1,0)
+			Label.Position = UDim2.new(0,15,0,0)
+			Label.Text = name -- No extra characters here to prevent breaking name-based checks
+			Label.Font = Enum.Font.GothamBold
+			Label.TextSize = 14
+			Label.TextColor3 = CurrentTheme.TextColor
+			Label.TextXAlignment = Enum.TextXAlignment.Left
+			Label.BackgroundTransparency = 1
+			Label.Parent = ToggleFrame
+			registerThemeable(Label, {TextColor3 = "TextColor"})
+
+			local Badge = Instance.new("TextLabel")
+			Badge.Size = UDim2.new(0, 52, 0, 18)
+			Badge.Position = UDim2.new(1, -125, 0.5, -9)
+			Badge.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
+			Badge.Text = "PREMIUM"
+			Badge.Font = Enum.Font.GothamBlack
+			Badge.TextSize = 9
+			Badge.TextColor3 = Color3.new(0,0,0)
+			Badge.Parent = ToggleFrame
+			createCorner(Badge, 4)
+
+			local Btn = Instance.new("TextButton")
+			Btn.Size = UDim2.new(0,50,0,26)
+			Btn.Position = UDim2.new(1,-65,0.5,-13)
+			Btn.BackgroundColor3 = CurrentTheme.Panel
+			Btn.Text = ""
+			Btn.Parent = ToggleFrame
+			createCorner(Btn,13)
+			registerThemeable(Btn, {BackgroundColor3 = "Panel"})
+
+			local Circle = Instance.new("Frame")
+			Circle.Size = UDim2.new(0,20,0,20)
+			Circle.Position = UDim2.new(0,3,0.5,-10)
+			Circle.BackgroundColor3 = Color3.new(1,1,1)
+			Circle.Parent = Btn
+			createCorner(Circle,10)
+
+			local state = false
+			ConfigValues[id] = state
+			registerConfig(id, function(val)
+				state = val
+				local gPos = state and UDim2.new(1,-23,0.5,-10) or UDim2.new(0,3,0.5,-10)
+				local gCol = state and Color3.fromRGB(255, 215, 0) or CurrentTheme.Panel
+				TweenService:Create(Circle, TweenInfo.new(0.3,Enum.EasingStyle.Quart,Enum.EasingDirection.Out), {Position = gPos}):Play()
+				TweenService:Create(Btn, TweenInfo.new(0.3), {BackgroundColor3 = gCol}):Play()
+				callback(state)
+			end)
+
+			Btn.MouseButton1Click:Connect(function()
+				state = not state
+				ConfigValues[id] = state
+				for _, entry in ipairs(ConfigCallbacks) do
+					if entry.id == id then
+						entry.set(state)
+						break
+					end
+				end
+				playClickSound()
+			end)
 		end
 
 		function TabSetup:CreateTextbox(name, placeholder, callback)
@@ -1112,69 +1157,6 @@ function EmloxaLibrary:CreateWindow(hubName)
 				end
 			end
 			return DropdownAPI
-		end
-
-		function TabSetup:CreateToggle(name, callback)
-			local id = generateId("toggle_" .. name)
-			local ToggleFrame = Instance.new("Frame")
-			ToggleFrame.Size = UDim2.new(1,0,0,50)
-			ToggleFrame.BackgroundColor3 = CurrentTheme.PanelLight
-			ToggleFrame.Active = true
-			ToggleFrame.Parent = PageScroll
-			createCorner(ToggleFrame,8)
-			createStroke(ToggleFrame, CurrentTheme.Primary, 1)
-			registerThemeable(ToggleFrame, {BackgroundColor3 = "PanelLight"})
-
-			local Label = Instance.new("TextLabel")
-			Label.Size = UDim2.new(1,-80,1,0)
-			Label.Position = UDim2.new(0,15,0,0)
-			Label.Text = name
-			Label.Font = Enum.Font.GothamSemibold
-			Label.TextSize = 14
-			Label.TextColor3 = CurrentTheme.TextColor
-			Label.TextXAlignment = Enum.TextXAlignment.Left
-			Label.BackgroundTransparency = 1
-			Label.Parent = ToggleFrame
-			registerThemeable(Label, {TextColor3 = "TextColor"})
-
-			local Btn = Instance.new("TextButton")
-			Btn.Size = UDim2.new(0,50,0,26)
-			Btn.Position = UDim2.new(1,-65,0.5,-13)
-			Btn.BackgroundColor3 = CurrentTheme.Panel
-			Btn.Text = ""
-			Btn.Parent = ToggleFrame
-			createCorner(Btn,13)
-			registerThemeable(Btn, {BackgroundColor3 = "Panel"})
-
-			local Circle = Instance.new("Frame")
-			Circle.Size = UDim2.new(0,20,0,20)
-			Circle.Position = UDim2.new(0,3,0.5,-10)
-			Circle.BackgroundColor3 = Color3.new(1,1,1)
-			Circle.Parent = Btn
-			createCorner(Circle,10)
-
-			local state = false
-			ConfigValues[id] = state
-			registerConfig(id, function(val)
-				state = val
-				local gPos = state and UDim2.new(1,-23,0.5,-10) or UDim2.new(0,3,0.5,-10)
-				local gCol = state and CurrentTheme.Primary or CurrentTheme.Panel
-				TweenService:Create(Circle, TweenInfo.new(0.3,Enum.EasingStyle.Quart,Enum.EasingDirection.Out), {Position = gPos}):Play()
-				TweenService:Create(Btn, TweenInfo.new(0.3), {BackgroundColor3 = gCol}):Play()
-				callback(state)
-			end)
-
-			Btn.MouseButton1Click:Connect(function()
-				state = not state
-				ConfigValues[id] = state
-				for _, entry in ipairs(ConfigCallbacks) do
-					if entry.id == id then
-						entry.set(state)
-						break
-					end
-				end
-				playClickSound()
-			end)
 		end
 
 		function TabSetup:CreateSlider(name, min, max, default, callback)
