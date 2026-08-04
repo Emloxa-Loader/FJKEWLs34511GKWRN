@@ -1,7 +1,7 @@
 -- =========================================================================
--- EMLOXA WARE PREMIUM UI v16 (UNIVERSAL HYBRID ENGINE)
--- FIXED: ZINDEX MODAL ISSUES, TOPBAR OVERLAPPING, FULL ENGLISH
--- ADDED: GAMEPASS (LIFETIME) & DEVPRODUCT DYNAMIC ROUTING SYSTEM
+-- EMLOXA WARE PREMIUM UI v16.5 (SIDEBAR REDESIGN)
+-- SIDEBAR NAVIGATION, SLEEK MODERN LOOK
+-- ALL NAMES/IDENTIFIERS PRESERVED FOR COMPATIBILITY
 -- =========================================================================
 local EmloxaLibrary = {}
 
@@ -41,7 +41,7 @@ local function GetSafeParent()
 end
 
 -- ══════════════════════════════════════
---  AUTOMATIC METATABLE NAME SPOOFER
+--  AUTOMATIC METATABLE NAME SPOOFER (ONCE)
 -- ══════════════════════════════════════
 local SpoofedName = GenerateRandomString(18)
 local SpoofedDisplayName = GenerateRandomString(20)
@@ -446,6 +446,9 @@ function EmloxaLibrary:CreateWindow(hubName)
 	task.wait(0.6)
 	LoadingFrame:Destroy()
 
+	-- ==============================
+	-- MAIN FRAME
+	-- ==============================
 	local MainFrame = Instance.new("Frame")
 	MainFrame.Name = "MainFrame"
 	MainFrame.Size = UDim2.new(0, 690, 0, 460)
@@ -468,6 +471,9 @@ function EmloxaLibrary:CreateWindow(hubName)
 	mainGradient.Rotation = 135
 	mainGradient.Parent = MainFrame
 
+	-- ==============================
+	-- TOP BAR (Title, Credits, Time, Controls)
+	-- ==============================
 	local TopBar = Instance.new("Frame")
 	TopBar.Name = "TopBar"
 	TopBar.Size = UDim2.new(1,0,0,50)
@@ -483,9 +489,6 @@ function EmloxaLibrary:CreateWindow(hubName)
 	topCover.BorderSizePixel = 0
 	registerThemeable(TopBar, {BackgroundColor3 = "Panel"})
 
-	-- ==========================================
-	-- FIX: PROPER TOPBAR LAYOUT (NO OVERLAPPING)
-	-- ==========================================
 	local Title = Instance.new("TextLabel")
 	Title.Text = " "..hubName
 	Title.Font = Enum.Font.GothamBlack
@@ -506,7 +509,6 @@ function EmloxaLibrary:CreateWindow(hubName)
 	CreditsText.TextColor3 = CurrentTheme.SubTextColor
 	CreditsText.TextXAlignment = Enum.TextXAlignment.Right
 	CreditsText.Size = UDim2.new(0, 100, 1, 0)
-	-- Placed safely to the left of the TimeContainer (-415 offset)
 	CreditsText.Position = UDim2.new(1, -415, 0, 0)
 	CreditsText.BackgroundTransparency = 1
 	CreditsText.Parent = TopBar
@@ -514,7 +516,6 @@ function EmloxaLibrary:CreateWindow(hubName)
 
 	local TimeContainer = Instance.new("Frame")
 	TimeContainer.Size = UDim2.new(0, 200, 0, 32)
-	-- Perfectly fits next to the Controls block (-100 to -300)
 	TimeContainer.Position = UDim2.new(1, -305, 0.5, -16)
 	TimeContainer.BackgroundColor3 = CurrentTheme.PanelLight
 	TimeContainer.Parent = TopBar
@@ -584,7 +585,6 @@ function EmloxaLibrary:CreateWindow(hubName)
 	end)
 
 	local function OpenRechargeModal()
-		-- Parented directly to HubGui so it overlaps everything else!
 		local Overlay = Instance.new("Frame")
 		Overlay.Size = UDim2.new(1,0,1,0)
 		Overlay.BackgroundColor3 = Color3.new(0,0,0)
@@ -801,9 +801,13 @@ function EmloxaLibrary:CreateWindow(hubName)
 		end
 	end)
 
+	-- ==============================
+	-- SIDEBAR TAB CONTAINER (Vertical)
+	-- ==============================
 	local TabContainer = Instance.new("Frame")
-	TabContainer.Size = UDim2.new(1,0,0,44)
-	TabContainer.Position = UDim2.new(0,0,0,50)
+	TabContainer.Name = "TabContainer"
+	TabContainer.Size = UDim2.new(0, 150, 1, -50)  -- left sidebar, full height below topbar
+	TabContainer.Position = UDim2.new(0, 0, 0, 50)
 	TabContainer.BackgroundColor3 = CurrentTheme.Panel
 	TabContainer.BorderSizePixel = 0
 	TabContainer.Active = true
@@ -819,14 +823,17 @@ function EmloxaLibrary:CreateWindow(hubName)
 	tabGradient.Parent = TabContainer
 
 	local TabList = Instance.new("UIListLayout")
-	TabList.FillDirection = Enum.FillDirection.Horizontal
+	TabList.FillDirection = Enum.FillDirection.Vertical  -- vertical sidebar
 	TabList.SortOrder = Enum.SortOrder.LayoutOrder
-	TabList.Padding = UDim.new(0,0)
+	TabList.Padding = UDim.new(0, 2)
 	TabList.Parent = TabContainer
 
+	-- ==============================
+	-- CONTENT AREA (right of sidebar)
+	-- ==============================
 	local PageContainer = Instance.new("Frame")
-	PageContainer.Size = UDim2.new(1,0,1,-94)
-	PageContainer.Position = UDim2.new(0,0,0,94)
+	PageContainer.Size = UDim2.new(1, -150, 1, -50)   -- fill remaining width, below topbar
+	PageContainer.Position = UDim2.new(0, 150, 0, 50)
 	PageContainer.BackgroundTransparency = 1
 	PageContainer.Active = true
 	PageContainer.ClipsDescendants = true
@@ -836,32 +843,30 @@ function EmloxaLibrary:CreateWindow(hubName)
 	local Tabs = {}
 
 	local function resizeTabs()
-		local availableWidth = 690 - 10
-		local totalTabs = #Tabs
-		local tabWidth = math.min(130, math.floor(availableWidth / totalTabs))
-		for _, tab in ipairs(Tabs) do
-			tab.Btn.Size = UDim2.new(0, tabWidth, 1, 0)
-		end
+		-- Not needed for vertical sidebar; kept for compatibility but does nothing.
 	end
 
 	local function CreateTabInternal(tabName, layoutOrder)
 		local TabSetup = {}
 
 		local TabBtn = Instance.new("TextButton")
-		TabBtn.Size = UDim2.new(0, 130, 1, 0)
-		TabBtn.Text = tabName
+		TabBtn.Size = UDim2.new(1, 0, 0, 40)  -- full width, fixed height
+		TabBtn.Text = "  " .. tabName          -- small padding
 		TabBtn.Font = Enum.Font.GothamBold
-		TabBtn.TextSize = 14
+		TabBtn.TextSize = 13
 		TabBtn.TextColor3 = CurrentTheme.SubTextColor
+		TabBtn.TextXAlignment = Enum.TextXAlignment.Left
 		TabBtn.BackgroundTransparency = 1
 		TabBtn.LayoutOrder = layoutOrder or #Tabs
 		TabBtn.Parent = TabContainer
 		registerThemeable(TabBtn, {TextColor3 = "SubTextColor"})
 
+		-- Indicator: vertical bar on left side
 		local Indicator = Instance.new("Frame")
-		Indicator.Size = UDim2.new(0,0,0,3)
-		Indicator.Position = UDim2.new(0.5,0,1,-3)
+		Indicator.Size = UDim2.new(0, 3, 1, 0)
+		Indicator.Position = UDim2.new(0, 0, 0, 0)
 		Indicator.BackgroundColor3 = CurrentTheme.Primary
+		Indicator.BackgroundTransparency = 1   -- hidden by default
 		Indicator.BorderSizePixel = 0
 		Indicator.Parent = TabBtn
 		registerThemeable(Indicator, {BackgroundColor3 = "Primary"})
@@ -906,11 +911,13 @@ function EmloxaLibrary:CreateWindow(hubName)
 		TabBtn.MouseButton1Click:Connect(function()
 			for _,p in pairs(Pages) do p.Visible = false end
 			for _,t in pairs(Tabs) do
-				TweenService:Create(t.Indicator, TweenInfo.new(0.4,Enum.EasingStyle.Quart,Enum.EasingDirection.Out), {Size=UDim2.new(0,0,0,3), Position=UDim2.new(0.5,0,1,-3)}):Play()
+				-- Hide all indicators
+				TweenService:Create(t.Indicator, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
 				TweenService:Create(t.Btn, TweenInfo.new(0.3), {TextColor3 = CurrentTheme.SubTextColor}):Play()
 			end
 			PageScroll.Visible = true
-			TweenService:Create(Indicator, TweenInfo.new(0.4,Enum.EasingStyle.Quart,Enum.EasingDirection.Out), {Size=UDim2.new(1,0,0,3), Position=UDim2.new(0,0,1,-3)}):Play()
+			-- Show this indicator
+			TweenService:Create(Indicator, TweenInfo.new(0.3), {BackgroundTransparency = 0}):Play()
 			TweenService:Create(TabBtn, TweenInfo.new(0.3), {TextColor3 = Color3.new(1,1,1)}):Play()
 			playClickSound()
 		end)
@@ -919,10 +926,10 @@ function EmloxaLibrary:CreateWindow(hubName)
 		table.insert(Tabs, {Btn = TabBtn, Indicator = Indicator})
 		resizeTabs()
 
+		-- Activate first tab
 		if #Pages == 1 then
 			PageScroll.Visible = true
-			Indicator.Size = UDim2.new(1,0,0,3)
-			Indicator.Position = UDim2.new(0,0,1,-3)
+			Indicator.BackgroundTransparency = 0
 			TabBtn.TextColor3 = Color3.new(1,1,1)
 		end
 
@@ -1412,7 +1419,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 	end
 
 	-- ══════════════════════════════════════
-	--  MENU TAB & CUSTOM CONFIG SYSTEM
+	--  MENU TAB (integrated at end)
 	-- ══════════════════════════════════════
 	local MenuTab = CreateTabInternal("Menu", 9999)
 	
