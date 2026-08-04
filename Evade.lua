@@ -229,14 +229,8 @@ function GameModule:Init(Window)
     end)
 
     local WorldTab = Window:CreateTab("World")
-    WorldTab:CreateToggle("FullBright", function(s) Settings.World.FullBright = s
-        Lighting.Brightness = s and 5 or OrigLighting.Brightness
-        Lighting.GlobalShadows = not s
-        if s then Lighting.Ambient = Color3.fromRGB(255,255,255) else Lighting.Ambient = OrigLighting.Ambient end
-    end)
-    WorldTab:CreateToggle("No Fog", function(s) Settings.World.NoFog = s
-        Lighting.FogEnd = s and 999999 or OrigLighting.FogEnd
-    end)
+    WorldTab:CreateToggle("FullBright", function(s) Settings.World.FullBright = s end)
+    WorldTab:CreateToggle("No Fog", function(s) Settings.World.NoFog = s end)
     WorldTab:CreateSlider("Field of View", 70, 120, 70, function(v) 
         Settings.World.FOV = v
         if Camera then Camera.FieldOfView = v end
@@ -339,17 +333,25 @@ function GameModule:Init(Window)
     end))
 
     -- ==========================================
-    -- ANA MOTOR (STABLE LOOP)
+    -- ANA MOTOR (STABLE LOOP) - MODIFIED
     -- ==========================================
-    table.insert(Connections, RunService.Heartbeat:Connect(function()
+    local lastTick = tick()
+    table.insert(Connections, RunService.Heartbeat:Connect(function(delta)
+        -- FullBright Loop: sürekli uygulanır
+        if Settings.World.FullBright then
+            Lighting.Brightness = 5
+            Lighting.GlobalShadows = false
+            Lighting.Ambient = Color3.fromRGB(255,255,255)
+        end
+
         local char = LocalPlayer.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
 
         if hum and hrp then
             local bVel = hrp:FindFirstChild("EmloxaVelocity")
-            
-            -- SPEED VE FLY MANTIĞI TAMAMEN YENİLENDİ VE EVADE FİZİĞİ EZİLDİ
+
+            -- SPEED & FLY MANTIĞI
             if Settings.Movement.FlyEnabled then
                 if not bVel then
                     bVel = Instance.new("BodyVelocity")
@@ -357,7 +359,7 @@ function GameModule:Init(Window)
                     bVel.Parent = hrp
                 end
                 
-                hum.PlatformStand = true -- Oyunun yerçekimini ve sürtünmesini ezer
+                hum.PlatformStand = true
                 bVel.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
                 
                 local flyDir = hum.MoveDirection
@@ -368,18 +370,21 @@ function GameModule:Init(Window)
                 bVel.Velocity = flyDir * Settings.Movement.FlySpeed
             else
                 if hum.PlatformStand then
-                    hum.PlatformStand = false -- Uçma kapanınca normale dön
+                    hum.PlatformStand = false
                 end
-                
+
+                -- Speed artık CFrame manipülasyonu ile (Y yükseklik korunur)
                 if Settings.Movement.SpeedEnabled and hum.MoveDirection.Magnitude > 0 then
-                    -- Hızın Evade sürtünmesine takılmaması için BodyVelocity ile zorla
-                    if not bVel then
-                        bVel = Instance.new("BodyVelocity")
-                        bVel.Name = "EmloxaVelocity"
-                        bVel.Parent = hrp
+                    -- BodyVelocity'yi temizle
+                    if bVel then bVel:Destroy() end
+
+                    -- Hareket yönünü yatay düzleme izdüşümü
+                    local moveDir = hum.MoveDirection * Vector3.new(1, 0, 1)
+                    if moveDir.Magnitude > 0 then
+                        moveDir = moveDir.Unit
+                        local offset = moveDir * Settings.Movement.SpeedValue * delta
+                        hrp.CFrame = hrp.CFrame + offset
                     end
-                    bVel.MaxForce = Vector3.new(math.huge, 0, math.huge)
-                    bVel.Velocity = hum.MoveDirection * Settings.Movement.SpeedValue
                 else
                     if bVel then bVel:Destroy() end
                 end
@@ -411,7 +416,6 @@ function GameModule:Init(Window)
                 end
             end
             if TargetedNextbot and TargetedNextbot:FindFirstChild("Hitbox") then
-                -- Botun tam üstüne ışınla ki anında ölmesin, ama peşinde kalsın
                 hrp.CFrame = TargetedNextbot.Hitbox.CFrame + Vector3.new(0, 3, 0)
             end
         end
@@ -490,9 +494,7 @@ function GameModule:Init(Window)
             end
         end
 
-        -- ==========================================
         -- AUTO REVIVE SELF & TP BACK LOGIC
-        -- ==========================================
         if Settings.Exploits.AutoReviveSelf and char then
             local isDowned = char:GetAttribute("Downed")
             
@@ -517,7 +519,7 @@ function GameModule:Init(Window)
                         if Settings.Exploits.ReviveTPDelay > 0 then
                             task.wait(Settings.Exploits.ReviveTPDelay)
                         else
-                            task.wait() -- 0 saniye seçilmişse frame atla ki buga girmesin
+                            task.wait()
                         end
                         
                         local curChar = LocalPlayer.Character
