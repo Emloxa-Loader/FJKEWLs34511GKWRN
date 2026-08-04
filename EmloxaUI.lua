@@ -2,6 +2,7 @@
 -- EMLOXA WARE PREMIUM UI v16.5 (SIDEBAR REDESIGN)
 -- SIDEBAR NAVIGATION, SLEEK MODERN LOOK
 -- ALL NAMES/IDENTIFIERS PRESERVED FOR COMPATIBILITY
+-- NAME SPOOF FULLY REMOVED (stability)
 -- =========================================================================
 local EmloxaLibrary = {}
 
@@ -16,7 +17,7 @@ local RbxAnalyticsService = game:GetService("RbxAnalyticsService")
 local LocalPlayer = Players.LocalPlayer
 
 -- ══════════════════════════════════════
---  ULTRA-RANDOM OBFUSCATED STRING GEN
+--  ULTRA-RANDOM OBFUSCATED STRING GEN (placeholder - no longer used for spoof)
 -- ══════════════════════════════════════
 local CHARSET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?"
 local function GenerateRandomString(length)
@@ -41,36 +42,8 @@ local function GetSafeParent()
 end
 
 -- ══════════════════════════════════════
---  AUTOMATIC METATABLE NAME SPOOFER (ONCE, SAFE)
+--  NAME SPOOF REMOVED - No metatable hooks
 -- ══════════════════════════════════════
-local SpoofedName = GenerateRandomString(18)
-local SpoofedDisplayName = GenerateRandomString(20)
-
--- Spoof işlemini güvenli hale getirdik: eğer gerekli fonksiyonlar yoksa veya hata olursa atlanır.
-pcall(function()
-	-- Gerekli fonksiyonların varlığını kontrol et
-	if not checkcaller or not newcclosure or not getrawmetatable or not setreadonly then return end
-	
-	local rawMeta = getrawmetatable(game)
-	if not rawMeta then return end
-	
-	setreadonly(rawMeta, false)
-	local oldIndex = rawMeta.__index
-	
-	rawMeta.__index = newcclosure(function(self, key)
-		-- Sadece LocalPlayer üzerinde ve dış çağrılarda ismi değiştir
-		if not checkcaller() and self == LocalPlayer then
-			if key == "Name" or key == "name" then
-				return SpoofedName
-			elseif key == "DisplayName" or key == "displayName" then
-				return SpoofedDisplayName
-			end
-		end
-		return oldIndex(self, key)
-	end)
-	
-	setreadonly(rawMeta, true)
-end)
 
 -- ══════════════════════════════════════
 --  ADVANCED DISCORD WEBHOOK LOGGING
@@ -944,6 +917,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 			return baseName .. "_" .. elementCounter
 		end
 
+		-- All UI element creation functions remain unchanged (Toggle, PremiumToggle, Textbox, Dropdown, Slider, Button, Divider, Notification)
 		function TabSetup:CreateToggle(name, callback)
 			local id = generateId("toggle_" .. name)
 			local ToggleFrame = Instance.new("Frame")
