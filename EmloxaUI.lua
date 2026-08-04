@@ -41,16 +41,24 @@ local function GetSafeParent()
 end
 
 -- ══════════════════════════════════════
---  AUTOMATIC METATABLE NAME SPOOFER (ONCE)
+--  AUTOMATIC METATABLE NAME SPOOFER (ONCE, SAFE)
 -- ══════════════════════════════════════
 local SpoofedName = GenerateRandomString(18)
 local SpoofedDisplayName = GenerateRandomString(20)
 
+-- Spoof işlemini güvenli hale getirdik: eğer gerekli fonksiyonlar yoksa veya hata olursa atlanır.
 pcall(function()
+	-- Gerekli fonksiyonların varlığını kontrol et
+	if not checkcaller or not newcclosure or not getrawmetatable or not setreadonly then return end
+	
 	local rawMeta = getrawmetatable(game)
-	if setreadonly then setreadonly(rawMeta, false) end
+	if not rawMeta then return end
+	
+	setreadonly(rawMeta, false)
 	local oldIndex = rawMeta.__index
+	
 	rawMeta.__index = newcclosure(function(self, key)
+		-- Sadece LocalPlayer üzerinde ve dış çağrılarda ismi değiştir
 		if not checkcaller() and self == LocalPlayer then
 			if key == "Name" or key == "name" then
 				return SpoofedName
@@ -60,7 +68,8 @@ pcall(function()
 		end
 		return oldIndex(self, key)
 	end)
-	if setreadonly then setreadonly(rawMeta, true) end
+	
+	setreadonly(rawMeta, true)
 end)
 
 -- ══════════════════════════════════════
@@ -806,7 +815,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 	-- ==============================
 	local TabContainer = Instance.new("Frame")
 	TabContainer.Name = "TabContainer"
-	TabContainer.Size = UDim2.new(0, 150, 1, -50)  -- left sidebar, full height below topbar
+	TabContainer.Size = UDim2.new(0, 150, 1, -50)
 	TabContainer.Position = UDim2.new(0, 0, 0, 50)
 	TabContainer.BackgroundColor3 = CurrentTheme.Panel
 	TabContainer.BorderSizePixel = 0
@@ -823,7 +832,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 	tabGradient.Parent = TabContainer
 
 	local TabList = Instance.new("UIListLayout")
-	TabList.FillDirection = Enum.FillDirection.Vertical  -- vertical sidebar
+	TabList.FillDirection = Enum.FillDirection.Vertical
 	TabList.SortOrder = Enum.SortOrder.LayoutOrder
 	TabList.Padding = UDim.new(0, 2)
 	TabList.Parent = TabContainer
@@ -832,7 +841,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 	-- CONTENT AREA (right of sidebar)
 	-- ==============================
 	local PageContainer = Instance.new("Frame")
-	PageContainer.Size = UDim2.new(1, -150, 1, -50)   -- fill remaining width, below topbar
+	PageContainer.Size = UDim2.new(1, -150, 1, -50)
 	PageContainer.Position = UDim2.new(0, 150, 0, 50)
 	PageContainer.BackgroundTransparency = 1
 	PageContainer.Active = true
@@ -850,8 +859,8 @@ function EmloxaLibrary:CreateWindow(hubName)
 		local TabSetup = {}
 
 		local TabBtn = Instance.new("TextButton")
-		TabBtn.Size = UDim2.new(1, 0, 0, 40)  -- full width, fixed height
-		TabBtn.Text = "  " .. tabName          -- small padding
+		TabBtn.Size = UDim2.new(1, 0, 0, 40)
+		TabBtn.Text = "  " .. tabName
 		TabBtn.Font = Enum.Font.GothamBold
 		TabBtn.TextSize = 13
 		TabBtn.TextColor3 = CurrentTheme.SubTextColor
@@ -861,12 +870,11 @@ function EmloxaLibrary:CreateWindow(hubName)
 		TabBtn.Parent = TabContainer
 		registerThemeable(TabBtn, {TextColor3 = "SubTextColor"})
 
-		-- Indicator: vertical bar on left side
 		local Indicator = Instance.new("Frame")
 		Indicator.Size = UDim2.new(0, 3, 1, 0)
 		Indicator.Position = UDim2.new(0, 0, 0, 0)
 		Indicator.BackgroundColor3 = CurrentTheme.Primary
-		Indicator.BackgroundTransparency = 1   -- hidden by default
+		Indicator.BackgroundTransparency = 1
 		Indicator.BorderSizePixel = 0
 		Indicator.Parent = TabBtn
 		registerThemeable(Indicator, {BackgroundColor3 = "Primary"})
@@ -911,12 +919,10 @@ function EmloxaLibrary:CreateWindow(hubName)
 		TabBtn.MouseButton1Click:Connect(function()
 			for _,p in pairs(Pages) do p.Visible = false end
 			for _,t in pairs(Tabs) do
-				-- Hide all indicators
 				TweenService:Create(t.Indicator, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
 				TweenService:Create(t.Btn, TweenInfo.new(0.3), {TextColor3 = CurrentTheme.SubTextColor}):Play()
 			end
 			PageScroll.Visible = true
-			-- Show this indicator
 			TweenService:Create(Indicator, TweenInfo.new(0.3), {BackgroundTransparency = 0}):Play()
 			TweenService:Create(TabBtn, TweenInfo.new(0.3), {TextColor3 = Color3.new(1,1,1)}):Play()
 			playClickSound()
@@ -926,7 +932,6 @@ function EmloxaLibrary:CreateWindow(hubName)
 		table.insert(Tabs, {Btn = TabBtn, Indicator = Indicator})
 		resizeTabs()
 
-		-- Activate first tab
 		if #Pages == 1 then
 			PageScroll.Visible = true
 			Indicator.BackgroundTransparency = 0
