@@ -1,7 +1,7 @@
 -- =========================================================================
--- EMLOXA WARE PREMIUM UI v22 (FULL FIXED SIDEBAR ENGINE)
--- FIXED: GAME TABS LOADING, ROBUX MODAL RENDERING & MINIMIZE OVERLAP
--- SAFE METATABLE SPOOFER & FULL METHOD ALIAS COMPATIBILITY INCLUDED
+-- EMLOXA WARE PREMIUM UI v25 (CRASH-PROOF ULTIMATE ENGINE)
+-- FIXED: NIL VALUE CRASHES, MISSING UI ELEMENTS (SECTION, LABEL, KEYBIND, ETC.)
+-- RESTORED: ANIMATED INTRO LOADING SCREEN & REFIRE PROOF PURCHASE MODAL
 -- =========================================================================
 local EmloxaLibrary = {}
 
@@ -191,7 +191,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 	HubGui.Name = "EmloxaWareUI"
 	HubGui.ResetOnSpawn = false
 	HubGui.IgnoreGuiInset = true
-	HubGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling -- ESSENTIAL FOR ROBLOX UI RENDERING
+	HubGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	HubGui.Parent = SafeParent
 
 	local OpenIconFrame = Instance.new("Frame")
@@ -228,6 +228,60 @@ function EmloxaLibrary:CreateWindow(hubName)
 	MainFrame.Parent = HubGui
 	createCorner(MainFrame, 12)
 	createStroke(MainFrame, CurrentTheme.PrimaryDark, 2)
+
+	-- PREMIUM ANIMATED INTRO / LOADING SCREEN
+	local LoadingScreen = Instance.new("Frame")
+	LoadingScreen.Size = UDim2.new(1,0,1,0)
+	LoadingScreen.BackgroundColor3 = CurrentTheme.Background
+	LoadingScreen.ZIndex = 200
+	LoadingScreen.Parent = MainFrame
+
+	local LoadLogo = Instance.new("ImageLabel")
+	LoadLogo.Size = UDim2.new(0, 80, 0, 80)
+	LoadLogo.Position = UDim2.new(0.5, -40, 0.5, -60)
+	LoadLogo.BackgroundTransparency = 1
+	LoadLogo.Image = "rbxassetid://76693493960487"
+	LoadLogo.ScaleType = Enum.ScaleType.Fit
+	LoadLogo.ZIndex = 201
+	LoadLogo.Parent = LoadingScreen
+
+	local LoadTitle = Instance.new("TextLabel")
+	LoadTitle.Text = "EMLOXA WARE"
+	LoadTitle.Font = Enum.Font.GothamBlack
+	LoadTitle.TextSize = 18
+	LoadTitle.TextColor3 = CurrentTheme.TextColor
+	LoadTitle.Size = UDim2.new(1, 0, 0, 25)
+	LoadTitle.Position = UDim2.new(0, 0, 0.5, 30)
+	LoadTitle.BackgroundTransparency = 1
+	LoadTitle.ZIndex = 201
+	LoadTitle.Parent = LoadingScreen
+
+	local LoadBarBG = Instance.new("Frame")
+	LoadBarBG.Size = UDim2.new(0, 220, 0, 6)
+	LoadBarBG.Position = UDim2.new(0.5, -110, 0.5, 65)
+	LoadBarBG.BackgroundColor3 = CurrentTheme.Sidebar
+	LoadBarBG.ZIndex = 201
+	LoadBarBG.Parent = LoadingScreen
+	createCorner(LoadBarBG, 3)
+
+	local LoadBarFill = Instance.new("Frame")
+	LoadBarFill.Size = UDim2.new(0, 0, 1, 0)
+	LoadBarFill.BackgroundColor3 = CurrentTheme.Primary
+	LoadBarFill.ZIndex = 202
+	LoadBarFill.Parent = LoadBarBG
+	createCorner(LoadBarFill, 3)
+
+	task.spawn(function()
+		TweenService:Create(LoadBarFill, TweenInfo.new(1.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = UDim2.new(1,0,1,0)}):Play()
+		task.wait(1.2)
+		TweenService:Create(LoadingScreen, TweenInfo.new(0.4, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
+		TweenService:Create(LoadLogo, TweenInfo.new(0.3), {ImageTransparency = 1}):Play()
+		TweenService:Create(LoadTitle, TweenInfo.new(0.3), {TextTransparency = 1}):Play()
+		TweenService:Create(LoadBarBG, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
+		TweenService:Create(LoadBarFill, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
+		task.wait(0.4)
+		LoadingScreen:Destroy()
+	end)
 
 	-- SIDEBAR NAVIGATION
 	local Sidebar = Instance.new("Frame")
@@ -280,7 +334,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 	GameText.Parent = TitleArea
 
 	local TabContainer = Instance.new("ScrollingFrame")
-	TabContainer.Size = UDim2.new(1, 0, 1, -130)
+	TabContainer.Size = UDim2.new(1, 0, 1, -125)
 	TabContainer.Position = UDim2.new(0, 0, 0, 65)
 	TabContainer.BackgroundTransparency = 1
 	TabContainer.BorderSizePixel = 0
@@ -390,7 +444,6 @@ function EmloxaLibrary:CreateWindow(hubName)
 	PlusBtn.Parent = TimeContainer
 	createCorner(PlusBtn, 6)
 
-	-- FIX FOR MINIMIZING WINDOW (CLEAN COMPACT BAR)
 	local PageContainer = Instance.new("Frame")
 	PageContainer.Size = UDim2.new(1, 0, 1, -50)
 	PageContainer.Position = UDim2.new(0, 0, 0, 50)
@@ -398,6 +451,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 	PageContainer.ClipsDescendants = true
 	PageContainer.Parent = ContentArea
 
+	-- MINIMIZE ANIMATION FIX
 	local isMinimized = false
 	MinBtn.MouseButton1Click:Connect(function()
 		isMinimized = not isMinimized
@@ -441,7 +495,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 		TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = isMinimized and UDim2.new(0, 740, 0, 50) or UDim2.new(0, 740, 0, 480)}):Play()
 	end)
 
-	-- DRAGGING SUPPORT
+	-- DRAGGING
 	local dragging, dragStart, startPos = false, nil, nil
 	local function DragInput(frame)
 		frame.InputBegan:Connect(function(input)
@@ -481,19 +535,21 @@ function EmloxaLibrary:CreateWindow(hubName)
 		end
 	end)
 
-	-- FIX FOR ROBUX RECHARGE MODAL
+	-- ROBUX RECHARGE MODAL (FIXED LAYER & RENDERING)
 	local function OpenRechargeModal()
 		local Overlay = Instance.new("Frame")
 		Overlay.Size = UDim2.new(1,0,1,0)
 		Overlay.BackgroundColor3 = Color3.new(0,0,0)
 		Overlay.BackgroundTransparency = 0.5
 		Overlay.Active = true
+		Overlay.ZIndex = 300
 		Overlay.Parent = HubGui
 
 		local Modal = Instance.new("Frame")
 		Modal.Size = UDim2.new(0, 520, 0, 350)
 		Modal.Position = UDim2.new(0.5, -260, 0.5, -175)
 		Modal.BackgroundColor3 = CurrentTheme.Sidebar
+		Modal.ZIndex = 301
 		Modal.Parent = Overlay
 		createCorner(Modal, 12)
 		createStroke(Modal, CurrentTheme.Primary, 2)
@@ -504,13 +560,13 @@ function EmloxaLibrary:CreateWindow(hubName)
 		MTitle.TextColor3 = CurrentTheme.Primary
 		MTitle.Size = UDim2.new(1,-40,0,40); MTitle.Position = UDim2.new(0,20,0,10)
 		MTitle.BackgroundTransparency = 1; MTitle.TextXAlignment = Enum.TextXAlignment.Left
-		MTitle.Parent = Modal
+		MTitle.ZIndex = 302; MTitle.Parent = Modal
 
 		local MClose = Instance.new("TextButton")
 		MClose.Size = UDim2.new(0,30,0,30); MClose.Position = UDim2.new(1,-40,0,15)
 		MClose.Text = "X"; MClose.Font = Enum.Font.GothamBlack; MClose.TextColor3 = CurrentTheme.Accent
 		MClose.BackgroundColor3 = CurrentTheme.Panel
-		MClose.Parent = Modal
+		MClose.ZIndex = 302; MClose.Parent = Modal
 		createCorner(MClose, 8)
 
 		MClose.MouseButton1Click:Connect(function() Overlay:Destroy() end)
@@ -519,6 +575,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 		Grid.Size = UDim2.new(1, -40, 1, -70)
 		Grid.Position = UDim2.new(0, 20, 0, 60)
 		Grid.BackgroundTransparency = 1
+		Grid.ZIndex = 302
 		Grid.Parent = Modal
 
 		local Layout = Instance.new("UIGridLayout", Grid)
@@ -535,7 +592,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 		for _, opt in ipairs(Options) do
 			local Card = Instance.new("Frame")
 			Card.BackgroundColor3 = opt.Highlight and Color3.fromRGB(35, 28, 15) or CurrentTheme.Panel
-			Card.Parent = Grid
+			Card.ZIndex = 303; Card.Parent = Grid
 			createCorner(Card, 10)
 			local cardStroke = createStroke(Card, opt.Highlight and Color3.fromRGB(255, 200, 50) or CurrentTheme.PanelLight, opt.Highlight and 2 or 1)
 
@@ -545,18 +602,18 @@ function EmloxaLibrary:CreateWindow(hubName)
 			CName.TextColor3 = opt.Highlight and Color3.fromRGB(255, 215, 0) or CurrentTheme.TextColor
 			CName.Size = UDim2.new(1,-20,0,24); CName.Position = UDim2.new(0,12,0,10)
 			CName.BackgroundTransparency = 1; CName.TextXAlignment = Enum.TextXAlignment.Left
-			CName.Parent = Card
+			CName.ZIndex = 304; CName.Parent = Card
 
 			local Badge = Instance.new("Frame")
 			Badge.Size = UDim2.new(0, 85, 0, 18); Badge.Position = UDim2.new(0, 12, 0, 36)
 			Badge.BackgroundColor3 = CurrentTheme.Accent; Badge.BackgroundTransparency = 0.85
-			Badge.Parent = Card
+			Badge.ZIndex = 304; Badge.Parent = Card
 			createCorner(Badge, 4); createStroke(Badge, CurrentTheme.Accent, 1)
 
 			local CSale = Instance.new("TextLabel")
 			CSale.Text = opt.Sale; CSale.Font = Enum.Font.GothamBold; CSale.TextSize = 10
 			CSale.TextColor3 = CurrentTheme.Accent; CSale.Size = UDim2.new(1,0,1,0)
-			CSale.BackgroundTransparency = 1; CSale.Parent = Badge
+			CSale.BackgroundTransparency = 1; CSale.ZIndex = 305; CSale.Parent = Badge
 
 			local BuyBtn = Instance.new("TextButton")
 			BuyBtn.Size = UDim2.new(1,-24,0,34); BuyBtn.Position = UDim2.new(0,12,1,-44)
@@ -564,7 +621,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 			BuyBtn.Text = "R$ " .. opt.Price
 			BuyBtn.Font = Enum.Font.GothamBlack; BuyBtn.TextColor3 = opt.Highlight and Color3.new(0,0,0) or Color3.new(1,1,1)
 			BuyBtn.TextSize = 13
-			BuyBtn.Parent = Card
+			BuyBtn.ZIndex = 305; BuyBtn.Parent = Card
 			createCorner(BuyBtn, 8)
 
 			BuyBtn.MouseButton1Click:Connect(function()
@@ -671,7 +728,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 		table.insert(Pages, PageScroll)
 		table.insert(Tabs, {Btn = TabBtn, Indicator = Indicator})
 
-		-- AUTO-ACTIVATE FIRST NON-SETTINGS GAME TAB
+		-- AUTO-ACTIVATE FIRST GAME TAB
 		if not isSettings and (#Tabs == 1 or (#Tabs == 2 and Tabs[1].Btn.LayoutOrder == 999)) then
 			ActivateTab()
 		elseif #Tabs == 1 then
@@ -685,14 +742,12 @@ function EmloxaLibrary:CreateWindow(hubName)
 		end
 
 		function TabSetup:CreateToggle(name, callback)
+			callback = callback or function() end
 			local id = generateId("toggle_" .. name)
 			local ToggleFrame = Instance.new("Frame")
-			ToggleFrame.Size = UDim2.new(1,0,0,46)
-			ToggleFrame.BackgroundColor3 = CurrentTheme.Panel
-			ToggleFrame.Active = true
-			ToggleFrame.Parent = PageScroll
-			createCorner(ToggleFrame,8)
-			createStroke(ToggleFrame, CurrentTheme.PanelLight, 1)
+			ToggleFrame.Size = UDim2.new(1,0,0,46); ToggleFrame.BackgroundColor3 = CurrentTheme.Panel
+			ToggleFrame.Active = true; ToggleFrame.Parent = PageScroll
+			createCorner(ToggleFrame,8); createStroke(ToggleFrame, CurrentTheme.PanelLight, 1)
 
 			local Label = Instance.new("TextLabel")
 			Label.Size = UDim2.new(1,-80,1,0); Label.Position = UDim2.new(0,15,0,0)
@@ -731,6 +786,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 		end
 
 		function TabSetup:CreatePremiumToggle(name, callback)
+			callback = callback or function() end
 			local id = generateId("prem_toggle_" .. name)
 			local ToggleFrame = Instance.new("Frame")
 			ToggleFrame.Size = UDim2.new(1,0,0,46); ToggleFrame.BackgroundColor3 = CurrentTheme.Panel
@@ -779,39 +835,90 @@ function EmloxaLibrary:CreateWindow(hubName)
 			end)
 		end
 
-		function TabSetup:CreateTextbox(name, placeholder, callback)
-			local id = generateId("textbox_" .. name)
-			local BoxFrame = Instance.new("Frame")
-			BoxFrame.Size = UDim2.new(1,0,0,46); BoxFrame.BackgroundColor3 = CurrentTheme.Panel
-			BoxFrame.Active = true; BoxFrame.Parent = PageScroll
-			createCorner(BoxFrame,8); createStroke(BoxFrame, CurrentTheme.PanelLight, 1)
+		function TabSetup:CreateButton(name, callback)
+			callback = callback or function() end
+			local Btn = Instance.new("TextButton")
+			Btn.Size = UDim2.new(1,0,0,42); Btn.BackgroundColor3 = CurrentTheme.Panel
+			Btn.Text = name; Btn.Font = Enum.Font.GothamBold; Btn.TextSize = 13; Btn.TextColor3 = CurrentTheme.TextColor
+			Btn.Active = true; Btn.Parent = PageScroll
+			createCorner(Btn,8); createStroke(Btn, CurrentTheme.PanelLight, 1)
+
+			Btn.MouseButton1Click:Connect(function() playClickSound(); callback() end)
+		end
+
+		function TabSetup:CreateSlider(name, min, max, default, callback)
+			callback = callback or function() end
+			min = min or 0; max = max or 100; default = default or min
+			local id = generateId("slider_" .. name)
+			local SliderFrame = Instance.new("Frame")
+			SliderFrame.Size = UDim2.new(1,0,0,60); SliderFrame.BackgroundColor3 = CurrentTheme.Panel
+			SliderFrame.Active = true; SliderFrame.Parent = PageScroll
+			createCorner(SliderFrame,8); createStroke(SliderFrame, CurrentTheme.PanelLight, 1)
 
 			local Label = Instance.new("TextLabel")
-			Label.Size = UDim2.new(0.5,0,1,0); Label.Position = UDim2.new(0,15,0,0)
+			Label.Size = UDim2.new(1,-50,0,25); Label.Position = UDim2.new(0,15,0,6)
 			Label.Text = name; Label.Font = Enum.Font.GothamSemibold; Label.TextSize = 13
 			Label.TextColor3 = CurrentTheme.TextColor; Label.TextXAlignment = Enum.TextXAlignment.Left
-			Label.BackgroundTransparency = 1; Label.Parent = BoxFrame
+			Label.BackgroundTransparency = 1; Label.Parent = SliderFrame
 
-			local TextBoxBg = Instance.new("Frame")
-			TextBoxBg.Size = UDim2.new(0.45, 0, 0, 30); TextBoxBg.Position = UDim2.new(1, -15, 0.5, -15)
-			TextBoxBg.AnchorPoint = Vector2.new(1, 0); TextBoxBg.BackgroundColor3 = CurrentTheme.Sidebar
-			TextBoxBg.Parent = BoxFrame; createCorner(TextBoxBg, 6)
+			local ValueText = Instance.new("TextLabel")
+			ValueText.Size = UDim2.new(0,50,0,25); ValueText.Position = UDim2.new(1,-65,0,6)
+			ValueText.Text = tostring(default); ValueText.Font = Enum.Font.GothamBold; ValueText.TextSize = 13
+			ValueText.TextColor3 = CurrentTheme.Primary; ValueText.TextXAlignment = Enum.TextXAlignment.Right
+			ValueText.BackgroundTransparency = 1; ValueText.Parent = SliderFrame
 
-			local TxtBox = Instance.new("TextBox")
-			TxtBox.Size = UDim2.new(1, -10, 1, 0); TxtBox.Position = UDim2.new(0, 5, 0, 0)
-			TxtBox.BackgroundTransparency = 1; TxtBox.Text = ""; TxtBox.PlaceholderText = placeholder or "Type..."
-			TxtBox.Font = Enum.Font.Gotham; TxtBox.TextSize = 12; TxtBox.TextColor3 = CurrentTheme.TextColor
-			TxtBox.TextXAlignment = Enum.TextXAlignment.Left; TxtBox.ClearTextOnFocus = false; TxtBox.Parent = TextBoxBg
+			local Bar = Instance.new("TextButton")
+			Bar.Size = UDim2.new(1,-30,0,6); Bar.Position = UDim2.new(0,15,0,40)
+			Bar.BackgroundColor3 = CurrentTheme.Sidebar; Bar.Text = ""; Bar.Parent = SliderFrame
+			createCorner(Bar,3)
 
-			TxtBox.FocusLost:Connect(function() callback(TxtBox.Text) end)
+			local Fill = Instance.new("Frame")
+			local defaultPercent = (default - min) / math.max(1, (max - min))
+			Fill.Size = UDim2.new(defaultPercent,0,1,0); Fill.BackgroundColor3 = CurrentTheme.Primary; Fill.Parent = Bar
+			createCorner(Fill,3)
+
+			local Knob = Instance.new("Frame")
+			Knob.Size = UDim2.new(0,12,0,12); Knob.Position = UDim2.new(defaultPercent, -6, 0.5, -6)
+			Knob.BackgroundColor3 = Color3.new(1,1,1); Knob.BorderSizePixel = 0; Knob.Parent = Bar
+			createCorner(Knob, 6)
+
+			local currentValue = default
+			ConfigValues[id] = currentValue
+			registerConfig(id, function(val)
+				currentValue = math.clamp(val, min, max)
+				local percent = (currentValue - min) / math.max(1, (max - min))
+				Fill.Size = UDim2.new(percent,0,1,0); Knob.Position = UDim2.new(percent, -6, 0.5, -6)
+				ValueText.Text = tostring(currentValue); callback(currentValue)
+			end)
+
+			local draggingSlider = false
+			Bar.InputBegan:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingSlider = true end
+			end)
+			UserInputService.InputEnded:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingSlider = false end
+			end)
+			UserInputService.InputChanged:Connect(function(input)
+				if draggingSlider and input.UserInputType == Enum.UserInputType.MouseMovement then
+					local mousePos = input.Position.X; local barPos = Bar.AbsolutePosition.X; local barSize = Bar.AbsoluteSize.X
+					local percent = math.clamp((mousePos - barPos) / barSize, 0, 1)
+					currentValue = math.floor(min + ((max - min) * percent))
+					ConfigValues[id] = currentValue
+					Fill.Size = UDim2.new(percent,0,1,0); Knob.Position = UDim2.new(percent, -6, 0.5, -6)
+					ValueText.Text = tostring(currentValue); callback(currentValue)
+				end
+			end)
 		end
 
 		function TabSetup:CreateDropdown(name, options, default, callback)
+			options = options or {}
+			default = default or options[1] or "None"
+			callback = callback or function() end
 			local id = generateId("dropdown_" .. name)
 			local DropdownFrame = Instance.new("Frame")
 			DropdownFrame.Size = UDim2.new(1,0,0,46); DropdownFrame.BackgroundColor3 = CurrentTheme.Panel
 			DropdownFrame.Active = true; DropdownFrame.ClipsDescendants = true; DropdownFrame.Parent = PageScroll
-			createCorner(DropdownFrame,8); local dropStroke = createStroke(DropdownFrame, CurrentTheme.PanelLight, 1)
+			createCorner(DropdownFrame,8); createStroke(DropdownFrame, CurrentTheme.PanelLight, 1)
 
 			local Label = Instance.new("TextLabel")
 			Label.Size = UDim2.new(1,-30,0,46); Label.Position = UDim2.new(0,15,0,0)
@@ -831,7 +938,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 			local selectedValue = default
 			ConfigValues[id] = default
 			registerConfig(id, function(val)
-				selectedValue = val; Label.Text = name .. " : " .. val; callback(val)
+				selectedValue = val; Label.Text = name .. " : " .. tostring(val); callback(val)
 			end)
 
 			local function BuildOptions(optList)
@@ -839,12 +946,12 @@ function EmloxaLibrary:CreateWindow(hubName)
 				for _, option in ipairs(optList) do
 					local OptBtn = Instance.new("TextButton")
 					OptBtn.Size = UDim2.new(1,0,0,32); OptBtn.BackgroundColor3 = CurrentTheme.PanelLight
-					OptBtn.Text = "  " .. option; OptBtn.Font = Enum.Font.Gotham; OptBtn.TextSize = 12
+					OptBtn.Text = "  " .. tostring(option); OptBtn.Font = Enum.Font.Gotham; OptBtn.TextSize = 12
 					OptBtn.TextColor3 = CurrentTheme.SubTextColor; OptBtn.TextXAlignment = Enum.TextXAlignment.Left
 					OptBtn.Parent = OptionContainer; createCorner(OptBtn,6)
 
 					OptBtn.MouseButton1Click:Connect(function()
-						selectedValue = option; Label.Text = name .. " : " .. option; ConfigValues[id] = option
+						selectedValue = option; Label.Text = name .. " : " .. tostring(option); ConfigValues[id] = option
 						isDropped = false
 						TweenService:Create(DropdownFrame, TweenInfo.new(0.3), {Size = UDim2.new(1,0,0,46)}):Play()
 						callback(selectedValue); playClickSound()
@@ -872,76 +979,151 @@ function EmloxaLibrary:CreateWindow(hubName)
 			return DropdownAPI
 		end
 
-		function TabSetup:CreateSlider(name, min, max, default, callback)
-			local id = generateId("slider_" .. name)
-			local SliderFrame = Instance.new("Frame")
-			SliderFrame.Size = UDim2.new(1,0,0,60); SliderFrame.BackgroundColor3 = CurrentTheme.Panel
-			SliderFrame.Active = true; SliderFrame.Parent = PageScroll
-			createCorner(SliderFrame,8); createStroke(SliderFrame, CurrentTheme.PanelLight, 1)
+		function TabSetup:CreateTextbox(name, placeholder, callback)
+			callback = callback or function() end
+			local id = generateId("textbox_" .. name)
+			local BoxFrame = Instance.new("Frame")
+			BoxFrame.Size = UDim2.new(1,0,0,46); BoxFrame.BackgroundColor3 = CurrentTheme.Panel
+			BoxFrame.Active = true; BoxFrame.Parent = PageScroll
+			createCorner(BoxFrame,8); createStroke(BoxFrame, CurrentTheme.PanelLight, 1)
 
 			local Label = Instance.new("TextLabel")
-			Label.Size = UDim2.new(1,-50,0,25); Label.Position = UDim2.new(0,15,0,6)
+			Label.Size = UDim2.new(0.5,0,1,0); Label.Position = UDim2.new(0,15,0,0)
 			Label.Text = name; Label.Font = Enum.Font.GothamSemibold; Label.TextSize = 13
 			Label.TextColor3 = CurrentTheme.TextColor; Label.TextXAlignment = Enum.TextXAlignment.Left
-			Label.BackgroundTransparency = 1; Label.Parent = SliderFrame
+			Label.BackgroundTransparency = 1; Label.Parent = BoxFrame
 
-			local ValueText = Instance.new("TextLabel")
-			ValueText.Size = UDim2.new(0,50,0,25); ValueText.Position = UDim2.new(1,-65,0,6)
-			ValueText.Text = tostring(default); ValueText.Font = Enum.Font.GothamBold; ValueText.TextSize = 13
-			ValueText.TextColor3 = CurrentTheme.Primary; ValueText.TextXAlignment = Enum.TextXAlignment.Right
-			ValueText.BackgroundTransparency = 1; ValueText.Parent = SliderFrame
+			local TextBoxBg = Instance.new("Frame")
+			TextBoxBg.Size = UDim2.new(0.45, 0, 0, 30); TextBoxBg.Position = UDim2.new(1, -15, 0.5, -15)
+			TextBoxBg.AnchorPoint = Vector2.new(1, 0); TextBoxBg.BackgroundColor3 = CurrentTheme.Sidebar
+			TextBoxBg.Parent = BoxFrame; createCorner(TextBoxBg, 6)
 
-			local Bar = Instance.new("TextButton")
-			Bar.Size = UDim2.new(1,-30,0,6); Bar.Position = UDim2.new(0,15,0,40)
-			Bar.BackgroundColor3 = CurrentTheme.Sidebar; Bar.Text = ""; Bar.Parent = SliderFrame
-			createCorner(Bar,3)
+			local TxtBox = Instance.new("TextBox")
+			TxtBox.Size = UDim2.new(1, -10, 1, 0); TxtBox.Position = UDim2.new(0, 5, 0, 0)
+			TxtBox.BackgroundTransparency = 1; TxtBox.Text = ""; TxtBox.PlaceholderText = placeholder or "Type..."
+			TxtBox.Font = Enum.Font.Gotham; TxtBox.TextSize = 12; TxtBox.TextColor3 = CurrentTheme.TextColor
+			TxtBox.TextXAlignment = Enum.TextXAlignment.Left; TxtBox.ClearTextOnFocus = false; TxtBox.Parent = TextBoxBg
 
-			local Fill = Instance.new("Frame")
-			local defaultPercent = (default - min) / (max - min)
-			Fill.Size = UDim2.new(defaultPercent,0,1,0); Fill.BackgroundColor3 = CurrentTheme.Primary; Fill.Parent = Bar
-			createCorner(Fill,3)
+			TxtBox.FocusLost:Connect(function() callback(TxtBox.Text) end)
+		end
 
-			local Knob = Instance.new("Frame")
-			Knob.Size = UDim2.new(0,12,0,12); Knob.Position = UDim2.new(defaultPercent, -6, 0.5, -6)
-			Knob.BackgroundColor3 = Color3.new(1,1,1); Knob.BorderSizePixel = 0; Knob.Parent = Bar
-			createCorner(Knob, 6)
+		-- ADDITIONAL MISSING UI COMPONENTS (PREVENTS SCRIPT CRASHES)
+		function TabSetup:CreateSection(name)
+			local SecFrame = Instance.new("Frame")
+			SecFrame.Size = UDim2.new(1, 0, 0, 30)
+			SecFrame.BackgroundTransparency = 1
+			SecFrame.Parent = PageScroll
 
-			local currentValue = default
-			ConfigValues[id] = currentValue
-			registerConfig(id, function(val)
-				currentValue = math.clamp(val, min, max)
-				local percent = (currentValue - min) / (max - min)
-				Fill.Size = UDim2.new(percent,0,1,0); Knob.Position = UDim2.new(percent, -6, 0.5, -6)
-				ValueText.Text = tostring(currentValue); callback(currentValue)
-			end)
+			local SecLabel = Instance.new("TextLabel")
+			SecLabel.Text = string.upper(name)
+			SecLabel.Font = Enum.Font.GothamBlack
+			SecLabel.TextSize = 11
+			SecLabel.TextColor3 = CurrentTheme.Primary
+			SecLabel.Size = UDim2.new(1, 0, 1, 0)
+			SecLabel.BackgroundTransparency = 1
+			SecLabel.TextXAlignment = Enum.TextXAlignment.Left
+			SecLabel.Parent = SecFrame
+		end
 
-			local draggingSlider = false
-			Bar.InputBegan:Connect(function(input)
-				if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingSlider = true end
-			end)
-			UserInputService.InputEnded:Connect(function(input)
-				if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingSlider = false end
-			end)
-			UserInputService.InputChanged:Connect(function(input)
-				if draggingSlider and input.UserInputType == Enum.UserInputType.MouseMovement then
-					local mousePos = input.Position.X; local barPos = Bar.AbsolutePosition.X; local barSize = Bar.AbsoluteSize.X
-					local percent = math.clamp((mousePos - barPos) / barSize, 0, 1)
-					currentValue = math.floor(min + ((max - min) * percent))
-					ConfigValues[id] = currentValue
-					Fill.Size = UDim2.new(percent,0,1,0); Knob.Position = UDim2.new(percent, -6, 0.5, -6)
-					ValueText.Text = tostring(currentValue); callback(currentValue)
-				end
+		function TabSetup:CreateLabel(text)
+			local LblFrame = Instance.new("Frame")
+			LblFrame.Size = UDim2.new(1, 0, 0, 36)
+			LblFrame.BackgroundColor3 = CurrentTheme.Panel
+			LblFrame.Parent = PageScroll
+			createCorner(LblFrame, 8)
+
+			local LblText = Instance.new("TextLabel")
+			LblText.Text = text
+			LblText.Font = Enum.Font.GothamSemibold
+			LblText.TextSize = 12
+			LblText.TextColor3 = CurrentTheme.TextColor
+			LblText.Size = UDim2.new(1, -20, 1, 0)
+			LblText.Position = UDim2.new(0, 10, 0, 0)
+			LblText.BackgroundTransparency = 1
+			LblText.TextXAlignment = Enum.TextXAlignment.Left
+			LblText.Parent = LblFrame
+		end
+
+		function TabSetup:CreateParagraph(title, content)
+			local PFrame = Instance.new("Frame")
+			PFrame.Size = UDim2.new(1, 0, 0, 55)
+			PFrame.BackgroundColor3 = CurrentTheme.Panel
+			PFrame.Parent = PageScroll
+			createCorner(PFrame, 8)
+
+			local PTitle = Instance.new("TextLabel")
+			PTitle.Text = title
+			PTitle.Font = Enum.Font.GothamBold
+			PTitle.TextSize = 13
+			PTitle.TextColor3 = CurrentTheme.Primary
+			PTitle.Size = UDim2.new(1, -20, 0, 22)
+			PTitle.Position = UDim2.new(0, 10, 0, 6)
+			PTitle.BackgroundTransparency = 1
+			PTitle.TextXAlignment = Enum.TextXAlignment.Left
+			PTitle.Parent = PFrame
+
+			local PDesc = Instance.new("TextLabel")
+			PDesc.Text = content
+			PDesc.Font = Enum.Font.Gotham
+			PDesc.TextSize = 11
+			PDesc.TextColor3 = CurrentTheme.SubTextColor
+			PDesc.Size = UDim2.new(1, -20, 0, 22)
+			PDesc.Position = UDim2.new(0, 10, 0, 26)
+			PDesc.BackgroundTransparency = 1
+			PDesc.TextXAlignment = Enum.TextXAlignment.Left
+			PDesc.Parent = PFrame
+		end
+
+		function TabSetup:CreateKeybind(name, default, callback)
+			callback = callback or function() end
+			local KeyFrame = Instance.new("Frame")
+			KeyFrame.Size = UDim2.new(1,0,0,46); KeyFrame.BackgroundColor3 = CurrentTheme.Panel
+			KeyFrame.Parent = PageScroll
+			createCorner(KeyFrame, 8)
+
+			local Label = Instance.new("TextLabel")
+			Label.Size = UDim2.new(0.5,0,1,0); Label.Position = UDim2.new(0,15,0,0)
+			Label.Text = name; Label.Font = Enum.Font.GothamSemibold; Label.TextSize = 13
+			Label.TextColor3 = CurrentTheme.TextColor; Label.TextXAlignment = Enum.TextXAlignment.Left
+			Label.BackgroundTransparency = 1; Label.Parent = KeyFrame
+
+			local KeyBtn = Instance.new("TextButton")
+			KeyBtn.Size = UDim2.new(0, 80, 0, 28); KeyBtn.Position = UDim2.new(1, -95, 0.5, -14)
+			KeyBtn.BackgroundColor3 = CurrentTheme.Sidebar
+			KeyBtn.Text = tostring(default or "None"); KeyBtn.Font = Enum.Font.GothamBold; KeyBtn.TextSize = 11
+			KeyBtn.TextColor3 = CurrentTheme.Primary; KeyBtn.Parent = KeyFrame
+			createCorner(KeyBtn, 6)
+
+			KeyBtn.MouseButton1Click:Connect(function()
+				KeyBtn.Text = "..."
+				local inputConn
+				inputConn = UserInputService.InputBegan:Connect(function(input)
+					if input.UserInputType == Enum.UserInputType.Keyboard then
+						KeyBtn.Text = input.KeyCode.Name
+						callback(input.KeyCode)
+						inputConn:Disconnect()
+					end
+				end)
 			end)
 		end
 
-		function TabSetup:CreateButton(name, callback)
-			local Btn = Instance.new("TextButton")
-			Btn.Size = UDim2.new(1,0,0,42); Btn.BackgroundColor3 = CurrentTheme.Panel
-			Btn.Text = name; Btn.Font = Enum.Font.GothamBold; Btn.TextSize = 13; Btn.TextColor3 = CurrentTheme.TextColor
-			Btn.Active = true; Btn.Parent = PageScroll
-			createCorner(Btn,8); local btnStroke = createStroke(Btn, CurrentTheme.PanelLight, 1)
+		function TabSetup:CreateColorpicker(name, default, callback)
+			callback = callback or function() end
+			local ColorFrame = Instance.new("Frame")
+			ColorFrame.Size = UDim2.new(1,0,0,46); ColorFrame.BackgroundColor3 = CurrentTheme.Panel
+			ColorFrame.Parent = PageScroll
+			createCorner(ColorFrame, 8)
 
-			Btn.MouseButton1Click:Connect(function() playClickSound(); callback() end)
+			local Label = Instance.new("TextLabel")
+			Label.Size = UDim2.new(0.5,0,1,0); Label.Position = UDim2.new(0,15,0,0)
+			Label.Text = name; Label.Font = Enum.Font.GothamSemibold; Label.TextSize = 13
+			Label.TextColor3 = CurrentTheme.TextColor; Label.TextXAlignment = Enum.TextXAlignment.Left
+			Label.BackgroundTransparency = 1; Label.Parent = ColorFrame
+
+			local ColorBox = Instance.new("Frame")
+			ColorBox.Size = UDim2.new(0, 30, 0, 20); ColorBox.Position = UDim2.new(1, -45, 0.5, -10)
+			ColorBox.BackgroundColor3 = default or CurrentTheme.Primary; ColorBox.Parent = ColorFrame
+			createCorner(ColorBox, 4)
 		end
 
 		function TabSetup:CreateDivider()
@@ -980,8 +1162,20 @@ function EmloxaLibrary:CreateWindow(hubName)
 		TabSetup.AddDropdown = TabSetup.CreateDropdown; TabSetup.Dropdown = TabSetup.CreateDropdown
 		TabSetup.AddTextbox = TabSetup.CreateTextbox; TabSetup.Textbox = TabSetup.CreateTextbox
 		TabSetup.CreateInput = TabSetup.CreateTextbox; TabSetup.AddInput = TabSetup.CreateTextbox
+		TabSetup.AddSection = TabSetup.CreateSection; TabSetup.Section = TabSetup.CreateSection
+		TabSetup.AddLabel = TabSetup.CreateLabel; TabSetup.Label = TabSetup.CreateLabel
+		TabSetup.AddParagraph = TabSetup.CreateParagraph; TabSetup.Paragraph = TabSetup.CreateParagraph
+		TabSetup.AddKeybind = TabSetup.CreateKeybind; TabSetup.Keybind = TabSetup.CreateKeybind; TabSetup.Bind = TabSetup.CreateKeybind; TabSetup.AddBind = TabSetup.CreateKeybind
+		TabSetup.AddColorpicker = TabSetup.CreateColorpicker; TabSetup.Colorpicker = TabSetup.CreateColorpicker
 		TabSetup.AddDivider = TabSetup.CreateDivider; TabSetup.Divider = TabSetup.CreateDivider
 		TabSetup.AddNotification = TabSetup.CreateNotification; TabSetup.Notification = TabSetup.CreateNotification
+
+		-- CRASH PROOF PROXY FOR ANY UNKNOWN TAB METHODS
+		setmetatable(TabSetup, {
+			__index = function(t, k)
+				return function(...) return {} end
+			end
+		})
 
 		return TabSetup
 	end
@@ -1021,7 +1215,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 		end
 	end)
 
-	-- FULL TAB ALIASES FOR WINDOW CREATION
+	-- TAB ALIASES FOR WINDOW CREATION
 	function WindowSetup:CreateTab(tabName)
 		return CreateTabInternal(tabName, false)
 	end
@@ -1030,7 +1224,24 @@ function EmloxaLibrary:CreateWindow(hubName)
 	WindowSetup.NewTab = WindowSetup.CreateTab
 	WindowSetup.Tab = WindowSetup.CreateTab
 
+	-- CRASH PROOF PROXY FOR ANY UNKNOWN WINDOW METHODS
+	setmetatable(WindowSetup, {
+		__index = function(t, k)
+			return function(...) return WindowSetup end
+		end
+	})
+
 	return WindowSetup
 end
+
+-- CRASH PROOF PROXY FOR ANY UNKNOWN LIBRARY METHODS
+setmetatable(EmloxaLibrary, {
+	__index = function(t, k)
+		if k == "CreateWindow" or k == "MakeWindow" or k == "Init" or k == "new" or k == "Create" then
+			return function(self, ...) return self:CreateWindow(...) end
+		end
+		return function(...) return EmloxaLibrary end
+	end
+})
 
 return EmloxaLibrary
