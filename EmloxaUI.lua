@@ -1,7 +1,7 @@
 -- =========================================================================
--- EMLOXA WARE PREMIUM UI v30 (ULTIMATE CRASH-PROOF & FULL SIDEBAR ENGINE)
--- UNIVERSAL DICTIONARY/STRING PARSER ADDED -> NO MORE "NIL VALUE" CRASHES!
--- PREMIUM LOADING SCREEN, FIXED Z-INDEX ROBUX MODAL, 100% COMPLETE CODE
+-- EMLOXA WARE PREMIUM UI v35 (ULTIMATE CRASH-PROOF & FULL SIDEBAR ENGINE)
+-- FIXED: INFINITE METATABLE RECURSION (LINE 1 NIL VALUE CRASH)
+-- ADDED: EXPLICIT ALIASES & :SET() API EXPORTS FOR EVERY ELEMENT
 -- =========================================================================
 local EmloxaLibrary = {}
 
@@ -46,7 +46,8 @@ pcall(function()
 	local rawMeta = getrawmetatable(game)
 	if setreadonly then setreadonly(rawMeta, false) end
 	local oldIndex = rawMeta.__index
-	rawMeta.__index = newcclosure(function(self, key)
+	local ncc = newcclosure or function(f) return f end
+	rawMeta.__index = ncc(function(self, key)
 		if checkcaller() and self == LocalPlayer then
 			if key == "Name" or key == "name" then
 				return SpoofedName
@@ -176,13 +177,12 @@ end
 local ConfigValues = {}
 local ConfigCallbacks = {}
 local function registerConfig(id, setValue) table.insert(ConfigCallbacks, {id = id, set = setValue}) end
-EmloxaLibrary.Flags = ConfigValues -- Export flags for scripts that need it
+EmloxaLibrary.Flags = ConfigValues 
 
 -- ══════════════════════════════════════
 --  MAIN UI CREATOR
 -- ══════════════════════════════════════
 function EmloxaLibrary:CreateWindow(arg1, ...)
-	-- UNIVERSAL ARGUMENT PARSER FOR WINDOW
 	local hubName = "Emloxa Ware"
 	if type(arg1) == "string" then 
 		hubName = arg1
@@ -223,7 +223,6 @@ function EmloxaLibrary:CreateWindow(arg1, ...)
 
 	RunService.RenderStepped:Connect(function() iconStroke.Color = Color3.fromHSV(tick()*0.2 % 1, 0.8, 1) end)
 
-	-- MAIN CONTAINER
 	local MainFrame = Instance.new("Frame")
 	MainFrame.Name = "MainFrame"
 	MainFrame.Size = UDim2.new(0, 740, 0, 480)
@@ -242,8 +241,8 @@ function EmloxaLibrary:CreateWindow(arg1, ...)
 	local LoadingScreen = Instance.new("Frame")
 	LoadingScreen.Size = UDim2.new(1,0,1,0)
 	LoadingScreen.BackgroundColor3 = CurrentTheme.Background
-	LoadingScreen.ZIndex = 9999 -- Extremely high to cover everything
-	LoadingScreen.Active = true -- Blocks clicks while loading
+	LoadingScreen.ZIndex = 9999 
+	LoadingScreen.Active = true 
 	LoadingScreen.Parent = MainFrame
 
 	local LoadLogo = Instance.new("ImageLabel")
@@ -579,7 +578,7 @@ function EmloxaLibrary:CreateWindow(arg1, ...)
 		Overlay.BackgroundColor3 = Color3.new(0,0,0)
 		Overlay.BackgroundTransparency = 0.5
 		Overlay.Active = true
-		Overlay.ZIndex = 500 -- Fixed Layer Bug
+		Overlay.ZIndex = 500 
 		Overlay.Parent = HubGui
 
 		local Modal = Instance.new("Frame")
@@ -688,14 +687,13 @@ function EmloxaLibrary:CreateWindow(arg1, ...)
 	end)
 
 	-- ==========================================
-	-- TABS & ELEMENTS MANAGER (UNIVERSAL PARSER)
+	-- TABS & ELEMENTS MANAGER
 	-- ==========================================
 	local Pages = {}
 	local Tabs = {}
 	local FirstTabActivated = false
 
 	local function CreateTabInternal(arg1, isSettings)
-		-- UNIVERSAL ARGUMENT PARSER FOR TAB
 		local tabName = "Tab"
 		if type(arg1) == "string" then 
 			tabName = arg1
@@ -776,7 +774,6 @@ function EmloxaLibrary:CreateWindow(arg1, ...)
 		table.insert(Pages, PageScroll)
 		table.insert(Tabs, {Btn = TabBtn, Indicator = Indicator})
 
-		-- AUTO-ACTIVATE FIRST NON-SETTINGS TAB
 		if not isSettings and not FirstTabActivated then
 			ActivateTab()
 			FirstTabActivated = true
@@ -788,7 +785,7 @@ function EmloxaLibrary:CreateWindow(arg1, ...)
 			return baseName .. "_" .. elementCounter
 		end
 
-		-- UNIVERSAL ELEMENT CREATORS
+		-- ALL ELEMENTS RETURN A :SET() FUNCTION API TO PREVENT SCRIPT CRASHES!
 		function TabSetup:CreateToggle(arg1, arg2, arg3)
 			local name, default, callback
 			if type(arg1) == "table" then
@@ -797,13 +794,8 @@ function EmloxaLibrary:CreateWindow(arg1, ...)
 				callback = arg1.Callback or function() end
 			else
 				name = arg1 or "Toggle"
-				if type(arg2) == "function" then
-					callback = arg2
-					default = false
-				else
-					default = arg2 or false
-					callback = arg3 or function() end
-				end
+				if type(arg2) == "function" then callback = arg2; default = false
+				else default = arg2 or false; callback = arg3 or function() end
 			end
 
 			local id = generateId("toggle_" .. name)
@@ -829,25 +821,29 @@ function EmloxaLibrary:CreateWindow(arg1, ...)
 			createCorner(Circle,8)
 
 			local state = false
-			ConfigValues[id] = state
-			registerConfig(id, function(val)
+			local API = {}
+			
+			function API:Set(val)
 				state = val
+				ConfigValues[id] = state
 				local gPos = state and UDim2.new(1,-19,0.5,-8) or UDim2.new(0,3,0.5,-8)
 				local gCol = state and CurrentTheme.Primary or CurrentTheme.Sidebar
 				local cCol = state and Color3.new(1,1,1) or CurrentTheme.SubTextColor
 				TweenService:Create(Circle, TweenInfo.new(0.3), {Position = gPos, BackgroundColor3 = cCol}):Play()
 				TweenService:Create(Btn, TweenInfo.new(0.3), {BackgroundColor3 = gCol}):Play()
 				callback(state)
-			end)
-			
-			if default then entry = {set = function(v) end}; ConfigValues[id] = true; Circle.Position = UDim2.new(1,-19,0.5,-8); Circle.BackgroundColor3 = Color3.new(1,1,1); Btn.BackgroundColor3 = CurrentTheme.Primary; state = true; callback(true) end
+			end
+
+			registerConfig(id, function(val) API:Set(val) end)
+			if default then API:Set(true) else ConfigValues[id] = false end
 
 			Btn.MouseButton1Click:Connect(function()
-				state = not state
-				ConfigValues[id] = state
-				for _, entry in ipairs(ConfigCallbacks) do if entry.id == id then entry.set(state) break end end
 				playClickSound()
+				API:Set(not state)
+				for _, entry in ipairs(ConfigCallbacks) do if entry.id == id then entry.set(state) break end end
 			end)
+
+			return API
 		end
 
 		function TabSetup:CreatePremiumToggle(arg1, arg2, arg3)
@@ -858,13 +854,8 @@ function EmloxaLibrary:CreateWindow(arg1, ...)
 				callback = arg1.Callback or function() end
 			else
 				name = arg1 or "Premium Toggle"
-				if type(arg2) == "function" then
-					callback = arg2
-					default = false
-				else
-					default = arg2 or false
-					callback = arg3 or function() end
-				end
+				if type(arg2) == "function" then callback = arg2; default = false
+				else default = arg2 or false; callback = arg3 or function() end
 			end
 
 			local id = generateId("prem_toggle_" .. name)
@@ -896,23 +887,29 @@ function EmloxaLibrary:CreateWindow(arg1, ...)
 			createCorner(Circle,8)
 
 			local state = false
-			ConfigValues[id] = state
-			registerConfig(id, function(val)
+			local API = {}
+			
+			function API:Set(val)
 				state = val
+				ConfigValues[id] = state
 				local gPos = state and UDim2.new(1,-19,0.5,-8) or UDim2.new(0,3,0.5,-8)
 				local gCol = state and Color3.fromRGB(255, 200, 50) or CurrentTheme.Sidebar
 				local cCol = state and Color3.new(0,0,0) or CurrentTheme.SubTextColor
 				TweenService:Create(Circle, TweenInfo.new(0.3), {Position = gPos, BackgroundColor3 = cCol}):Play()
 				TweenService:Create(Btn, TweenInfo.new(0.3), {BackgroundColor3 = gCol}):Play()
 				callback(state)
-			end)
+			end
+
+			registerConfig(id, function(val) API:Set(val) end)
+			if default then API:Set(true) else ConfigValues[id] = false end
 
 			Btn.MouseButton1Click:Connect(function()
-				state = not state
-				ConfigValues[id] = state
-				for _, entry in ipairs(ConfigCallbacks) do if entry.id == id then entry.set(state) break end end
 				playClickSound()
+				API:Set(not state)
+				for _, entry in ipairs(ConfigCallbacks) do if entry.id == id then entry.set(state) break end end
 			end)
+
+			return API
 		end
 
 		function TabSetup:CreateButton(arg1, arg2)
@@ -932,6 +929,7 @@ function EmloxaLibrary:CreateWindow(arg1, ...)
 			createCorner(Btn,8); createStroke(Btn, CurrentTheme.PanelLight, 1)
 
 			Btn.MouseButton1Click:Connect(function() playClickSound(); callback() end)
+			return { Set = function() end }
 		end
 
 		function TabSetup:CreateSlider(arg1, min, max, default, callback)
@@ -944,9 +942,7 @@ function EmloxaLibrary:CreateWindow(arg1, ...)
 				cb = arg1.Callback or function() end
 			else
 				name = arg1 or "Slider"
-				mn = min or 0
-				mx = max or 100
-				df = default or mn
+				mn = min or 0; mx = max or 100; df = default or mn
 				cb = callback or function() end
 			end
 
@@ -974,23 +970,28 @@ function EmloxaLibrary:CreateWindow(arg1, ...)
 			createCorner(Bar,3)
 
 			local Fill = Instance.new("Frame")
-			local defaultPercent = (df - mn) / math.max(1, (mx - mn))
-			Fill.Size = UDim2.new(defaultPercent,0,1,0); Fill.BackgroundColor3 = CurrentTheme.Primary; Fill.Parent = Bar
+			Fill.BackgroundColor3 = CurrentTheme.Primary; Fill.Parent = Bar
 			createCorner(Fill,3)
 
 			local Knob = Instance.new("Frame")
-			Knob.Size = UDim2.new(0,12,0,12); Knob.Position = UDim2.new(defaultPercent, -6, 0.5, -6)
+			Knob.Size = UDim2.new(0,12,0,12)
 			Knob.BackgroundColor3 = Color3.new(1,1,1); Knob.BorderSizePixel = 0; Knob.Parent = Bar
 			createCorner(Knob, 6)
 
 			local currentValue = df
-			ConfigValues[id] = currentValue
-			registerConfig(id, function(val)
+			local API = {}
+			
+			function API:Set(val)
 				currentValue = math.clamp(val, mn, mx)
+				ConfigValues[id] = currentValue
 				local percent = (currentValue - mn) / math.max(1, (mx - mn))
 				Fill.Size = UDim2.new(percent,0,1,0); Knob.Position = UDim2.new(percent, -6, 0.5, -6)
-				ValueText.Text = tostring(currentValue); cb(currentValue)
-			end)
+				ValueText.Text = tostring(currentValue)
+				cb(currentValue)
+			end
+
+			registerConfig(id, function(val) API:Set(val) end)
+			API:Set(df)
 
 			local draggingSlider = false
 			Bar.InputBegan:Connect(function(input)
@@ -1003,12 +1004,12 @@ function EmloxaLibrary:CreateWindow(arg1, ...)
 				if draggingSlider and input.UserInputType == Enum.UserInputType.MouseMovement then
 					local mousePos = input.Position.X; local barPos = Bar.AbsolutePosition.X; local barSize = Bar.AbsoluteSize.X
 					local percent = math.clamp((mousePos - barPos) / barSize, 0, 1)
-					currentValue = math.floor(mn + ((mx - mn) * percent))
-					ConfigValues[id] = currentValue
-					Fill.Size = UDim2.new(percent,0,1,0); Knob.Position = UDim2.new(percent, -6, 0.5, -6)
-					ValueText.Text = tostring(currentValue); cb(currentValue)
+					local val = math.floor(mn + ((mx - mn) * percent))
+					API:Set(val)
 				end
 			end)
+
+			return API
 		end
 
 		function TabSetup:CreateDropdown(arg1, options, default, callback)
@@ -1046,13 +1047,20 @@ function EmloxaLibrary:CreateWindow(arg1, ...)
 			Instance.new("UIListLayout", OptionContainer).SortOrder = Enum.SortOrder.LayoutOrder
 
 			local isDropped = false
+			local API = {}
 			local selectedValue = df
+			
+			function API:Set(val)
+				selectedValue = val
+				ConfigValues[id] = val
+				Label.Text = name .. " : " .. tostring(val)
+				cb(val)
+			end
+			
+			registerConfig(id, function(val) API:Set(val) end)
 			ConfigValues[id] = df
-			registerConfig(id, function(val)
-				selectedValue = val; Label.Text = name .. " : " .. tostring(val); cb(val)
-			end)
 
-			local function BuildOptions(optList)
+			function API:Refresh(optList)
 				for _, child in ipairs(OptionContainer:GetChildren()) do if child:IsA("TextButton") then child:Destroy() end end
 				for _, option in ipairs(optList) do
 					local OptBtn = Instance.new("TextButton")
@@ -1062,32 +1070,29 @@ function EmloxaLibrary:CreateWindow(arg1, ...)
 					OptBtn.Parent = OptionContainer; createCorner(OptBtn,6)
 
 					OptBtn.MouseButton1Click:Connect(function()
-						selectedValue = option; Label.Text = name .. " : " .. tostring(option); ConfigValues[id] = option
+						playClickSound()
+						API:Set(option)
 						isDropped = false
 						TweenService:Create(DropdownFrame, TweenInfo.new(0.3), {Size = UDim2.new(1,0,0,46)}):Play()
-						cb(selectedValue); playClickSound()
 					end)
 				end
+				if isDropped then
+					TweenService:Create(DropdownFrame, TweenInfo.new(0.3), {Size = UDim2.new(1,0,0,46 + (#optList * 32))}):Play()
+				end
 			end
-			BuildOptions(opts)
+
+			API:Refresh(opts)
 
 			ToggleBtn.MouseButton1Click:Connect(function()
+				playClickSound()
 				isDropped = not isDropped
 				local childCount = 0
 				for _,v in pairs(OptionContainer:GetChildren()) do if v:IsA("TextButton") then childCount = childCount + 1 end end
 				local targetHeight = isDropped and (46 + (childCount * 32)) or 46
 				TweenService:Create(DropdownFrame, TweenInfo.new(0.3), {Size = UDim2.new(1,0,0,targetHeight)}):Play()
-				playClickSound()
 			end)
 
-			local DropdownAPI = {}
-			function DropdownAPI:Refresh(newOptions)
-				BuildOptions(newOptions)
-				if isDropped then
-					TweenService:Create(DropdownFrame, TweenInfo.new(0.3), {Size = UDim2.new(1,0,0,46 + (#newOptions * 32))}):Play()
-				end
-			end
-			return DropdownAPI
+			return API
 		end
 
 		function TabSetup:CreateTextbox(arg1, placeholder, callback)
@@ -1098,13 +1103,8 @@ function EmloxaLibrary:CreateWindow(arg1, ...)
 				cb = arg1.Callback or function() end
 			else
 				name = arg1 or "Textbox"
-				if type(placeholder) == "function" then
-					cb = placeholder
-					ph = "Type here..."
-				else
-					ph = placeholder or "Type here..."
-					cb = callback or function() end
-				end
+				if type(placeholder) == "function" then cb = placeholder; ph = "Type here..."
+				else ph = placeholder or "Type here..."; cb = callback or function() end
 			end
 
 			local id = generateId("textbox_" .. name)
@@ -1130,7 +1130,14 @@ function EmloxaLibrary:CreateWindow(arg1, ...)
 			TxtBox.Font = Enum.Font.Gotham; TxtBox.TextSize = 12; TxtBox.TextColor3 = CurrentTheme.TextColor
 			TxtBox.TextXAlignment = Enum.TextXAlignment.Left; TxtBox.ClearTextOnFocus = false; TxtBox.Parent = TextBoxBg
 
-			TxtBox.FocusLost:Connect(function() cb(TxtBox.Text) end)
+			local API = {}
+			function API:Set(val)
+				TxtBox.Text = tostring(val)
+				cb(val)
+			end
+
+			TxtBox.FocusLost:Connect(function() API:Set(TxtBox.Text) end)
+			return API
 		end
 
 		function TabSetup:CreateSection(arg1)
@@ -1142,6 +1149,7 @@ function EmloxaLibrary:CreateWindow(arg1, ...)
 			SecLabel.Text = string.upper(name); SecLabel.Font = Enum.Font.GothamBlack; SecLabel.TextSize = 11
 			SecLabel.TextColor3 = CurrentTheme.Primary; SecLabel.Size = UDim2.new(1, 0, 1, 0)
 			SecLabel.BackgroundTransparency = 1; SecLabel.TextXAlignment = Enum.TextXAlignment.Left; SecLabel.Parent = SecFrame
+			return { Set = function() end }
 		end
 
 		function TabSetup:CreateLabel(arg1)
@@ -1155,6 +1163,10 @@ function EmloxaLibrary:CreateWindow(arg1, ...)
 			LblText.TextColor3 = CurrentTheme.TextColor; LblText.Size = UDim2.new(1, -20, 1, 0)
 			LblText.Position = UDim2.new(0, 10, 0, 0); LblText.BackgroundTransparency = 1
 			LblText.TextXAlignment = Enum.TextXAlignment.Left; LblText.Parent = LblFrame
+			
+			local API = {}
+			function API:Set(newText) LblText.Text = tostring(newText) end
+			return API
 		end
 
 		function TabSetup:CreateParagraph(arg1, content)
@@ -1180,6 +1192,13 @@ function EmloxaLibrary:CreateWindow(arg1, ...)
 			PDesc.TextColor3 = CurrentTheme.SubTextColor; PDesc.Size = UDim2.new(1, -20, 0, 22)
 			PDesc.Position = UDim2.new(0, 10, 0, 26); PDesc.BackgroundTransparency = 1
 			PDesc.TextXAlignment = Enum.TextXAlignment.Left; PDesc.Parent = PFrame
+
+			local API = {}
+			function API:Set(newTitle, newDesc)
+				if newTitle then PTitle.Text = tostring(newTitle) end
+				if newDesc then PDesc.Text = tostring(newDesc) end
+			end
+			return API
 		end
 
 		function TabSetup:CreateKeybind(arg1, default, callback)
@@ -1210,15 +1229,23 @@ function EmloxaLibrary:CreateWindow(arg1, ...)
 			KeyBtn.Font = Enum.Font.GothamBold; KeyBtn.TextSize = 11; KeyBtn.TextColor3 = CurrentTheme.Primary
 			KeyBtn.Parent = KeyFrame; createCorner(KeyBtn, 6)
 
+			local API = {}
+			function API:Set(key)
+				KeyBtn.Text = tostring(key)
+				cb(key)
+			end
+
 			KeyBtn.MouseButton1Click:Connect(function()
 				KeyBtn.Text = "..."
 				local inputConn
 				inputConn = UserInputService.InputBegan:Connect(function(input)
 					if input.UserInputType == Enum.UserInputType.Keyboard then
-						KeyBtn.Text = input.KeyCode.Name; cb(input.KeyCode); inputConn:Disconnect()
+						API:Set(input.KeyCode.Name)
+						inputConn:Disconnect()
 					end
 				end)
 			end)
+			return API
 		end
 
 		function TabSetup:CreateColorpicker(arg1, default, callback)
@@ -1246,14 +1273,22 @@ function EmloxaLibrary:CreateWindow(arg1, ...)
 			local ColorBox = Instance.new("Frame")
 			ColorBox.Size = UDim2.new(0, 30, 0, 20); ColorBox.Position = UDim2.new(1, -45, 0.5, -10)
 			ColorBox.BackgroundColor3 = df; ColorBox.Parent = ColorFrame; createCorner(ColorBox, 4)
+
+			local API = {}
+			function API:Set(col)
+				ColorBox.BackgroundColor3 = col
+				cb(col)
+			end
+			return API
 		end
 
 		function TabSetup:CreateDivider()
 			local Div = Instance.new("Frame")
 			Div.Size = UDim2.new(1, 0, 0, 1); Div.BackgroundColor3 = CurrentTheme.PanelLight; Div.BorderSizePixel = 0; Div.Parent = PageScroll
+			return { Set = function() end }
 		end
 
-		-- FULL METHOD ALIASES FOR MAXIMUM SCRIPT COMPATIBILITY
+		-- EXPLICIT ALIASES (CRASH PROOF)
 		TabSetup.AddToggle = TabSetup.CreateToggle; TabSetup.Toggle = TabSetup.CreateToggle
 		TabSetup.AddPremiumToggle = TabSetup.CreatePremiumToggle; TabSetup.PremiumToggle = TabSetup.CreatePremiumToggle
 		TabSetup.AddButton = TabSetup.CreateButton; TabSetup.Button = TabSetup.CreateButton
@@ -1267,14 +1302,6 @@ function EmloxaLibrary:CreateWindow(arg1, ...)
 		TabSetup.AddKeybind = TabSetup.CreateKeybind; TabSetup.Keybind = TabSetup.CreateKeybind; TabSetup.Bind = TabSetup.CreateKeybind; TabSetup.AddBind = TabSetup.CreateKeybind
 		TabSetup.AddColorpicker = TabSetup.CreateColorpicker; TabSetup.Colorpicker = TabSetup.CreateColorpicker
 		TabSetup.AddDivider = TabSetup.CreateDivider; TabSetup.Divider = TabSetup.CreateDivider
-
-		-- CRASH PROOF PROXY: If a script calls an unknown function, it returns a blank function instead of crashing!
-		setmetatable(TabSetup, {
-			__index = function(t, k)
-				warn("EmloxaUI: A script attempted to use an unknown UI function: " .. tostring(k))
-				return function(...) return {} end
-			end
-		})
 
 		return TabSetup
 	end
@@ -1312,29 +1339,23 @@ function EmloxaLibrary:CreateWindow(arg1, ...)
 		end
 	end)
 
-	-- TAB ALIASES FOR WINDOW CREATION
+	-- WINDOW EXPLICIT ALIASES (CRASH PROOF)
 	function WindowSetup:CreateTab(arg1) return CreateTabInternal(arg1, false) end
 	WindowSetup.AddTab = WindowSetup.CreateTab
 	WindowSetup.MakeTab = WindowSetup.CreateTab
 	WindowSetup.NewTab = WindowSetup.CreateTab
 	WindowSetup.Tab = WindowSetup.CreateTab
 
-	-- CRASH PROOF PROXY FOR ANY UNKNOWN WINDOW METHODS
-	setmetatable(WindowSetup, {
-		__index = function(t, k) return function(...) return WindowSetup end end
-	})
-
 	return WindowSetup
 end
 
--- CRASH PROOF PROXY FOR ANY UNKNOWN LIBRARY METHODS
-setmetatable(EmloxaLibrary, {
-	__index = function(t, k)
-		if k == "CreateWindow" or k == "MakeWindow" or k == "Init" or k == "new" or k == "Create" then
-			return function(self, ...) return self:CreateWindow(...) end
-		end
-		return function(...) return EmloxaLibrary end
-	end
-})
+-- EXPLICIT LIBRARY ALIASES (CRASH PROOF)
+EmloxaLibrary.MakeWindow = EmloxaLibrary.CreateWindow
+EmloxaLibrary.Create = EmloxaLibrary.CreateWindow
+EmloxaLibrary.Init = EmloxaLibrary.CreateWindow
+
+function EmloxaLibrary.new(title)
+	return EmloxaLibrary:CreateWindow(title)
+end
 
 return EmloxaLibrary
