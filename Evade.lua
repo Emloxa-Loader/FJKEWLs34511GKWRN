@@ -1,7 +1,6 @@
 -- =========================================================================
--- EMLOXA WARE: EVADE (PLACE ID: 9872472334) – TEMİZLENMİŞ v4
--- SADECE CARRY, VOTE, ESP, MOVEMENT (REVIVE KALDIRILDI)
--- KESİNTİSİZ SPEED, DÜZGÜN NEXTBOT ESP, HIGHLIGHT MODLARI
+-- EMLOXA WARE: EVADE (PLACE ID: 9872472334) – v5 FINAL
+-- CFrame Speed, Fixed Highlight, Visual Boombox, Better Nextbot ESP
 -- =========================================================================
 local GameModule = {}
 
@@ -16,9 +15,9 @@ function GameModule:Init(Window)
     local LocalPlayer = Players.LocalPlayer
     local Camera = Workspace.CurrentCamera
 
-    -- ==========================================
-    -- GLOBAL AYARLAR & DEĞİŞKENLER
-    -- ==========================================
+    -- HUI parent
+    local HUIParent = (gethui and gethui()) or game:GetService("CoreGui")
+
     local Connections = {}
     local ActiveESPs = {}
     local DownedTimers = {}
@@ -48,7 +47,13 @@ function GameModule:Init(Window)
             FullBright = false, NoFog = false,
             FOV = 70, ThirdPerson = false
         },
-        Misc = { AntiAFK = true }
+        Radio = {
+            Enabled = false,
+            CurrentID = "",
+            Loop = false,
+            Volume = 0.5,
+            Favorites = {}
+        }
     }
 
     local IsHoldingSpace = false
@@ -62,11 +67,11 @@ function GameModule:Init(Window)
     }
 
     -- ==========================================
-    -- HUD
+    -- HUD (HUI)
     -- ==========================================
     local StatusGui = Instance.new("ScreenGui")
     StatusGui.Name = "EmloxaStatusUI"
-    StatusGui.Parent = game:GetService("CoreGui") or LocalPlayer.PlayerGui
+    StatusGui.Parent = HUIParent
 
     local MainFrame = Instance.new("Frame")
     MainFrame.Size = UDim2.new(0, 240, 0, 180)
@@ -117,7 +122,7 @@ function GameModule:Init(Window)
     ManualKeyLabel.Size = UDim2.new(1, -20, 0, 50)
     ManualKeyLabel.Position = UDim2.new(0, 10, 0, 90)
     ManualKeyLabel.BackgroundTransparency = 1
-    ManualKeyLabel.Text = "[H] -> Manual Step 1: Teleport & Pick\n[J] -> Manual Step 2: Lift to Sky\n[K] -> Manual Step 3: Drop & Revive"
+    ManualKeyLabel.Text = "[H] -> Teleport & Pick\n[J] -> Lift to Sky\n[K] -> Drop & Revive"
     ManualKeyLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
     ManualKeyLabel.Font = Enum.Font.Gotham
     ManualKeyLabel.TextSize = 11
@@ -134,7 +139,7 @@ function GameModule:Init(Window)
     end
 
     -- ==========================================
-    -- GELİŞMİŞ OYUNCU (DOWNED) BULUCU
+    -- DOWNED CHECK
     -- ==========================================
     local function IsPlayerDowned(p)
         if not p then return false end
@@ -156,7 +161,7 @@ function GameModule:Init(Window)
     end
 
     -- ==========================================
-    -- LAG-FREE ESP SİSTEMİ (DUPLICATE KORUMALI)
+    -- ESP (FIXED HIGHLIGHT)
     -- ==========================================
     local function CreateESP(target, nameText, color, attachPart, yOffset, useHighlight)
         if not target or not attachPart or target:FindFirstChild("EmloxaESP_Tag") then return end
@@ -320,7 +325,7 @@ function GameModule:Init(Window)
             if char.HumanoidRootPart:FindFirstChild("EmloxaVelocity") then char.HumanoidRootPart.EmloxaVelocity:Destroy() end
             if char.HumanoidRootPart:FindFirstChild("EmloxaSpeed") then char.HumanoidRootPart.EmloxaSpeed:Destroy() end
         end
-        local ui = game:GetService("CoreGui"):FindFirstChild("EmloxaWareUI") or LocalPlayer.PlayerGui:FindFirstChild("EmloxaWareUI")
+        local ui = HUIParent:FindFirstChild("EmloxaWareUI") or LocalPlayer.PlayerGui:FindFirstChild("EmloxaWareUI")
         if ui then ui:Destroy() end
     end)
 
@@ -333,6 +338,7 @@ function GameModule:Init(Window)
         if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.LeftControl then IsHoldingCtrl = true end
 
         if input.KeyCode == Enum.KeyCode.H then
+            -- carry pick
             local closest = nil
             local minDist = math.huge
             local myHrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
@@ -400,7 +406,7 @@ function GameModule:Init(Window)
     end))
 
     -- ==========================================
-    -- NEXTBOT TARAMASI (NPC İSİM LİSTESİ İLE)
+    -- NEXTBOT SCAN (Humanoid kontrolü)
     -- ==========================================
     local npcNames = {}
     local function updateNpcNames()
@@ -416,9 +422,7 @@ function GameModule:Init(Window)
     end
     updateNpcNames()
     ReplicatedStorage.ChildAdded:Connect(function(child)
-        if child.Name == "NPCs" then
-            updateNpcNames()
-        end
+        if child.Name == "NPCs" then updateNpcNames() end
     end)
     if ReplicatedStorage:FindFirstChild("NPCs") then
         ReplicatedStorage.NPCs.ChildAdded:Connect(updateNpcNames)
@@ -434,7 +438,8 @@ function GameModule:Init(Window)
         local npcs = {}
         for _, v in ipairs(Workspace:GetDescendants()) do
             if v:IsA("Model") and npcNames[v.Name] then
-                if v:FindFirstChild("Hitbox") or v:FindFirstChild("HumanoidRootPart") then
+                -- Humanoid kontrolü
+                if v:FindFirstChildOfClass("Humanoid") then
                     table.insert(npcs, v)
                 end
             end
@@ -444,17 +449,15 @@ function GameModule:Init(Window)
     end
 
     -- ==========================================
-    -- ANA MOTOR (HEARTBEAT LOOP)
+    -- ANA MOTOR
     -- ==========================================
     table.insert(Connections, RunService.Heartbeat:Connect(function(delta)
-        -- FullBright
+        -- FullBright/NoFog
         if Settings.World.FullBright then
             Lighting.Brightness = 5
             Lighting.GlobalShadows = false
             Lighting.Ambient = Color3.fromRGB(255,255,255)
         end
-
-        -- NoFog
         if Settings.World.NoFog then
             Lighting.FogEnd = 999999
         else
@@ -466,7 +469,7 @@ function GameModule:Init(Window)
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
 
         if hum and hrp then
-            -- Fly
+            -- Fly (BodyVelocity)
             if Settings.Movement.FlyEnabled then
                 if hrp:FindFirstChild("EmloxaSpeed") then hrp.EmloxaSpeed:Destroy() end
                 local bVel = hrp:FindFirstChild("EmloxaVelocity")
@@ -486,23 +489,14 @@ function GameModule:Init(Window)
                 if hum.PlatformStand then hum.PlatformStand = false end
                 if hrp:FindFirstChild("EmloxaVelocity") then hrp.EmloxaVelocity:Destroy() end
 
-                -- Speed (sürekli)
-                if Settings.Movement.SpeedEnabled then
-                    local bv = hrp:FindFirstChild("EmloxaSpeed")
-                    if not bv then
-                        bv = Instance.new("BodyVelocity")
-                        bv.Name = "EmloxaSpeed"
-                        bv.MaxForce = Vector3.new(100000, 0, 100000)
-                        bv.Parent = hrp
+                -- CFrame Speed (Y eksenine dokunma)
+                if Settings.Movement.SpeedEnabled and hum.MoveDirection.Magnitude > 0 then
+                    local moveDir = hum.MoveDirection * Vector3.new(1, 0, 1)
+                    if moveDir.Magnitude > 0 then
+                        moveDir = moveDir.Unit
+                        local offset = moveDir * Settings.Movement.SpeedValue * delta
+                        hrp.CFrame = hrp.CFrame + offset
                     end
-                    if hum.MoveDirection.Magnitude > 0 then
-                        local moveDir = hum.MoveDirection.Unit
-                        bv.Velocity = Vector3.new(moveDir.X * Settings.Movement.SpeedValue, 0, moveDir.Z * Settings.Movement.SpeedValue)
-                    else
-                        bv.Velocity = Vector3.new(0, 0, 0) -- durunca hızı sıfırla, kalkınca anında devreye girer
-                    end
-                else
-                    if hrp:FindFirstChild("EmloxaSpeed") then hrp.EmloxaSpeed:Destroy() end
                 end
             end
 
@@ -518,7 +512,7 @@ function GameModule:Init(Window)
             end
         end
 
-        -- Downed takip
+        -- Downed tracking
         for _, p in pairs(Players:GetPlayers()) do
             if p ~= LocalPlayer and p.Character then
                 if IsPlayerDowned(p) then
@@ -529,7 +523,7 @@ function GameModule:Init(Window)
             end
         end
 
-        -- Carry otomasyonu
+        -- Carry
         if Settings.CarrySystem.AutoMode and hrp then
             if Settings.CarrySystem.State == "Idle" then
                 for p, startTime in pairs(DownedTimers) do
@@ -580,7 +574,7 @@ function GameModule:Init(Window)
             end
         end
 
-        -- Auto Vote
+        -- Vote
         if Settings.Vote.AutoVote then
             local ev = ReplicatedStorage:FindFirstChild("Events")
             if ev and ev:FindFirstChild("Player") and ev.Player:FindFirstChild("Vote") then
@@ -588,7 +582,7 @@ function GameModule:Init(Window)
             end
         end
 
-        -- ESP Oluşturma
+        -- ESP
         if Settings.Visuals.PlayerESP then
             for _, p in pairs(Players:GetPlayers()) do
                 if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
@@ -622,7 +616,7 @@ function GameModule:Init(Window)
             end
         end
 
-        -- ESP Mesafe / Renk güncelleme
+        -- ESP Update
         local camPos = Camera and Camera.CFrame.Position or Vector3.new(0,0,0)
         for i = #ActiveESPs, 1, -1 do
             local esp = ActiveESPs[i]
@@ -657,6 +651,303 @@ function GameModule:Init(Window)
 
         if Settings.World.FOV ~= 70 and Camera then Camera.FieldOfView = Settings.World.FOV end
     end))
+
+    -- ==========================================
+    -- VISUAL RADIO (BOOMBOX)
+    -- ==========================================
+    local function hasBoomboxAccessory()
+        local char = LocalPlayer.Character
+        if char then
+            for _, child in ipairs(char:GetChildren()) do
+                if child:IsA("Accessory") and child.Name == "Evade Boombox IDOLAccessory" then
+                    return true
+                end
+            end
+        end
+        return false
+    end
+
+    local RadioGui = nil
+    local RadioOpen = false
+    local CurrentSound = nil
+
+    local function loadFavorites()
+        local file = "Emloxa_Favorites.json"
+        if isfile then
+            local success, data = pcall(function() return readfile(file) end)
+            if success then
+                local decoded = HttpService:JSONDecode(data)
+                if decoded then Settings.Radio.Favorites = decoded end
+            end
+        end
+    end
+    local function saveFavorites()
+        local file = "Emloxa_Favorites.json"
+        if writefile then
+            writefile(file, HttpService:JSONEncode(Settings.Radio.Favorites))
+        end
+    end
+
+    local function createRadio()
+        if RadioGui then return end
+        RadioGui = Instance.new("ScreenGui")
+        RadioGui.Name = "EmloxaRadio"
+        RadioGui.Parent = HUIParent
+        RadioGui.Enabled = false
+
+        local Main = Instance.new("Frame")
+        Main.Size = UDim2.new(0, 400, 0, 300)
+        Main.Position = UDim2.new(0.5, -200, 0.5, -150)
+        Main.BackgroundColor3 = Color3.fromRGB(25,25,35)
+        Main.BorderSizePixel = 0
+        Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 10)
+        Main.Parent = RadioGui
+
+        -- Title
+        local Title = Instance.new("TextLabel")
+        Title.Size = UDim2.new(1,0,0,40)
+        Title.BackgroundColor3 = Color3.fromRGB(102,85,255)
+        Title.Text = "Emloxa Ware Player"
+        Title.Font = Enum.Font.GothamBlack
+        Title.TextSize = 18
+        Title.TextColor3 = Color3.new(1,1,1)
+        Title.Parent = Main
+
+        -- Sekme çerçevesi
+        local TabFrame = Instance.new("Frame")
+        TabFrame.Size = UDim2.new(1,0,0,30)
+        TabFrame.Position = UDim2.new(0,0,0,40)
+        TabFrame.BackgroundColor3 = Color3.fromRGB(20,20,30)
+        TabFrame.Parent = Main
+
+        local PlayTab = Instance.new("TextButton")
+        PlayTab.Size = UDim2.new(0.5,0,1,0)
+        PlayTab.Text = "Play"
+        PlayTab.Font = Enum.Font.GothamBold
+        PlayTab.TextSize = 14
+        PlayTab.BackgroundColor3 = Color3.fromRGB(102,85,255)
+        PlayTab.TextColor3 = Color3.new(1,1,1)
+        PlayTab.Parent = TabFrame
+
+        local FavTab = Instance.new("TextButton")
+        FavTab.Size = UDim2.new(0.5,0,1,0)
+        FavTab.Position = UDim2.new(0.5,0,0,0)
+        FavTab.Text = "Favorites"
+        FavTab.Font = Enum.Font.GothamBold
+        FavTab.TextSize = 14
+        FavTab.BackgroundColor3 = Color3.fromRGB(40,40,50)
+        FavTab.TextColor3 = Color3.new(0.8,0.8,0.8)
+        FavTab.Parent = TabFrame
+
+        -- Play sayfası
+        local PlayPage = Instance.new("Frame")
+        PlayPage.Size = UDim2.new(1,0,1,-70)
+        PlayPage.Position = UDim2.new(0,0,0,70)
+        PlayPage.BackgroundTransparency = 1
+        PlayPage.Visible = true
+        PlayPage.Parent = Main
+
+        local SongID = Instance.new("TextBox")
+        SongID.Size = UDim2.new(1,-20,0,30)
+        SongID.Position = UDim2.new(0,10,0,10)
+        SongID.PlaceholderText = "Enter Music ID..."
+        SongID.Text = Settings.Radio.CurrentID
+        SongID.Font = Enum.Font.Gotham
+        SongID.TextSize = 14
+        SongID.BackgroundColor3 = Color3.fromRGB(40,40,50)
+        SongID.TextColor3 = Color3.new(1,1,1)
+        Instance.new("UICorner", SongID).CornerRadius = UDim.new(0, 6)
+        SongID.Parent = PlayPage
+
+        local LoopToggle = Instance.new("TextButton")
+        LoopToggle.Size = UDim2.new(0, 30, 0, 30)
+        LoopToggle.Position = UDim2.new(0, 10, 0, 50)
+        LoopToggle.Text = "🔁"
+        LoopToggle.Font = Enum.Font.Gotham
+        LoopToggle.TextSize = 18
+        LoopToggle.BackgroundColor3 = Settings.Radio.Loop and Color3.fromRGB(102,85,255) or Color3.fromRGB(40,40,50)
+        LoopToggle.TextColor3 = Color3.new(1,1,1)
+        Instance.new("UICorner", LoopToggle).CornerRadius = UDim.new(0, 6)
+        LoopToggle.Parent = PlayPage
+
+        local NowPlaying = Instance.new("TextLabel")
+        NowPlaying.Size = UDim2.new(1,-60,0,30)
+        NowPlaying.Position = UDim2.new(0,45,0,50)
+        NowPlaying.Text = "No music playing"
+        NowPlaying.Font = Enum.Font.Gotham
+        NowPlaying.TextSize = 12
+        NowPlaying.TextColor3 = Color3.new(0.8,0.8,0.8)
+        NowPlaying.BackgroundTransparency = 1
+        NowPlaying.TextXAlignment = Enum.TextXAlignment.Left
+        NowPlaying.Parent = PlayPage
+
+        local ControlsFrame = Instance.new("Frame")
+        ControlsFrame.Size = UDim2.new(1,-20,0,40)
+        ControlsFrame.Position = UDim2.new(0,10,1,-50)
+        ControlsFrame.BackgroundTransparency = 1
+        ControlsFrame.Parent = PlayPage
+
+        local function createButton(text, posX, callback)
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(0, 40, 0, 40)
+            btn.Position = UDim2.new(0, posX, 0, 0)
+            btn.Text = text
+            btn.Font = Enum.Font.GothamBold
+            btn.TextSize = 16
+            btn.BackgroundColor3 = Color3.fromRGB(40,40,50)
+            btn.TextColor3 = Color3.new(1,1,1)
+            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+            btn.Parent = ControlsFrame
+            btn.MouseButton1Click:Connect(callback)
+            return btn
+        end
+
+        local PrevBtn = createButton("⏮", 0, function()
+            -- önceki parça (basit liste çevrimi)
+        end)
+        local PlayBtn = createButton("▶", 50, function()
+            local id = SongID.Text
+            if id == "" then return end
+            if CurrentSound then CurrentSound:Destroy() end
+            local sound = Instance.new("Sound")
+            sound.SoundId = "rbxassetid://" .. id
+            sound.Volume = Settings.Radio.Volume
+            sound.Looped = Settings.Radio.Loop
+            sound.Parent = Workspace
+            sound:Play()
+            CurrentSound = sound
+            NowPlaying.Text = "Playing: " .. id
+            PlayBtn.Text = "⏸"
+        end)
+        local NextBtn = createButton("⏭", 100, function()
+            -- sonraki parça
+        end)
+
+        -- Favorites sayfası
+        local FavPage = Instance.new("Frame")
+        FavPage.Size = UDim2.new(1,0,1,-70)
+        FavPage.Position = UDim2.new(0,0,0,70)
+        FavPage.BackgroundTransparency = 1
+        FavPage.Visible = false
+        FavPage.Parent = Main
+
+        local SearchBox = Instance.new("TextBox")
+        SearchBox.Size = UDim2.new(1,-50,0,30)
+        SearchBox.Position = UDim2.new(0,10,0,10)
+        SearchBox.PlaceholderText = "Search ID..."
+        SearchBox.Font = Enum.Font.Gotham
+        SearchBox.TextSize = 14
+        SearchBox.BackgroundColor3 = Color3.fromRGB(40,40,50)
+        SearchBox.TextColor3 = Color3.new(1,1,1)
+        Instance.new("UICorner", SearchBox).CornerRadius = UDim.new(0, 6)
+        SearchBox.Parent = FavPage
+
+        local AddFavBtn = Instance.new("TextButton")
+        AddFavBtn.Size = UDim2.new(0, 30, 0, 30)
+        AddFavBtn.Position = UDim2.new(1, -40, 0, 10)
+        AddFavBtn.Text = "♡"
+        AddFavBtn.Font = Enum.Font.Gotham
+        AddFavBtn.TextSize = 18
+        AddFavBtn.BackgroundColor3 = Color3.fromRGB(40,40,50)
+        AddFavBtn.TextColor3 = Color3.new(1,1,1)
+        Instance.new("UICorner", AddFavBtn).CornerRadius = UDim.new(0, 6)
+        AddFavBtn.Parent = FavPage
+
+        local FavList = Instance.new("ScrollingFrame")
+        FavList.Size = UDim2.new(1,-20,1,-60)
+        FavList.Position = UDim2.new(0,10,0,50)
+        FavList.BackgroundTransparency = 1
+        FavList.ScrollBarThickness = 3
+        FavList.CanvasSize = UDim2.new(0,0,0,0)
+        FavList.Parent = FavPage
+
+        local FavLayout = Instance.new("UIListLayout")
+        FavLayout.Padding = UDim.new(0, 4)
+        FavLayout.Parent = FavList
+
+        local function refreshFavList()
+            for _, child in ipairs(FavList:GetChildren()) do
+                if child:IsA("TextButton") then child:Destroy() end
+            end
+            for _, favID in ipairs(Settings.Radio.Favorites) do
+                local entry = Instance.new("TextButton")
+                entry.Size = UDim2.new(1,0,0,30)
+                entry.Text = favID
+                entry.Font = Enum.Font.Gotham
+                entry.TextSize = 12
+                entry.BackgroundColor3 = Color3.fromRGB(40,40,50)
+                entry.TextColor3 = Color3.new(1,1,1)
+                Instance.new("UICorner", entry).CornerRadius = UDim.new(0, 4)
+                entry.Parent = FavList
+                entry.MouseButton1Click:Connect(function()
+                    SongID.Text = favID
+                    PlayTab.BackgroundColor3 = Color3.fromRGB(102,85,255)
+                    FavTab.BackgroundColor3 = Color3.fromRGB(40,40,50)
+                    PlayPage.Visible = true
+                    FavPage.Visible = false
+                end)
+            end
+            FavList.CanvasSize = UDim2.new(0,0,0,FavLayout.AbsoluteContentSize.Y + 10)
+        end
+
+        AddFavBtn.MouseButton1Click:Connect(function()
+            local id = SearchBox.Text
+            if id == "" then return end
+            local found = false
+            for _, fav in ipairs(Settings.Radio.Favorites) do
+                if fav == id then found = true break end
+            end
+            if not found then
+                table.insert(Settings.Radio.Favorites, id)
+                saveFavorites()
+                refreshFavList()
+                AddFavBtn.Text = "❤️"
+            end
+        end)
+
+        PlayTab.MouseButton1Click:Connect(function()
+            PlayPage.Visible = true
+            FavPage.Visible = false
+            PlayTab.BackgroundColor3 = Color3.fromRGB(102,85,255)
+            FavTab.BackgroundColor3 = Color3.fromRGB(40,40,50)
+        end)
+        FavTab.MouseButton1Click:Connect(function()
+            PlayPage.Visible = false
+            FavPage.Visible = true
+            FavTab.BackgroundColor3 = Color3.fromRGB(102,85,255)
+            PlayTab.BackgroundColor3 = Color3.fromRGB(40,40,50)
+            refreshFavList()
+        end)
+
+        loadFavorites()
+    end
+
+    local function toggleRadio()
+        if hasBoomboxAccessory() then return end -- varsa hiç açma
+        if not RadioGui then createRadio() end
+        RadioOpen = not RadioOpen
+        RadioGui.Enabled = RadioOpen
+        if RadioOpen then
+            UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+        else
+            UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+        end
+    end
+
+    table.insert(Connections, UserInputService.InputBegan:Connect(function(input, gpe)
+        if gpe then return end
+        if input.KeyCode == Enum.KeyCode.V then
+            toggleRadio()
+        end
+    end))
+
+    -- ==========================================
+    -- INIT
+    -- ==========================================
+    if not hasBoomboxAccessory() then
+        -- hemen radio oluştur ama kapalı
+        createRadio()
+    end
 end
 
 return GameModule
