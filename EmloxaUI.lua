@@ -1,6 +1,5 @@
 -- =========================================================================
--- EMLOXA WARE PREMIUM UI v17.5 (FIXED LOGO, LIFETIME BYPASS FOR deadnegzel61)
--- LOGO: GitHub raw link + fallback
+-- EMLOXA WARE PREMIUM UI v17.6 (FIXED LOGO, DAILY LIMIT GAMEPASSES)
 -- =========================================================================
 local EmloxaLibrary = {}
 
@@ -15,18 +14,35 @@ local SoundService = game:GetService("SoundService")
 local LocalPlayer = Players.LocalPlayer
 
 -- ══════════════════════════════════════
---  LOGO (GitHub raw + fallback)
+--  LOGO (GitHub raw + fallback via getcustomasset)
 -- ══════════════════════════════════════
 local LOGO_URL = "https://raw.githubusercontent.com/Emloxa-Loader/FJKEWLs34511GKWRN/refs/heads/main/foto.png"
-local FALLBACK_LOGO = "rbxassetid://107602224137000"  -- Yedek logo
+local FALLBACK_LOGO = "rbxassetid://107602224137000"
 
--- Resim yükleme fonksiyonu (hata alırsa yedeğe geçer)
 local function loadLogo(imageObject)
-    pcall(function()
-        imageObject.Image = LOGO_URL
+    local success, customAsset = pcall(function()
+        if writefile and getcustomasset then
+            local imgData
+            local req = (syn and syn.request) or (http and http.request) or request
+            if req then
+                local response = req({Url = LOGO_URL, Method = "GET"})
+                imgData = response.Body
+            elseif game.HttpGet then
+                imgData = game:HttpGet(LOGO_URL)
+            end
+            
+            if not imgData then error("Download failed") end
+            local fileName = "emloxa_logo.png"
+            writefile(fileName, imgData)
+            return getcustomasset(fileName)
+        else
+            error("getcustomasset not supported")
+        end
     end)
-    -- Eğer executor URL'i desteklemezse yedek logo kullan
-    if not pcall(function() return imageObject.Image end) then
+
+    if success and customAsset then
+        imageObject.Image = customAsset
+    else
         imageObject.Image = FALLBACK_LOGO
     end
 end
@@ -140,7 +156,7 @@ local function GetSavedConfigs()
 end
 
 -- ══════════════════════════════════════
---  HWID & TIME LIMIT
+--  HWID & DAILY LIMIT LOGIC
 -- ══════════════════════════════════════
 local function GetHWID()
     local clientID = ""
@@ -151,32 +167,15 @@ local function GetHWID()
     return clientID
 end
 
-local TimeDataFile = ConfigFolder .. "/.sys_limit.json"
+local TimeDataFile = ConfigFolder .. "/.sys_limit_daily.json"
 
 local CurrentHWIDData = {
     HWID = GetHWID(),
-    RemainingSeconds = 7200,
+    RemainingSeconds = 7200, -- Default 2 Hours
     LastResetDate = os.date("%Y-%m-%d"),
     IsLifetime = false,
-    ExtraBonusSeconds = 0
+    CurrentDailyLimit = 7200
 }
-
-local function LoadTimeData()
-    if isfile(TimeDataFile) then
-        pcall(function()
-            local json = readfile(TimeDataFile)
-            local decoded = HttpService:JSONDecode(json)
-            if decoded and decoded.HWID == GetHWID() then
-                local today = os.date("%Y-%m-%d")
-                if decoded.LastResetDate ~= today then
-                    decoded.RemainingSeconds = 7200 + (decoded.ExtraBonusSeconds or 0)
-                    decoded.LastResetDate = today
-                end
-                CurrentHWIDData = decoded
-            end
-        end)
-    end
-end
 
 local function SaveTimeData()
     pcall(function()
@@ -184,16 +183,58 @@ local function SaveTimeData()
     end)
 end
 
+local function LoadTimeData()
+    if isfile(TimeDataFile) then
+        pcall(function()
+            local json = readfile(TimeDataFile)
+            local decoded = HttpService:JSONDecode(json)
+            if decoded and decoded.HWID == GetHWID() then
+                CurrentHWIDData = decoded
+            end
+        end)
+    end
+end
+
 LoadTimeData()
 
+-- Check Gamepasses asynchronously
 task.spawn(function()
-    local success, hasPass = pcall(function()
-        return MarketplaceService:UserOwnsGamePassAsync(LocalPlayer.UserId, 1931252522)
+    local maxLimit = 7200
+    local isLife = false
+    
+    local success, results = pcall(function()
+        local p4 = MarketplaceService:UserOwnsGamePassAsync(LocalPlayer.UserId, 1940574828)
+        local p6 = MarketplaceService:UserOwnsGamePassAsync(LocalPlayer.UserId, 1940772812)
+        local p8 = MarketplaceService:UserOwnsGamePassAsync(LocalPlayer.UserId, 1942452785)
+        local pLife = MarketplaceService:UserOwnsGamePassAsync(LocalPlayer.UserId, 1931252522)
+        return {p4, p6, p8, pLife}
     end)
-    if success and hasPass then
-        CurrentHWIDData.IsLifetime = true
-        SaveTimeData()
+
+    if success then
+        if results[4] then isLife = true
+        elseif results[3] then maxLimit = 28800 -- 8 Hours
+        elseif results[2] then maxLimit = 21600 -- 6 Hours
+        elseif results[1] then maxLimit = 14400 -- 4 Hours
+        end
     end
+
+    local today = os.date("%Y-%m-%d")
+    
+    -- If it's a new day, reset to max limit
+    if CurrentHWIDData.LastResetDate ~= today then
+        CurrentHWIDData.RemainingSeconds = maxLimit
+        CurrentHWIDData.LastResetDate = today
+    else
+        -- If they bought a pass today and their limit increased, add the difference
+        if CurrentHWIDData.CurrentDailyLimit and CurrentHWIDData.CurrentDailyLimit < maxLimit then
+            local diff = maxLimit - CurrentHWIDData.CurrentDailyLimit
+            CurrentHWIDData.RemainingSeconds = CurrentHWIDData.RemainingSeconds + diff
+        end
+    end
+    
+    CurrentHWIDData.CurrentDailyLimit = maxLimit
+    CurrentHWIDData.IsLifetime = isLife
+    SaveTimeData()
 end)
 
 -- ══════════════════════════════════════
@@ -311,7 +352,7 @@ function EmloxaLibrary:CreateWindow(hubName)
     HubGui.IgnoreGuiInset = true
     HubGui.Parent = SafeParent
 
-    -- Open Icon (mini logo)
+    -- Open Icon
     local OpenIconFrame = Instance.new("Frame")
     OpenIconFrame.Name = "OpenIconFrame"
     OpenIconFrame.Size = UDim2.new(0, 55, 0, 55)
@@ -327,7 +368,7 @@ function EmloxaLibrary:CreateWindow(hubName)
     local OpenIcon = Instance.new("ImageButton")
     OpenIcon.Size = UDim2.new(1,0,1,0)
     OpenIcon.BackgroundTransparency = 1
-    loadLogo(OpenIcon)  -- Logo yükleme (yedekli)
+    loadLogo(OpenIcon)
     OpenIcon.ScaleType = Enum.ScaleType.Fit
     OpenIcon.Active = true
     OpenIcon.Parent = OpenIconFrame
@@ -363,7 +404,7 @@ function EmloxaLibrary:CreateWindow(hubName)
     local LoadLogo = Instance.new("ImageLabel")
     LoadLogo.Size = UDim2.new(1,0,1,0)
     LoadLogo.BackgroundTransparency = 1
-    loadLogo(LoadLogo)  -- Logo yükleme (yedekli)
+    loadLogo(LoadLogo)
     LoadLogo.ScaleType = Enum.ScaleType.Fit
     LoadLogo.Parent = LoadLogoContainer
 
@@ -455,7 +496,7 @@ function EmloxaLibrary:CreateWindow(hubName)
     TopLogo.Size = UDim2.new(0, 30, 0, 30)
     TopLogo.Position = UDim2.new(0, 8, 0.5, -15)
     TopLogo.BackgroundTransparency = 1
-    loadLogo(TopLogo)  -- Logo yükleme
+    loadLogo(TopLogo)
     TopLogo.ScaleType = Enum.ScaleType.Fit
     TopLogo.Parent = TopBar
 
@@ -499,7 +540,6 @@ function EmloxaLibrary:CreateWindow(hubName)
     Controls.BackgroundTransparency = 1
     Controls.Parent = TopBar
 
-    -- Time Widget
     local TimeIcon = Instance.new("TextLabel")
     TimeIcon.Size = UDim2.new(0, 24, 1, 0)
     TimeIcon.Position = UDim2.new(0, 6, 0, 0)
@@ -552,14 +592,51 @@ function EmloxaLibrary:CreateWindow(hubName)
         end
     end)
 
-    -- DEADNEGZEL61 ÖZEL: Süre uzatma her zaman çalışsın
     local function canPurchaseExtension()
         if LocalPlayer.Name == "deadnegzel61" then return true end
         return not CurrentHWIDData.IsLifetime
     end
 
+    local function ShowCopiedNotification(msg)
+        local Notif = Instance.new("Frame")
+        Notif.Size = UDim2.new(0, 300, 0, 70)
+        Notif.Position = UDim2.new(1, 10, 1, -80)
+        Notif.BackgroundColor3 = CurrentTheme.Panel
+        Notif.Active = true
+        Notif.ZIndex = 200
+        Notif.Parent = HubGui
+        createCorner(Notif,10)
+        createStroke(Notif, CurrentTheme.Primary, 2)
+        local TitleLabel = Instance.new("TextLabel")
+        TitleLabel.Text = "📋 Link Copied!"
+        TitleLabel.Font = Enum.Font.GothamBold
+        TitleLabel.TextSize = 14
+        TitleLabel.TextColor3 = CurrentTheme.Primary
+        TitleLabel.Size = UDim2.new(1,-20,0,20)
+        TitleLabel.Position = UDim2.new(0,10,0,8)
+        TitleLabel.BackgroundTransparency = 1
+        TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+        TitleLabel.Parent = Notif
+        local MsgLabel = Instance.new("TextLabel")
+        MsgLabel.Text = msg or "Buy via browser if the in-game prompt doesn't open."
+        MsgLabel.Font = Enum.Font.Gotham
+        MsgLabel.TextSize = 12
+        MsgLabel.TextColor3 = CurrentTheme.TextColor
+        MsgLabel.Size = UDim2.new(1,-20,0,30)
+        MsgLabel.Position = UDim2.new(0,10,0,32)
+        MsgLabel.BackgroundTransparency = 1
+        MsgLabel.TextXAlignment = Enum.TextXAlignment.Left
+        MsgLabel.TextWrapped = true
+        MsgLabel.Parent = Notif
+        TweenService:Create(Notif, TweenInfo.new(0.5,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Position = UDim2.new(1,-310,1,-80)}):Play()
+        task.wait(4)
+        TweenService:Create(Notif, TweenInfo.new(0.4), {Position = UDim2.new(1,10,1,-80)}):Play()
+        task.wait(0.4)
+        Notif:Destroy()
+    end
+
     local function OpenRechargeModal()
-        if not canPurchaseExtension() then return end -- deadnegzel61 değilse ve lifetime ise engelle
+        if not canPurchaseExtension() then return end
         local Overlay = Instance.new("Frame")
         Overlay.Size = UDim2.new(1,0,1,0)
         Overlay.BackgroundColor3 = Color3.new(0,0,0)
@@ -569,8 +646,8 @@ function EmloxaLibrary:CreateWindow(hubName)
         Overlay.Parent = HubGui
 
         local Modal = Instance.new("Frame")
-        Modal.Size = UDim2.new(0, 500, 0, 330)
-        Modal.Position = UDim2.new(0.5, -250, 0.5, -165)
+        Modal.Size = UDim2.new(0, 500, 0, 360)
+        Modal.Position = UDim2.new(0.5, -250, 0.5, -180)
         Modal.BackgroundColor3 = CurrentTheme.Panel
         Modal.ZIndex = 101
         Modal.Parent = Overlay
@@ -579,13 +656,21 @@ function EmloxaLibrary:CreateWindow(hubName)
         registerThemeable(Modal, {BackgroundColor3 = "Panel"})
 
         local MTitle = Instance.new("TextLabel")
-        MTitle.Text = "⚡ Extend Subscription Access"
+        MTitle.Text = "⚡ Upgrade Daily Limit"
         MTitle.Font = Enum.Font.GothamBlack; MTitle.TextSize = 16
         MTitle.TextColor3 = CurrentTheme.Primary
         MTitle.Size = UDim2.new(1,-40,0,30); MTitle.Position = UDim2.new(0,18,0,12)
         MTitle.BackgroundTransparency = 1; MTitle.TextXAlignment = Enum.TextXAlignment.Left
         MTitle.ZIndex = 102; MTitle.Parent = Modal
         registerThemeable(MTitle, {TextColor3 = "Primary"})
+
+        local MDesc = Instance.new("TextLabel")
+        MDesc.Text = "Buy a pass once to permanently increase your DAILY usage limit! Auto-selects highest tier."
+        MDesc.Font = Enum.Font.Gotham; MDesc.TextSize = 11
+        MDesc.TextColor3 = CurrentTheme.SubTextColor
+        MDesc.Size = UDim2.new(1,-40,0,20); MDesc.Position = UDim2.new(0,18,0,38)
+        MDesc.BackgroundTransparency = 1; MDesc.TextXAlignment = Enum.TextXAlignment.Left
+        MDesc.ZIndex = 102; MDesc.Parent = Modal
 
         local MClose = Instance.new("TextButton")
         MClose.Size = UDim2.new(0,28,0,28); MClose.Position = UDim2.new(1,-36,0,12)
@@ -597,7 +682,7 @@ function EmloxaLibrary:CreateWindow(hubName)
         MClose.MouseButton1Click:Connect(function() Overlay:Destroy() end)
 
         local Grid = Instance.new("Frame")
-        Grid.Size = UDim2.new(1,-36,1,-60); Grid.Position = UDim2.new(0,18,0,50)
+        Grid.Size = UDim2.new(1,-36,1,-80); Grid.Position = UDim2.new(0,18,0,70)
         Grid.BackgroundTransparency = 1
         Grid.ZIndex = 102; Grid.Parent = Modal
 
@@ -606,10 +691,10 @@ function EmloxaLibrary:CreateWindow(hubName)
         Layout.CellPadding = UDim2.new(0, 18, 0, 18)
 
         local Options = {
-            {Name = "1 Hour Pass", Price = "10 Robux", Sale = "20% SALE", ID = 3613048307, Type = "Product"},
-            {Name = "5 Hours Pass", Price = "35 Robux", Sale = "30% SALE", ID = 3613048436, Type = "Product"},
-            {Name = "10 Hours Pass", Price = "55 Robux", Sale = "45% SALE", ID = 3613048476, Type = "Product"},
-            {Name = "LIFETIME VIP", Price = "500 Robux", Sale = "70% BEST VALUE", ID = 1931252522, Type = "GamePass"}
+            {Name = "4 Hours Daily", Price = "25 Robux", Info = "+2 Hrs to Default", ID = 1940574828},
+            {Name = "6 Hours Daily", Price = "55 Robux", Info = "+4 Hrs to Default", ID = 1940772812},
+            {Name = "8 Hours Daily", Price = "70 Robux", Info = "+6 Hrs to Default", ID = 1942452785},
+            {Name = "LIFETIME VIP", Price = "250 Robux", Info = "Unlimited Usage", ID = 1931252522}
         }
 
         for _, opt in ipairs(Options) do
@@ -626,12 +711,12 @@ function EmloxaLibrary:CreateWindow(hubName)
             CName.TextXAlignment = Enum.TextXAlignment.Left
             CName.ZIndex = 104; CName.Parent = Card
 
-            local CSale = Instance.new("TextLabel")
-            CSale.Text = opt.Sale; CSale.Font = Enum.Font.GothamBlack; CSale.TextSize = 10
-            CSale.TextColor3 = CurrentTheme.Accent; CSale.Size = UDim2.new(1,-10,0,18)
-            CSale.Position = UDim2.new(0,8,0,30); CSale.BackgroundTransparency = 1
-            CSale.TextXAlignment = Enum.TextXAlignment.Left
-            CSale.ZIndex = 104; CSale.Parent = Card
+            local CInfo = Instance.new("TextLabel")
+            CInfo.Text = opt.Info; CInfo.Font = Enum.Font.GothamBlack; CInfo.TextSize = 10
+            CInfo.TextColor3 = CurrentTheme.Accent; CInfo.Size = UDim2.new(1,-10,0,18)
+            CInfo.Position = UDim2.new(0,8,0,30); CInfo.BackgroundTransparency = 1
+            CInfo.TextXAlignment = Enum.TextXAlignment.Left
+            CInfo.ZIndex = 104; CInfo.Parent = Card
 
             local BuyBtn = Instance.new("TextButton")
             BuyBtn.Size = UDim2.new(1,-16,0,34); BuyBtn.Position = UDim2.new(0,8,1,-42)
@@ -643,70 +728,40 @@ function EmloxaLibrary:CreateWindow(hubName)
 
             BuyBtn.MouseButton1Click:Connect(function()
                 pcall(function()
-                    if opt.Type == "Product" then
-                        MarketplaceService:PromptProductPurchase(LocalPlayer, opt.ID)
-                    elseif opt.Type == "GamePass" then
-                        MarketplaceService:PromptGamePassPurchase(LocalPlayer, opt.ID)
-                    end
+                    MarketplaceService:PromptGamePassPurchase(LocalPlayer, opt.ID)
                 end)
+                if setclipboard then
+                    setclipboard("https://www.roblox.com/game-pass/" .. tostring(opt.ID))
+                end
+                task.spawn(ShowCopiedNotification)
             end)
         end
     end
     PlusBtn.MouseButton1Click:Connect(OpenRechargeModal)
 
-    -- Purchase listeners (herkeste çalışır, deadnegzel61 dahil)
-    MarketplaceService.PromptProductPurchaseFinished:Connect(function(userId, productId, isPurchased)
-        if isPurchased and userId == LocalPlayer.UserId then
-            local amount = 0
-            if productId == 3613048307 then amount = 3600
-            elseif productId == 3613048436 then amount = 18000
-            elseif productId == 3613048476 then amount = 36000 end
-            if amount > 0 then
-                CurrentHWIDData.RemainingSeconds = CurrentHWIDData.RemainingSeconds + amount
-                CurrentHWIDData.ExtraBonusSeconds = CurrentHWIDData.ExtraBonusSeconds + amount
-                SaveTimeData()
-                playSound(128537772502751, 0.7)
-                local Notif = Instance.new("Frame")
-                Notif.Size = UDim2.new(0, 240, 0, 60)
-                Notif.Position = UDim2.new(1, 10, 1, -80)
-                Notif.BackgroundColor3 = CurrentTheme.Panel
-                Notif.Active = true
-                Notif.Parent = HubGui
-                createCorner(Notif,10)
-                createStroke(Notif, CurrentTheme.Primary,2)
-                local TitleLabel = Instance.new("TextLabel")
-                TitleLabel.Text = "Thank you!"
-                TitleLabel.Font = Enum.Font.GothamBold
-                TitleLabel.TextSize = 14
-                TitleLabel.TextColor3 = CurrentTheme.Primary
-                TitleLabel.Size = UDim2.new(1,-20,0,20)
-                TitleLabel.Position = UDim2.new(0,10,0,8)
-                TitleLabel.BackgroundTransparency = 1
-                TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-                TitleLabel.Parent = Notif
-                local MsgLabel = Instance.new("TextLabel")
-                MsgLabel.Text = "Time added: " .. tostring(math.floor(amount/3600)) .. " hours"
-                MsgLabel.Font = Enum.Font.Gotham
-                MsgLabel.TextSize = 12
-                MsgLabel.TextColor3 = CurrentTheme.TextColor
-                MsgLabel.Size = UDim2.new(1,-20,0,20)
-                MsgLabel.Position = UDim2.new(0,10,0,32)
-                MsgLabel.BackgroundTransparency = 1
-                MsgLabel.TextXAlignment = Enum.TextXAlignment.Left
-                MsgLabel.Parent = Notif
-                TweenService:Create(Notif, TweenInfo.new(0.5,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Position = UDim2.new(1,-250,1,-80)}):Play()
-                task.wait(3)
-                TweenService:Create(Notif, TweenInfo.new(0.4), {Position = UDim2.new(1,10,1,-80)}):Play()
-                task.wait(0.4)
-                Notif:Destroy()
-            end
-        end
-    end)
+    -- Gamepass Purchase Listener
     MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player, gamePassId, isPurchased)
-        if isPurchased and player == LocalPlayer and gamePassId == 1931252522 then
-            CurrentHWIDData.IsLifetime = true
+        if isPurchased and player == LocalPlayer then
+            local newLimit = nil
+            local wasLife = CurrentHWIDData.IsLifetime
+            
+            if gamePassId == 1931252522 then
+                CurrentHWIDData.IsLifetime = true
+                wasLife = true
+            elseif gamePassId == 1942452785 then newLimit = 28800
+            elseif gamePassId == 1940772812 then newLimit = 21600
+            elseif gamePassId == 1940574828 then newLimit = 14400
+            end
+
+            if not wasLife and newLimit and newLimit > CurrentHWIDData.CurrentDailyLimit then
+                local added = newLimit - CurrentHWIDData.CurrentDailyLimit
+                CurrentHWIDData.RemainingSeconds = CurrentHWIDData.RemainingSeconds + added
+                CurrentHWIDData.CurrentDailyLimit = newLimit
+            end
+            
             SaveTimeData()
             playSound(128537772502751, 0.7)
+            
             local Notif = Instance.new("Frame")
             Notif.Size = UDim2.new(0, 240, 0, 60)
             Notif.Position = UDim2.new(1, 10, 1, -80)
@@ -715,8 +770,9 @@ function EmloxaLibrary:CreateWindow(hubName)
             Notif.Parent = HubGui
             createCorner(Notif,10)
             createStroke(Notif, CurrentTheme.Primary,2)
+            
             local TitleLabel = Instance.new("TextLabel")
-            TitleLabel.Text = "Thank you!"
+            TitleLabel.Text = "Purchase Complete!"
             TitleLabel.Font = Enum.Font.GothamBold
             TitleLabel.TextSize = 14
             TitleLabel.TextColor3 = CurrentTheme.Primary
@@ -725,8 +781,13 @@ function EmloxaLibrary:CreateWindow(hubName)
             TitleLabel.BackgroundTransparency = 1
             TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
             TitleLabel.Parent = Notif
+            
             local MsgLabel = Instance.new("TextLabel")
-            MsgLabel.Text = "Lifetime VIP activated!"
+            if CurrentHWIDData.IsLifetime then
+                MsgLabel.Text = "Lifetime VIP activated!"
+            else
+                MsgLabel.Text = "Daily limit increased successfully!"
+            end
             MsgLabel.Font = Enum.Font.Gotham
             MsgLabel.TextSize = 12
             MsgLabel.TextColor3 = CurrentTheme.TextColor
@@ -735,6 +796,7 @@ function EmloxaLibrary:CreateWindow(hubName)
             MsgLabel.BackgroundTransparency = 1
             MsgLabel.TextXAlignment = Enum.TextXAlignment.Left
             MsgLabel.Parent = Notif
+            
             TweenService:Create(Notif, TweenInfo.new(0.5,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Position = UDim2.new(1,-250,1,-80)}):Play()
             task.wait(3)
             TweenService:Create(Notif, TweenInfo.new(0.4), {Position = UDim2.new(1,10,1,-80)}):Play()
@@ -858,7 +920,7 @@ function EmloxaLibrary:CreateWindow(hubName)
         end
     end)
 
-    -- SIDEBAR (centered text, animated underline)
+    -- SIDEBAR
     local TabContainer = Instance.new("Frame")
     TabContainer.Name = "TabContainer"
     TabContainer.Size = UDim2.new(0, 150, 1, -50)
@@ -903,17 +965,16 @@ function EmloxaLibrary:CreateWindow(hubName)
         TabBtn.Font = Enum.Font.GothamBold
         TabBtn.TextSize = 13
         TabBtn.TextColor3 = CurrentTheme.SubTextColor
-        TabBtn.TextXAlignment = Enum.TextXAlignment.Center  -- center text
+        TabBtn.TextXAlignment = Enum.TextXAlignment.Center
         TabBtn.BackgroundTransparency = 1
         TabBtn.LayoutOrder = layoutOrder or #Tabs
         TabBtn.Parent = TabContainer
         registerThemeable(TabBtn, {TextColor3 = "SubTextColor"})
 
-        -- Animated white underline
         local Indicator = Instance.new("Frame")
-        Indicator.Size = UDim2.new(0, 0, 0, 2)  -- starts with zero width
+        Indicator.Size = UDim2.new(0, 0, 0, 2)
         Indicator.AnchorPoint = Vector2.new(0.5, 1)
-        Indicator.Position = UDim2.new(0.5, 0, 1, 0)  -- bottom center
+        Indicator.Position = UDim2.new(0.5, 0, 1, 0)
         Indicator.BackgroundColor3 = Color3.new(1,1,1)
         Indicator.BorderSizePixel = 0
         Indicator.Parent = TabBtn
@@ -1459,7 +1520,7 @@ function EmloxaLibrary:CreateWindow(hubName)
         return TabSetup
     end
 
-    -- MENU TAB (with BG Music toggle)
+    -- MENU TAB
     local MenuTab = CreateTabInternal("Menu", 9999)
     
     MenuTab:CreateDropdown("Theme", EmloxaLibrary:GetThemeNames(), "Default", function(val)
