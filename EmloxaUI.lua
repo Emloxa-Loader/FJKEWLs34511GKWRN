@@ -1,5 +1,5 @@
 -- =========================================================================
--- EMLOXA WARE PREMIUM UI v17.7 (ANIMATED LOADING, ROUNDED LOGOS, NOTIF FIX)
+-- EMLOXA WARE PREMIUM UI v18.0 (SLEEK UI REDESIGN & CUSTOM MP3 BGM)
 -- =========================================================================
 local EmloxaLibrary = {}
 
@@ -14,26 +14,28 @@ local SoundService = game:GetService("SoundService")
 local LocalPlayer = Players.LocalPlayer
 
 -- ══════════════════════════════════════
---  LOGO (GitHub raw + fallback via getcustomasset)
+--  ASSET DOWNLOADER (Logo & Music)
 -- ══════════════════════════════════════
 local LOGO_URL = "https://raw.githubusercontent.com/Emloxa-Loader/FJKEWLs34511GKWRN/refs/heads/main/foto.png"
 local FALLBACK_LOGO = "rbxassetid://107602224137000"
 
-local function loadLogo(imageObject)
+local MUSIC_URL = "https://github.com/Emloxa-Loader/FJKEWLs34511GKWRN/raw/refs/heads/main/song.mp3"
+local FALLBACK_MUSIC = "rbxassetid://140348392510911"
+
+local function getDownloadedAsset(url, fileName, fallback)
     local success, customAsset = pcall(function()
         if writefile and getcustomasset then
-            local imgData
+            local assetData
             local req = (syn and syn.request) or (http and http.request) or request
             if req then
-                local response = req({Url = LOGO_URL, Method = "GET"})
-                imgData = response.Body
+                local response = req({Url = url, Method = "GET"})
+                assetData = response.Body
             elseif game.HttpGet then
-                imgData = game:HttpGet(LOGO_URL)
+                assetData = game:HttpGet(url)
             end
             
-            if not imgData then error("Download failed") end
-            local fileName = "emloxa_logo.png"
-            writefile(fileName, imgData)
+            if not assetData then error("Download failed") end
+            writefile(fileName, assetData)
             return getcustomasset(fileName)
         else
             error("getcustomasset not supported")
@@ -41,10 +43,14 @@ local function loadLogo(imageObject)
     end)
 
     if success and customAsset then
-        imageObject.Image = customAsset
+        return customAsset
     else
-        imageObject.Image = FALLBACK_LOGO
+        return fallback
     end
+end
+
+local function loadLogo(imageObject)
+    imageObject.Image = getDownloadedAsset(LOGO_URL, "emloxa_logo.png", FALLBACK_LOGO)
 end
 
 -- ══════════════════════════════════════
@@ -52,7 +58,12 @@ end
 -- ══════════════════════════════════════
 local function createSound(id, volume, looped, parent)
     local sound = Instance.new("Sound")
-    sound.SoundId = "rbxassetid://" .. tostring(id)
+    -- ID eğer rbxassetid:// içermiyorsa (özel asset ise) direkt ata
+    if string.find(tostring(id), "rbxasset") then
+        sound.SoundId = tostring(id)
+    else
+        sound.SoundId = "rbxassetid://" .. tostring(id)
+    end
     sound.Volume = volume or 0.5
     sound.Looped = looped or false
     sound.Parent = parent or SoundService
@@ -273,11 +284,11 @@ local Themes = {
 local CurrentTheme = Themes["Default"]
 
 local function createCorner(frame, radius)
-    local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0, radius or 8); c.Parent = frame
+    local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0, radius or 6); c.Parent = frame
     return c
 end
 local function createStroke(frame, color, thickness)
-    local s = Instance.new("UIStroke"); s.Color = color or CurrentTheme.Primary; s.Thickness = thickness or 2; s.Parent = frame
+    local s = Instance.new("UIStroke"); s.Color = color or CurrentTheme.Primary; s.Thickness = thickness or 1; s.Parent = frame
     return s
 end
 local function createShadow(parent, size, offset, trans)
@@ -358,7 +369,7 @@ function EmloxaLibrary:CreateWindow(hubName)
     OpenIconFrame.Visible = false
     OpenIconFrame.Active = true
     OpenIconFrame.Parent = HubGui
-    createCorner(OpenIconFrame, 14)
+    createCorner(OpenIconFrame, 12)
     local iconStroke = createStroke(OpenIconFrame, CurrentTheme.Primary, 2)
     registerThemeable(OpenIconFrame, {BackgroundColor3 = "Panel"})
 
@@ -369,7 +380,7 @@ function EmloxaLibrary:CreateWindow(hubName)
     OpenIcon.ScaleType = Enum.ScaleType.Fit
     OpenIcon.Active = true
     OpenIcon.Parent = OpenIconFrame
-    createCorner(OpenIcon, 14)
+    createCorner(OpenIcon, 12)
 
     RunService.RenderStepped:Connect(function()
         iconStroke.Color = Color3.fromHSV(tick()*0.3 % 1, 0.9, 1)
@@ -407,9 +418,9 @@ function EmloxaLibrary:CreateWindow(hubName)
     loadLogo(LoadLogo)
     LoadLogo.ScaleType = Enum.ScaleType.Fit
     LoadLogo.Parent = LoadLogoContainer
-    createCorner(LoadLogo, 16) -- Yuvarlatma eklendi
+    createCorner(LoadLogo, 16)
 
-    -- Yalandan şık yükleme animasyonu (Pulsing)
+    -- Pulse Animation
     local pulseTween = TweenService:Create(LoadLogoContainer, TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {Size = UDim2.new(0, 135, 0, 135)})
     pulseTween:Play()
 
@@ -463,13 +474,13 @@ function EmloxaLibrary:CreateWindow(hubName)
     -- MAIN FRAME
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
-    MainFrame.Size = UDim2.new(0, 690, 0, 460)
-    MainFrame.Position = UDim2.new(0.5, -345, 0.5, -230)
+    MainFrame.Size = UDim2.new(0, 710, 0, 480) -- Slightly widened for sleek UI
+    MainFrame.Position = UDim2.new(0.5, -355, 0.5, -240)
     MainFrame.BorderSizePixel = 0
     MainFrame.ClipsDescendants = true
     MainFrame.Active = true
     MainFrame.Parent = HubGui
-    createCorner(MainFrame, 14)
+    createCorner(MainFrame, 12)
     createStroke(MainFrame, CurrentTheme.Primary, 2)
     createShadow(MainFrame, UDim2.new(1,24,1,24), -12, 0.6)
     MainFrame.BackgroundColor3 = CurrentTheme.Background
@@ -491,7 +502,7 @@ function EmloxaLibrary:CreateWindow(hubName)
     TopBar.BorderSizePixel = 0
     TopBar.Active = true
     TopBar.Parent = MainFrame
-    createCorner(TopBar, 14)
+    createCorner(TopBar, 12)
     local topCover = Instance.new("Frame", TopBar)
     topCover.Size = UDim2.new(1,0,0.5,0)
     topCover.Position = UDim2.new(0,0,0.5,0)
@@ -499,16 +510,16 @@ function EmloxaLibrary:CreateWindow(hubName)
     topCover.BorderSizePixel = 0
     registerThemeable(TopBar, {BackgroundColor3 = "Panel"})
 
-    -- Top Logo (Rounded)
+    -- Top Logo
     local TopLogo = Instance.new("ImageLabel")
     TopLogo.Size = UDim2.new(0, 30, 0, 30)
-    TopLogo.Position = UDim2.new(0, 8, 0.5, -15)
+    TopLogo.Position = UDim2.new(0, 12, 0.5, -15)
     TopLogo.BackgroundTransparency = 1
     TopLogo.ClipsDescendants = true
     loadLogo(TopLogo)
     TopLogo.ScaleType = Enum.ScaleType.Fit
     TopLogo.Parent = TopBar
-    createCorner(TopLogo, 6) -- Köşeli logo yuvarlatıldı
+    createCorner(TopLogo, 6) 
 
     local Title = Instance.new("TextLabel")
     Title.Text = hubName
@@ -516,7 +527,7 @@ function EmloxaLibrary:CreateWindow(hubName)
     Title.TextSize = 15
     Title.TextXAlignment = Enum.TextXAlignment.Left
     Title.Size = UDim2.new(0, 150, 1, 0)
-    Title.Position = UDim2.new(0, 42, 0, 0)
+    Title.Position = UDim2.new(0, 52, 0, 0)
     Title.BackgroundTransparency = 1
     Title.Parent = TopBar
     RunService.RenderStepped:Connect(function()
@@ -608,7 +619,7 @@ function EmloxaLibrary:CreateWindow(hubName)
     end
 
     local function ShowCopiedNotification(msg)
-        playSound(131390520971848, 0.7) -- İstenen bildirim sesi
+        playSound(131390520971848, 0.7)
         local Notif = Instance.new("Frame")
         Notif.Size = UDim2.new(0, 300, 0, 70)
         Notif.Position = UDim2.new(1, 10, 1, -80)
@@ -628,7 +639,7 @@ function EmloxaLibrary:CreateWindow(hubName)
         TitleLabel.Position = UDim2.new(0,10,0,8)
         TitleLabel.BackgroundTransparency = 1
         TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-        TitleLabel.ZIndex = 205 -- Görünürlük sorunu çözüldü
+        TitleLabel.ZIndex = 205
         TitleLabel.Parent = Notif
         
         local MsgLabel = Instance.new("TextLabel")
@@ -641,7 +652,7 @@ function EmloxaLibrary:CreateWindow(hubName)
         MsgLabel.BackgroundTransparency = 1
         MsgLabel.TextXAlignment = Enum.TextXAlignment.Left
         MsgLabel.TextWrapped = true
-        MsgLabel.ZIndex = 205 -- Görünürlük sorunu çözüldü
+        MsgLabel.ZIndex = 205
         MsgLabel.Parent = Notif
         
         TweenService:Create(Notif, TweenInfo.new(0.5,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Position = UDim2.new(1,-310,1,-80)}):Play()
@@ -776,7 +787,7 @@ function EmloxaLibrary:CreateWindow(hubName)
             end
             
             SaveTimeData()
-            playSound(131390520971848, 0.7) -- Satın alım bildirimi için yeni ses
+            playSound(131390520971848, 0.7)
             
             local Notif = Instance.new("Frame")
             Notif.Size = UDim2.new(0, 240, 0, 60)
@@ -824,9 +835,11 @@ function EmloxaLibrary:CreateWindow(hubName)
         end
     end)
 
-    -- Background Music
-    local bgMusic = createSound(140348392510911, 0.3, true, HubGui)
+    -- Background Music (CUSTOM URL MP3)
+    local musicAssetId = getDownloadedAsset(MUSIC_URL, "emloxa_bgm.mp3", FALLBACK_MUSIC)
+    local bgMusic = createSound(musicAssetId, 0.25, true, HubGui)
     bgMusic.Name = "EmloxaBGMusic"
+    
     local bgMusicEnabled = true
     local bgMusicConfigFile = ConfigFolder .. "/.bgmusic.json"
     if isfile(bgMusicConfigFile) then
@@ -859,10 +872,10 @@ function EmloxaLibrary:CreateWindow(hubName)
 
     local CloseBtn = Instance.new("TextButton")
     CloseBtn.Size = UDim2.new(0,32,0,32)
-    CloseBtn.Position = UDim2.new(0,50,0.5,-16)
+    CloseBtn.Position = UDim2.new(0,44,0.5,-16)
     CloseBtn.Text = "X"
     CloseBtn.Font = Enum.Font.GothamBlack
-    CloseBtn.TextSize = 18
+    CloseBtn.TextSize = 16
     CloseBtn.TextColor3 = CurrentTheme.Accent
     CloseBtn.BackgroundColor3 = CurrentTheme.PanelLight
     CloseBtn.Parent = Controls
@@ -890,7 +903,7 @@ function EmloxaLibrary:CreateWindow(hubName)
     MinBtn.MouseButton1Click:Connect(function()
         isMinimized = not isMinimized
         playClickSound()
-        animateWindow(isMinimized and UDim2.new(0,690,0,50) or UDim2.new(0,690,0,460))
+        animateWindow(isMinimized and UDim2.new(0,710,0,50) or UDim2.new(0,710,0,480))
         TweenService:Create(MinBtn, TweenInfo.new(0.2), {TextColor3 = isMinimized and CurrentTheme.Primary or Color3.new(1,1,1)}):Play()
     end)
 
@@ -910,7 +923,7 @@ function EmloxaLibrary:CreateWindow(hubName)
         task.wait(0.25)
         OpenIconFrame.Visible = false
         MainFrame.Visible = true
-        animateWindow(isMinimized and UDim2.new(0,690,0,50) or UDim2.new(0,690,0,460))
+        animateWindow(isMinimized and UDim2.new(0,710,0,50) or UDim2.new(0,710,0,480))
     end)
 
     local dragging, dragStart, startPos = false, nil, nil
@@ -942,7 +955,7 @@ function EmloxaLibrary:CreateWindow(hubName)
     -- SIDEBAR
     local TabContainer = Instance.new("Frame")
     TabContainer.Name = "TabContainer"
-    TabContainer.Size = UDim2.new(0, 150, 1, -50)
+    TabContainer.Size = UDim2.new(0, 160, 1, -50)
     TabContainer.Position = UDim2.new(0, 0, 0, 50)
     TabContainer.BackgroundColor3 = CurrentTheme.Panel
     TabContainer.BorderSizePixel = 0
@@ -965,8 +978,8 @@ function EmloxaLibrary:CreateWindow(hubName)
     TabList.Parent = TabContainer
 
     local PageContainer = Instance.new("Frame")
-    PageContainer.Size = UDim2.new(1, -150, 1, -50)
-    PageContainer.Position = UDim2.new(0, 150, 0, 50)
+    PageContainer.Size = UDim2.new(1, -160, 1, -50)
+    PageContainer.Position = UDim2.new(0, 160, 0, 50)
     PageContainer.BackgroundTransparency = 1
     PageContainer.Active = true
     PageContainer.ClipsDescendants = true
@@ -979,7 +992,7 @@ function EmloxaLibrary:CreateWindow(hubName)
         local TabSetup = {}
 
         local TabBtn = Instance.new("TextButton")
-        TabBtn.Size = UDim2.new(1, 0, 0, 40)
+        TabBtn.Size = UDim2.new(1, 0, 0, 42)
         TabBtn.Text = tabName
         TabBtn.Font = Enum.Font.GothamBold
         TabBtn.TextSize = 13
@@ -1002,7 +1015,7 @@ function EmloxaLibrary:CreateWindow(hubName)
         PageScroll.Size = UDim2.new(1,0,1,0)
         PageScroll.BackgroundTransparency = 1
         PageScroll.BorderSizePixel = 0
-        PageScroll.ScrollBarThickness = 4
+        PageScroll.ScrollBarThickness = 3
         PageScroll.ScrollBarImageColor3 = CurrentTheme.Primary
         PageScroll.Active = true
         PageScroll.Visible = false
@@ -1011,16 +1024,16 @@ function EmloxaLibrary:CreateWindow(hubName)
 
         local PageLayout = Instance.new("UIListLayout")
         PageLayout.SortOrder = Enum.SortOrder.LayoutOrder
-        PageLayout.Padding = UDim.new(0,12)
+        PageLayout.Padding = UDim.new(0,10) -- Sleeker padding
         PageLayout.Parent = PageScroll
         Instance.new("UIPadding", PageScroll).PaddingTop = UDim.new(0,12)
-        Instance.new("UIPadding", PageScroll).PaddingLeft = UDim.new(0,15)
-        Instance.new("UIPadding", PageScroll).PaddingRight = UDim.new(0,15)
+        Instance.new("UIPadding", PageScroll).PaddingLeft = UDim.new(0,18)
+        Instance.new("UIPadding", PageScroll).PaddingRight = UDim.new(0,18)
 
         PageScroll.ChildAdded:Connect(function(child)
             if child:IsA("GuiObject") then
                 task.wait()
-                PageScroll.CanvasSize = UDim2.new(0,0,0,PageLayout.AbsoluteContentSize.Y + 20)
+                PageScroll.CanvasSize = UDim2.new(0,0,0,PageLayout.AbsoluteContentSize.Y + 24)
             end
         end)
 
@@ -1044,7 +1057,7 @@ function EmloxaLibrary:CreateWindow(hubName)
                 TweenService:Create(t.Btn, TweenInfo.new(0.3), {TextColor3 = CurrentTheme.SubTextColor}):Play()
             end
             PageScroll.Visible = true
-            TweenService:Create(Indicator, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, -20, 0, 2)}):Play()
+            TweenService:Create(Indicator, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, -30, 0, 2)}):Play()
             TweenService:Create(TabBtn, TweenInfo.new(0.3), {TextColor3 = Color3.new(1,1,1)}):Play()
         end)
 
@@ -1053,7 +1066,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 
         if #Pages == 1 then
             PageScroll.Visible = true
-            Indicator.Size = UDim2.new(1, -20, 0, 2)
+            Indicator.Size = UDim2.new(1, -30, 0, 2)
             TabBtn.TextColor3 = Color3.new(1,1,1)
         end
 
@@ -1063,23 +1076,25 @@ function EmloxaLibrary:CreateWindow(hubName)
             return baseName .. "_" .. elementCounter
         end
 
+        -- ==== REFINED SLEEK UI ELEMENTS ====
+
         function TabSetup:CreateToggle(name, callback)
             local id = generateId("toggle_" .. name)
             local ToggleFrame = Instance.new("Frame")
-            ToggleFrame.Size = UDim2.new(1,0,0,50)
+            ToggleFrame.Size = UDim2.new(1,0,0,42) -- Thinner
             ToggleFrame.BackgroundColor3 = CurrentTheme.PanelLight
             ToggleFrame.Active = true
             ToggleFrame.Parent = PageScroll
-            createCorner(ToggleFrame,8)
+            createCorner(ToggleFrame,6)
             createStroke(ToggleFrame, CurrentTheme.Primary, 1)
             registerThemeable(ToggleFrame, {BackgroundColor3 = "PanelLight"})
 
             local Label = Instance.new("TextLabel")
             Label.Size = UDim2.new(1,-80,1,0)
-            Label.Position = UDim2.new(0,15,0,0)
+            Label.Position = UDim2.new(0,14,0,0)
             Label.Text = name
             Label.Font = Enum.Font.GothamSemibold
-            Label.TextSize = 14
+            Label.TextSize = 13
             Label.TextColor3 = CurrentTheme.TextColor
             Label.TextXAlignment = Enum.TextXAlignment.Left
             Label.BackgroundTransparency = 1
@@ -1087,26 +1102,26 @@ function EmloxaLibrary:CreateWindow(hubName)
             registerThemeable(Label, {TextColor3 = "TextColor"})
 
             local Btn = Instance.new("TextButton")
-            Btn.Size = UDim2.new(0,50,0,26)
-            Btn.Position = UDim2.new(1,-65,0.5,-13)
+            Btn.Size = UDim2.new(0,42,0,22)
+            Btn.Position = UDim2.new(1,-56,0.5,-11)
             Btn.BackgroundColor3 = CurrentTheme.Panel
             Btn.Text = ""
             Btn.Parent = ToggleFrame
-            createCorner(Btn,13)
+            createCorner(Btn,11)
             registerThemeable(Btn, {BackgroundColor3 = "Panel"})
 
             local Circle = Instance.new("Frame")
-            Circle.Size = UDim2.new(0,20,0,20)
-            Circle.Position = UDim2.new(0,3,0.5,-10)
+            Circle.Size = UDim2.new(0,16,0,16)
+            Circle.Position = UDim2.new(0,3,0.5,-8)
             Circle.BackgroundColor3 = Color3.new(1,1,1)
             Circle.Parent = Btn
-            createCorner(Circle,10)
+            createCorner(Circle,8)
 
             local state = false
             ConfigValues[id] = state
             registerConfig(id, function(val)
                 state = val
-                local gPos = state and UDim2.new(1,-23,0.5,-10) or UDim2.new(0,3,0.5,-10)
+                local gPos = state and UDim2.new(1,-19,0.5,-8) or UDim2.new(0,3,0.5,-8)
                 local gCol = state and CurrentTheme.Primary or CurrentTheme.Panel
                 TweenService:Create(Circle, TweenInfo.new(0.3,Enum.EasingStyle.Quart,Enum.EasingDirection.Out), {Position = gPos}):Play()
                 TweenService:Create(Btn, TweenInfo.new(0.3), {BackgroundColor3 = gCol}):Play()
@@ -1130,20 +1145,20 @@ function EmloxaLibrary:CreateWindow(hubName)
         function TabSetup:CreatePremiumToggle(name, callback)
             local id = generateId("prem_toggle_" .. name)
             local ToggleFrame = Instance.new("Frame")
-            ToggleFrame.Size = UDim2.new(1,0,0,50)
+            ToggleFrame.Size = UDim2.new(1,0,0,42)
             ToggleFrame.BackgroundColor3 = CurrentTheme.PanelLight
             ToggleFrame.Active = true
             ToggleFrame.Parent = PageScroll
-            createCorner(ToggleFrame,8)
-            createStroke(ToggleFrame, Color3.fromRGB(255, 215, 0), 1.5)
+            createCorner(ToggleFrame,6)
+            createStroke(ToggleFrame, Color3.fromRGB(255, 215, 0), 1)
             registerThemeable(ToggleFrame, {BackgroundColor3 = "PanelLight"})
 
             local Label = Instance.new("TextLabel")
             Label.Size = UDim2.new(1,-110,1,0)
-            Label.Position = UDim2.new(0,15,0,0)
+            Label.Position = UDim2.new(0,14,0,0)
             Label.Text = name 
             Label.Font = Enum.Font.GothamBold
-            Label.TextSize = 14
+            Label.TextSize = 13
             Label.TextColor3 = CurrentTheme.TextColor
             Label.TextXAlignment = Enum.TextXAlignment.Left
             Label.BackgroundTransparency = 1
@@ -1151,8 +1166,8 @@ function EmloxaLibrary:CreateWindow(hubName)
             registerThemeable(Label, {TextColor3 = "TextColor"})
 
             local Badge = Instance.new("TextLabel")
-            Badge.Size = UDim2.new(0, 52, 0, 18)
-            Badge.Position = UDim2.new(1, -125, 0.5, -9)
+            Badge.Size = UDim2.new(0, 50, 0, 16)
+            Badge.Position = UDim2.new(1, -115, 0.5, -8)
             Badge.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
             Badge.Text = "PREMIUM"
             Badge.Font = Enum.Font.GothamBlack
@@ -1162,26 +1177,26 @@ function EmloxaLibrary:CreateWindow(hubName)
             createCorner(Badge, 4)
 
             local Btn = Instance.new("TextButton")
-            Btn.Size = UDim2.new(0,50,0,26)
-            Btn.Position = UDim2.new(1,-65,0.5,-13)
+            Btn.Size = UDim2.new(0,42,0,22)
+            Btn.Position = UDim2.new(1,-56,0.5,-11)
             Btn.BackgroundColor3 = CurrentTheme.Panel
             Btn.Text = ""
             Btn.Parent = ToggleFrame
-            createCorner(Btn,13)
+            createCorner(Btn,11)
             registerThemeable(Btn, {BackgroundColor3 = "Panel"})
 
             local Circle = Instance.new("Frame")
-            Circle.Size = UDim2.new(0,20,0,20)
-            Circle.Position = UDim2.new(0,3,0.5,-10)
+            Circle.Size = UDim2.new(0,16,0,16)
+            Circle.Position = UDim2.new(0,3,0.5,-8)
             Circle.BackgroundColor3 = Color3.new(1,1,1)
             Circle.Parent = Btn
-            createCorner(Circle,10)
+            createCorner(Circle,8)
 
             local state = false
             ConfigValues[id] = state
             registerConfig(id, function(val)
                 state = val
-                local gPos = state and UDim2.new(1,-23,0.5,-10) or UDim2.new(0,3,0.5,-10)
+                local gPos = state and UDim2.new(1,-19,0.5,-8) or UDim2.new(0,3,0.5,-8)
                 local gCol = state and Color3.fromRGB(255, 215, 0) or CurrentTheme.Panel
                 TweenService:Create(Circle, TweenInfo.new(0.3,Enum.EasingStyle.Quart,Enum.EasingDirection.Out), {Position = gPos}):Play()
                 TweenService:Create(Btn, TweenInfo.new(0.3), {BackgroundColor3 = gCol}):Play()
@@ -1205,20 +1220,20 @@ function EmloxaLibrary:CreateWindow(hubName)
         function TabSetup:CreateTextbox(name, placeholder, callback)
             local id = generateId("textbox_" .. name)
             local BoxFrame = Instance.new("Frame")
-            BoxFrame.Size = UDim2.new(1,0,0,48)
+            BoxFrame.Size = UDim2.new(1,0,0,42)
             BoxFrame.BackgroundColor3 = CurrentTheme.PanelLight
             BoxFrame.Active = true
             BoxFrame.Parent = PageScroll
-            createCorner(BoxFrame,8)
+            createCorner(BoxFrame,6)
             createStroke(BoxFrame, CurrentTheme.Primary, 1)
             registerThemeable(BoxFrame, {BackgroundColor3 = "PanelLight"})
 
             local Label = Instance.new("TextLabel")
             Label.Size = UDim2.new(0.5,0,1,0)
-            Label.Position = UDim2.new(0,15,0,0)
+            Label.Position = UDim2.new(0,14,0,0)
             Label.Text = name
             Label.Font = Enum.Font.GothamSemibold
-            Label.TextSize = 14
+            Label.TextSize = 13
             Label.TextColor3 = CurrentTheme.TextColor
             Label.TextXAlignment = Enum.TextXAlignment.Left
             Label.BackgroundTransparency = 1
@@ -1226,12 +1241,12 @@ function EmloxaLibrary:CreateWindow(hubName)
             registerThemeable(Label, {TextColor3 = "TextColor"})
 
             local TextBoxBg = Instance.new("Frame")
-            TextBoxBg.Size = UDim2.new(0.45, 0, 0, 32)
-            TextBoxBg.Position = UDim2.new(1, -15, 0.5, -16)
+            TextBoxBg.Size = UDim2.new(0.40, 0, 0, 26)
+            TextBoxBg.Position = UDim2.new(1, -12, 0.5, -13)
             TextBoxBg.AnchorPoint = Vector2.new(1, 0)
             TextBoxBg.BackgroundColor3 = CurrentTheme.Panel
             TextBoxBg.Parent = BoxFrame
-            createCorner(TextBoxBg, 6)
+            createCorner(TextBoxBg, 4)
             registerThemeable(TextBoxBg, {BackgroundColor3 = "Panel"})
 
             local TxtBox = Instance.new("TextBox")
@@ -1241,7 +1256,7 @@ function EmloxaLibrary:CreateWindow(hubName)
             TxtBox.Text = ""
             TxtBox.PlaceholderText = placeholder or "Type here..."
             TxtBox.Font = Enum.Font.Gotham
-            TxtBox.TextSize = 13
+            TxtBox.TextSize = 12
             TxtBox.TextColor3 = CurrentTheme.TextColor
             TxtBox.TextXAlignment = Enum.TextXAlignment.Left
             TxtBox.ClearTextOnFocus = false
@@ -1256,21 +1271,21 @@ function EmloxaLibrary:CreateWindow(hubName)
         function TabSetup:CreateDropdown(name, options, default, callback)
             local id = generateId("dropdown_" .. name)
             local DropdownFrame = Instance.new("Frame")
-            DropdownFrame.Size = UDim2.new(1,0,0,48)
+            DropdownFrame.Size = UDim2.new(1,0,0,42)
             DropdownFrame.BackgroundColor3 = CurrentTheme.PanelLight
             DropdownFrame.Active = true
             DropdownFrame.ClipsDescendants = true
             DropdownFrame.Parent = PageScroll
-            createCorner(DropdownFrame,8)
+            createCorner(DropdownFrame,6)
             createStroke(DropdownFrame, CurrentTheme.Primary, 1)
             registerThemeable(DropdownFrame, {BackgroundColor3 = "PanelLight"})
 
             local Label = Instance.new("TextLabel")
-            Label.Size = UDim2.new(1,-30,0,48)
-            Label.Position = UDim2.new(0,15,0,0)
+            Label.Size = UDim2.new(1,-30,0,42)
+            Label.Position = UDim2.new(0,14,0,0)
             Label.Text = name .. " : " .. tostring(default)
             Label.Font = Enum.Font.GothamSemibold
-            Label.TextSize = 14
+            Label.TextSize = 13
             Label.TextColor3 = CurrentTheme.TextColor
             Label.TextXAlignment = Enum.TextXAlignment.Left
             Label.BackgroundTransparency = 1
@@ -1278,14 +1293,14 @@ function EmloxaLibrary:CreateWindow(hubName)
             registerThemeable(Label, {TextColor3 = "TextColor"})
 
             local ToggleBtn = Instance.new("TextButton")
-            ToggleBtn.Size = UDim2.new(1,0,0,48)
+            ToggleBtn.Size = UDim2.new(1,0,0,42)
             ToggleBtn.BackgroundTransparency = 1
             ToggleBtn.Text = ""
             ToggleBtn.Parent = DropdownFrame
 
             local OptionContainer = Instance.new("Frame")
-            OptionContainer.Size = UDim2.new(1,0,1,-48)
-            OptionContainer.Position = UDim2.new(0,0,0,48)
+            OptionContainer.Size = UDim2.new(1,0,1,-42)
+            OptionContainer.Position = UDim2.new(0,0,0,42)
             OptionContainer.BackgroundTransparency = 1
             OptionContainer.Parent = DropdownFrame
             local UIListLayout = Instance.new("UIListLayout", OptionContainer)
@@ -1306,15 +1321,15 @@ function EmloxaLibrary:CreateWindow(hubName)
                 end
                 for _, option in ipairs(optList) do
                     local OptBtn = Instance.new("TextButton")
-                    OptBtn.Size = UDim2.new(1,0,0,34)
+                    OptBtn.Size = UDim2.new(1,0,0,30)
                     OptBtn.BackgroundColor3 = CurrentTheme.Panel
                     OptBtn.Text = "  " .. option
                     OptBtn.Font = Enum.Font.Gotham
-                    OptBtn.TextSize = 13
+                    OptBtn.TextSize = 12
                     OptBtn.TextColor3 = CurrentTheme.SubTextColor
                     OptBtn.TextXAlignment = Enum.TextXAlignment.Left
                     OptBtn.Parent = OptionContainer
-                    createCorner(OptBtn,6)
+                    createCorner(OptBtn,4)
                     registerThemeable(OptBtn, {BackgroundColor3 = "Panel", TextColor3 = "SubTextColor"})
 
                     OptBtn.MouseButton1Click:Connect(function()
@@ -1323,7 +1338,7 @@ function EmloxaLibrary:CreateWindow(hubName)
                         Label.Text = name .. " : " .. option
                         ConfigValues[id] = option
                         isDropped = false
-                        TweenService:Create(DropdownFrame, TweenInfo.new(0.3,Enum.EasingStyle.Quart,Enum.EasingDirection.Out), {Size = UDim2.new(1,0,0,48)}):Play()
+                        TweenService:Create(DropdownFrame, TweenInfo.new(0.3,Enum.EasingStyle.Quart,Enum.EasingDirection.Out), {Size = UDim2.new(1,0,0,42)}):Play()
                         TweenService:Create(Label, TweenInfo.new(0.2), {TextColor3 = CurrentTheme.TextColor}):Play()
                         callback(selectedValue)
                     end)
@@ -1344,7 +1359,7 @@ function EmloxaLibrary:CreateWindow(hubName)
                 isDropped = not isDropped
                 local childCount = 0
                 for _,v in pairs(OptionContainer:GetChildren()) do if v:IsA("TextButton") then childCount = childCount + 1 end end
-                local targetHeight = isDropped and (48 + (childCount * 34)) or 48
+                local targetHeight = isDropped and (42 + (childCount * 30)) or 42
                 TweenService:Create(DropdownFrame, TweenInfo.new(0.3,Enum.EasingStyle.Quart,Enum.EasingDirection.Out), {Size = UDim2.new(1,0,0,targetHeight)}):Play()
                 TweenService:Create(Label, TweenInfo.new(0.2), {TextColor3 = isDropped and CurrentTheme.Primary or CurrentTheme.TextColor}):Play()
             end)
@@ -1353,7 +1368,7 @@ function EmloxaLibrary:CreateWindow(hubName)
             function DropdownAPI:Refresh(newOptions)
                 BuildOptions(newOptions)
                 if isDropped then
-                    local targetHeight = 48 + (#newOptions * 34)
+                    local targetHeight = 42 + (#newOptions * 30)
                     TweenService:Create(DropdownFrame, TweenInfo.new(0.3), {Size = UDim2.new(1,0,0,targetHeight)}):Play()
                 end
             end
@@ -1363,20 +1378,20 @@ function EmloxaLibrary:CreateWindow(hubName)
         function TabSetup:CreateSlider(name, min, max, default, callback)
             local id = generateId("slider_" .. name)
             local SliderFrame = Instance.new("Frame")
-            SliderFrame.Size = UDim2.new(1,0,0,65)
+            SliderFrame.Size = UDim2.new(1,0,0,52) -- Thinner overall height
             SliderFrame.BackgroundColor3 = CurrentTheme.PanelLight
             SliderFrame.Active = true
             SliderFrame.Parent = PageScroll
-            createCorner(SliderFrame,8)
+            createCorner(SliderFrame,6)
             createStroke(SliderFrame, CurrentTheme.Primary, 1)
             registerThemeable(SliderFrame, {BackgroundColor3 = "PanelLight"})
 
             local Label = Instance.new("TextLabel")
-            Label.Size = UDim2.new(1,-50,0,25)
-            Label.Position = UDim2.new(0,15,0,8)
+            Label.Size = UDim2.new(1,-50,0,24)
+            Label.Position = UDim2.new(0,14,0,6)
             Label.Text = name
             Label.Font = Enum.Font.GothamSemibold
-            Label.TextSize = 14
+            Label.TextSize = 13
             Label.TextColor3 = CurrentTheme.TextColor
             Label.TextXAlignment = Enum.TextXAlignment.Left
             Label.BackgroundTransparency = 1
@@ -1384,11 +1399,11 @@ function EmloxaLibrary:CreateWindow(hubName)
             registerThemeable(Label, {TextColor3 = "TextColor"})
 
             local ValueText = Instance.new("TextLabel")
-            ValueText.Size = UDim2.new(0,50,0,25)
-            ValueText.Position = UDim2.new(1,-65,0,8)
+            ValueText.Size = UDim2.new(0,50,0,24)
+            ValueText.Position = UDim2.new(1,-60,0,6)
             ValueText.Text = tostring(default)
             ValueText.Font = Enum.Font.GothamBold
-            ValueText.TextSize = 14
+            ValueText.TextSize = 13
             ValueText.TextColor3 = CurrentTheme.Primary
             ValueText.TextXAlignment = Enum.TextXAlignment.Right
             ValueText.BackgroundTransparency = 1
@@ -1396,12 +1411,12 @@ function EmloxaLibrary:CreateWindow(hubName)
             registerThemeable(ValueText, {TextColor3 = "Primary"})
 
             local Bar = Instance.new("TextButton")
-            Bar.Size = UDim2.new(1,-30,0,8)
-            Bar.Position = UDim2.new(0,15,0,42)
+            Bar.Size = UDim2.new(1,-28,0,4) -- Thinner bar
+            Bar.Position = UDim2.new(0,14,0,36)
             Bar.BackgroundColor3 = CurrentTheme.Panel
             Bar.Text = ""
             Bar.Parent = SliderFrame
-            createCorner(Bar,4)
+            createCorner(Bar,2)
             registerThemeable(Bar, {BackgroundColor3 = "Panel"})
 
             local Fill = Instance.new("Frame")
@@ -1409,16 +1424,16 @@ function EmloxaLibrary:CreateWindow(hubName)
             Fill.Size = UDim2.new(defaultPercent,0,1,0)
             Fill.BackgroundColor3 = CurrentTheme.Primary
             Fill.Parent = Bar
-            createCorner(Fill,4)
+            createCorner(Fill,2)
             registerThemeable(Fill, {BackgroundColor3 = "Primary"})
 
             local Knob = Instance.new("Frame")
-            Knob.Size = UDim2.new(0,14,0,14)
-            Knob.Position = UDim2.new(defaultPercent, -7, 0.5, -7)
+            Knob.Size = UDim2.new(0,12,0,12) -- Smaller knob
+            Knob.Position = UDim2.new(defaultPercent, -6, 0.5, -6)
             Knob.BackgroundColor3 = Color3.new(1,1,1)
             Knob.BorderSizePixel = 0
             Knob.Parent = Bar
-            createCorner(Knob, 7)
+            createCorner(Knob, 6)
 
             local currentValue = default
             ConfigValues[id] = currentValue
@@ -1426,7 +1441,7 @@ function EmloxaLibrary:CreateWindow(hubName)
                 currentValue = math.clamp(val, min, max)
                 local percent = (currentValue - min) / (max - min)
                 Fill.Size = UDim2.new(percent,0,1,0)
-                Knob.Position = UDim2.new(percent, -7, 0.5, -7)
+                Knob.Position = UDim2.new(percent, -6, 0.5, -6)
                 ValueText.Text = tostring(currentValue)
                 callback(currentValue)
             end)
@@ -1450,7 +1465,7 @@ function EmloxaLibrary:CreateWindow(hubName)
                     currentValue = math.floor(min + ((max - min) * percent))
                     ConfigValues[id] = currentValue
                     Fill.Size = UDim2.new(percent,0,1,0)
-                    Knob.Position = UDim2.new(percent, -7, 0.5, -7)
+                    Knob.Position = UDim2.new(percent, -6, 0.5, -6)
                     ValueText.Text = tostring(currentValue)
                     callback(currentValue)
                 end
@@ -1459,24 +1474,24 @@ function EmloxaLibrary:CreateWindow(hubName)
 
         function TabSetup:CreateButton(name, callback)
             local Btn = Instance.new("TextButton")
-            Btn.Size = UDim2.new(1,0,0,42)
+            Btn.Size = UDim2.new(1,0,0,40)
             Btn.BackgroundColor3 = CurrentTheme.PanelLight
             Btn.Text = name
             Btn.Font = Enum.Font.GothamBold
-            Btn.TextSize = 15
+            Btn.TextSize = 14
             Btn.TextColor3 = CurrentTheme.TextColor
             Btn.Active = true
             Btn.Parent = PageScroll
-            createCorner(Btn,8)
+            createCorner(Btn,6)
             createStroke(Btn, CurrentTheme.Primary, 1)
             registerThemeable(Btn, {BackgroundColor3 = "PanelLight", TextColor3 = "TextColor"})
 
             Btn.MouseEnter:Connect(playHoverSound)
             Btn.MouseButton1Click:Connect(function()
                 playClickSound()
-                TweenService:Create(Btn, TweenInfo.new(0.1), {Size = UDim2.new(0.98,0,0,40), BackgroundColor3 = CurrentTheme.Primary}):Play()
+                TweenService:Create(Btn, TweenInfo.new(0.1), {Size = UDim2.new(0.98,0,0,38), BackgroundColor3 = CurrentTheme.Primary}):Play()
                 task.wait(0.1)
-                TweenService:Create(Btn, TweenInfo.new(0.2), {Size = UDim2.new(1,0,0,42), BackgroundColor3 = CurrentTheme.PanelLight}):Play()
+                TweenService:Create(Btn, TweenInfo.new(0.2), {Size = UDim2.new(1,0,0,40), BackgroundColor3 = CurrentTheme.PanelLight}):Play()
                 callback()
             end)
         end
@@ -1493,7 +1508,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 
         function TabSetup:CreateNotification(title, message, duration)
             duration = duration or 2
-            playSound(131390520971848, 0.7) -- İstenen bildirim sesi
+            playSound(131390520971848, 0.7) 
             
             local Notif = Instance.new("Frame")
             Notif.Size = UDim2.new(0, 250, 0, 70)
