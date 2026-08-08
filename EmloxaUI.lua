@@ -1,5 +1,5 @@
 -- =========================================================================
--- EMLOXA WARE PREMIUM UI v17.6 (FIXED LOGO, DAILY LIMIT GAMEPASSES)
+-- EMLOXA WARE PREMIUM UI v17.7 (ANIMATED LOADING, ROUNDED LOGOS, NOTIF FIX)
 -- =========================================================================
 local EmloxaLibrary = {}
 
@@ -197,7 +197,6 @@ end
 
 LoadTimeData()
 
--- Check Gamepasses asynchronously
 task.spawn(function()
     local maxLimit = 7200
     local isLife = false
@@ -220,12 +219,10 @@ task.spawn(function()
 
     local today = os.date("%Y-%m-%d")
     
-    -- If it's a new day, reset to max limit
     if CurrentHWIDData.LastResetDate ~= today then
         CurrentHWIDData.RemainingSeconds = maxLimit
         CurrentHWIDData.LastResetDate = today
     else
-        -- If they bought a pass today and their limit increased, add the difference
         if CurrentHWIDData.CurrentDailyLimit and CurrentHWIDData.CurrentDailyLimit < maxLimit then
             local diff = maxLimit - CurrentHWIDData.CurrentDailyLimit
             CurrentHWIDData.RemainingSeconds = CurrentHWIDData.RemainingSeconds + diff
@@ -378,7 +375,7 @@ function EmloxaLibrary:CreateWindow(hubName)
         iconStroke.Color = Color3.fromHSV(tick()*0.3 % 1, 0.9, 1)
     end)
 
-    -- LOADING SCREEN
+    -- LOADING SCREEN (With Animations and UI Corners)
     local LoadingFrame = Instance.new("Frame")
     LoadingFrame.Name = "LoadingFrame"
     LoadingFrame.Size = UDim2.new(1,0,1,0)
@@ -399,14 +396,22 @@ function EmloxaLibrary:CreateWindow(hubName)
     LoadLogoContainer.Size = UDim2.new(0, 120, 0, 120)
     LoadLogoContainer.Position = UDim2.new(0.5, -60, 0.4, -60)
     LoadLogoContainer.BackgroundTransparency = 1
+    LoadLogoContainer.AnchorPoint = Vector2.new(0.5, 0.5)
+    LoadLogoContainer.Position = UDim2.new(0.5, 0, 0.4, 0)
     LoadLogoContainer.Parent = LoadingFrame
 
     local LoadLogo = Instance.new("ImageLabel")
     LoadLogo.Size = UDim2.new(1,0,1,0)
     LoadLogo.BackgroundTransparency = 1
+    LoadLogo.ClipsDescendants = true
     loadLogo(LoadLogo)
     LoadLogo.ScaleType = Enum.ScaleType.Fit
     LoadLogo.Parent = LoadLogoContainer
+    createCorner(LoadLogo, 16) -- Yuvarlatma eklendi
+
+    -- Yalandan şık yükleme animasyonu (Pulsing)
+    local pulseTween = TweenService:Create(LoadLogoContainer, TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {Size = UDim2.new(0, 135, 0, 135)})
+    pulseTween:Play()
 
     local Spinner = Instance.new("Frame")
     Spinner.Size = UDim2.new(0, 50, 0, 50)
@@ -444,8 +449,10 @@ function EmloxaLibrary:CreateWindow(hubName)
     end)
 
     playSound(3320590485, 0.5)
-    task.wait(2)
+    task.wait(2.5)
     for _, conn in ipairs(loadingConnections) do conn:Disconnect() end
+    pulseTween:Cancel()
+    
     TweenService:Create(LoadingFrame, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
     TweenService:Create(LoadLogo, TweenInfo.new(0.5), {ImageTransparency = 1}):Play()
     TweenService:Create(LoadText, TweenInfo.new(0.5), {TextTransparency = 1}):Play()
@@ -492,13 +499,16 @@ function EmloxaLibrary:CreateWindow(hubName)
     topCover.BorderSizePixel = 0
     registerThemeable(TopBar, {BackgroundColor3 = "Panel"})
 
+    -- Top Logo (Rounded)
     local TopLogo = Instance.new("ImageLabel")
     TopLogo.Size = UDim2.new(0, 30, 0, 30)
     TopLogo.Position = UDim2.new(0, 8, 0.5, -15)
     TopLogo.BackgroundTransparency = 1
+    TopLogo.ClipsDescendants = true
     loadLogo(TopLogo)
     TopLogo.ScaleType = Enum.ScaleType.Fit
     TopLogo.Parent = TopBar
+    createCorner(TopLogo, 6) -- Köşeli logo yuvarlatıldı
 
     local Title = Instance.new("TextLabel")
     Title.Text = hubName
@@ -598,6 +608,7 @@ function EmloxaLibrary:CreateWindow(hubName)
     end
 
     local function ShowCopiedNotification(msg)
+        playSound(131390520971848, 0.7) -- İstenen bildirim sesi
         local Notif = Instance.new("Frame")
         Notif.Size = UDim2.new(0, 300, 0, 70)
         Notif.Position = UDim2.new(1, 10, 1, -80)
@@ -607,6 +618,7 @@ function EmloxaLibrary:CreateWindow(hubName)
         Notif.Parent = HubGui
         createCorner(Notif,10)
         createStroke(Notif, CurrentTheme.Primary, 2)
+        
         local TitleLabel = Instance.new("TextLabel")
         TitleLabel.Text = "📋 Link Copied!"
         TitleLabel.Font = Enum.Font.GothamBold
@@ -616,7 +628,9 @@ function EmloxaLibrary:CreateWindow(hubName)
         TitleLabel.Position = UDim2.new(0,10,0,8)
         TitleLabel.BackgroundTransparency = 1
         TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+        TitleLabel.ZIndex = 205 -- Görünürlük sorunu çözüldü
         TitleLabel.Parent = Notif
+        
         local MsgLabel = Instance.new("TextLabel")
         MsgLabel.Text = msg or "Buy via browser if the in-game prompt doesn't open."
         MsgLabel.Font = Enum.Font.Gotham
@@ -627,7 +641,9 @@ function EmloxaLibrary:CreateWindow(hubName)
         MsgLabel.BackgroundTransparency = 1
         MsgLabel.TextXAlignment = Enum.TextXAlignment.Left
         MsgLabel.TextWrapped = true
+        MsgLabel.ZIndex = 205 -- Görünürlük sorunu çözüldü
         MsgLabel.Parent = Notif
+        
         TweenService:Create(Notif, TweenInfo.new(0.5,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Position = UDim2.new(1,-310,1,-80)}):Play()
         task.wait(4)
         TweenService:Create(Notif, TweenInfo.new(0.4), {Position = UDim2.new(1,10,1,-80)}):Play()
@@ -760,13 +776,14 @@ function EmloxaLibrary:CreateWindow(hubName)
             end
             
             SaveTimeData()
-            playSound(128537772502751, 0.7)
+            playSound(131390520971848, 0.7) -- Satın alım bildirimi için yeni ses
             
             local Notif = Instance.new("Frame")
             Notif.Size = UDim2.new(0, 240, 0, 60)
             Notif.Position = UDim2.new(1, 10, 1, -80)
             Notif.BackgroundColor3 = CurrentTheme.Panel
             Notif.Active = true
+            Notif.ZIndex = 200
             Notif.Parent = HubGui
             createCorner(Notif,10)
             createStroke(Notif, CurrentTheme.Primary,2)
@@ -780,6 +797,7 @@ function EmloxaLibrary:CreateWindow(hubName)
             TitleLabel.Position = UDim2.new(0,10,0,8)
             TitleLabel.BackgroundTransparency = 1
             TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+            TitleLabel.ZIndex = 205
             TitleLabel.Parent = Notif
             
             local MsgLabel = Instance.new("TextLabel")
@@ -795,6 +813,7 @@ function EmloxaLibrary:CreateWindow(hubName)
             MsgLabel.Position = UDim2.new(0,10,0,32)
             MsgLabel.BackgroundTransparency = 1
             MsgLabel.TextXAlignment = Enum.TextXAlignment.Left
+            MsgLabel.ZIndex = 205
             MsgLabel.Parent = Notif
             
             TweenService:Create(Notif, TweenInfo.new(0.5,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Position = UDim2.new(1,-250,1,-80)}):Play()
@@ -1474,11 +1493,14 @@ function EmloxaLibrary:CreateWindow(hubName)
 
         function TabSetup:CreateNotification(title, message, duration)
             duration = duration or 2
+            playSound(131390520971848, 0.7) -- İstenen bildirim sesi
+            
             local Notif = Instance.new("Frame")
             Notif.Size = UDim2.new(0, 250, 0, 70)
             Notif.Position = UDim2.new(1, 10, 1, -80)
             Notif.BackgroundColor3 = CurrentTheme.Panel
             Notif.Active = true
+            Notif.ZIndex = 200
             Notif.Parent = HubGui
             createCorner(Notif,10)
             createStroke(Notif, CurrentTheme.Primary,2)
@@ -1494,6 +1516,7 @@ function EmloxaLibrary:CreateWindow(hubName)
             TitleLabel.Position = UDim2.new(0,10,0,8)
             TitleLabel.BackgroundTransparency = 1
             TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+            TitleLabel.ZIndex = 205
             TitleLabel.Parent = Notif
             registerThemeable(TitleLabel, {TextColor3 = "Primary"})
 
@@ -1507,6 +1530,7 @@ function EmloxaLibrary:CreateWindow(hubName)
             MsgLabel.BackgroundTransparency = 1
             MsgLabel.TextXAlignment = Enum.TextXAlignment.Left
             MsgLabel.TextWrapped = true
+            MsgLabel.ZIndex = 205
             MsgLabel.Parent = Notif
             registerThemeable(MsgLabel, {TextColor3 = "TextColor"})
 
