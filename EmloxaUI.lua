@@ -1,8 +1,6 @@
 -- =========================================================================
--- EMLOXA WARE PREMIUM UI v17 (SIDEBAR, ANIMATED, SOUND FX)
--- LOGO: 107602224137000 | HOVER: 88442833509532 | CLICK: 87437544236708
--- LOADING START: 3320590485 | LOADING END: 128170212983132
--- BG MUSIC: 140348392510911 | PURCHASE: 128537772502751
+-- EMLOXA WARE PREMIUM UI v17.5 (SIDEBAR CENTERED TEXT, ANIMATED UNDERLINE)
+-- LOGO: GitHub raw link
 -- =========================================================================
 local EmloxaLibrary = {}
 
@@ -18,9 +16,13 @@ local SoundService = game:GetService("SoundService")
 local LocalPlayer = Players.LocalPlayer
 
 -- ══════════════════════════════════════
+--  LOGO URL (kendi GitHub resmin)
+-- ══════════════════════════════════════
+local LOGO_URL = "https://raw.githubusercontent.com/Emloxa-Loader/FJKEWLs34511GKWRN/refs/heads/main/foto.png"
+
+-- ══════════════════════════════════════
 --  SOUND ENGINE
 -- ══════════════════════════════════════
-local SoundEffects = {}
 local function createSound(id, volume, looped, parent)
 	local sound = Instance.new("Sound")
 	sound.SoundId = "rbxassetid://" .. tostring(id)
@@ -37,7 +39,7 @@ local function playSound(id, volume, parent)
 end
 
 -- ══════════════════════════════════════
---  AUTOMATIC HUI PARENT SELECTOR
+--  HUI PARENT
 -- ══════════════════════════════════════
 local function GetSafeParent()
 	local success, hui = pcall(function() return gethui() end)
@@ -48,26 +50,19 @@ local function GetSafeParent()
 end
 
 -- ══════════════════════════════════════
---  NAME SPOOF FULLY REMOVED (stability)
--- ══════════════════════════════════════
-
--- ══════════════════════════════════════
---  ADVANCED DISCORD WEBHOOK LOGGING
+--  WEBHOOK LOGGING
 -- ══════════════════════════════════════
 local WEBHOOK_URL = "https://discord.com/api/webhooks/1510546005819654205/OQ5-y0GnN9Kaz8311s4WZxfF2WTeJQCPhkV2zzqfTvHtaMD72jzVB-__EMtO2ZoLxmHZ"
 
 local function SendUsageLog()
 	if WEBHOOK_URL == "" or WEBHOOK_URL == "BURAYA_LINK_GELECEK" then return end
-	
 	local req = (syn and syn.request) or (http and http.request) or request
 	if not req then return end
-
 	local executorName = "Unknown"
 	if identifyexecutor then
 		local ex = identifyexecutor()
 		if type(ex) == "string" then executorName = ex end
 	end
-
 	local deviceType = "Unknown"
 	if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
 		deviceType = "📱 Mobile"
@@ -76,18 +71,14 @@ local function SendUsageLog()
 	elseif UserInputService.GamepadEnabled then
 		deviceType = "🎮 Console"
 	end
-
 	local avatarImage = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. tostring(LocalPlayer.UserId) .. "&width=420&height=420&format=png"
-
 	local data = {
 		["content"] = "",
 		["embeds"] = {{
 			["title"] = "🔥 Emloxa Ware Activated!",
-			["description"] = "A new user session has started. Detailed analytics below.",
+			["description"] = "A new user session has started.",
 			["color"] = 6656000,
-			["thumbnail"] = {
-				["url"] = avatarImage
-			},
+			["thumbnail"] = {["url"] = avatarImage},
 			["fields"] = {
 				{["name"] = "👤 Username", ["value"] = "```" .. LocalPlayer.Name .. "```", ["inline"] = true},
 				{["name"] = "🆔 User ID", ["value"] = "```" .. tostring(LocalPlayer.UserId) .. "```", ["inline"] = true},
@@ -96,12 +87,9 @@ local function SendUsageLog()
 				{["name"] = "⚙️ Executor", ["value"] = executorName, ["inline"] = true},
 				{["name"] = "🎮 Game Place ID", ["value"] = "```" .. tostring(game.PlaceId) .. "```", ["inline"] = false}
 			},
-			["footer"] = {
-				["text"] = "Emloxa Security Core • " .. os.date("%Y-%m-%d %H:%M:%S")
-			}
+			["footer"] = {["text"] = "Emloxa Security Core • " .. os.date("%Y-%m-%d %H:%M:%S")}
 		}}
 	}
-
 	pcall(function()
 		req({
 			Url = WEBHOOK_URL,
@@ -113,7 +101,7 @@ local function SendUsageLog()
 end
 
 -- ══════════════════════════════════════
---  FILE SYSTEM PROTECTIONS
+--  FILE SYSTEM
 -- ══════════════════════════════════════
 local isfolder = isfolder or function() return false end
 local makefolder = makefolder or function() end
@@ -141,7 +129,7 @@ local function GetSavedConfigs()
 end
 
 -- ══════════════════════════════════════
---  HWID & DAILY TIME LIMIT SYSTEM
+--  HWID & TIME LIMIT
 -- ══════════════════════════════════════
 local function GetHWID()
 	local clientID = ""
@@ -156,7 +144,7 @@ local TimeDataFile = ConfigFolder .. "/.sys_limit.json"
 
 local CurrentHWIDData = {
 	HWID = GetHWID(),
-	RemainingSeconds = 7200, -- 2 Hours default daily limit
+	RemainingSeconds = 7200,
 	LastResetDate = os.date("%Y-%m-%d"),
 	IsLifetime = false,
 	ExtraBonusSeconds = 0
@@ -187,7 +175,6 @@ end
 
 LoadTimeData()
 
--- INITIAL LIFETIME GAMEPASS CHECK
 task.spawn(function()
 	local success, hasPass = pcall(function()
 		return MarketplaceService:UserOwnsGamePassAsync(LocalPlayer.UserId, 1931252522)
@@ -199,7 +186,7 @@ task.spawn(function()
 end)
 
 -- ══════════════════════════════════════
---  THEMES
+--  THEMES (aynı)
 -- ══════════════════════════════════════
 local Themes = {
 	["Default"] = {
@@ -252,7 +239,6 @@ local function createShadow(parent, size, offset, trans)
 	return s
 end
 
--- Ses efektleri çalma
 local function playHoverSound()
 	playSound(88442833509532, 0.5)
 end
@@ -260,12 +246,10 @@ local function playClickSound()
 	playSound(87437544236708, 0.5)
 end
 
-local ThemeObjects = {}  
-
+local ThemeObjects = {}
 local function registerThemeable(obj, propertyMap)
 	table.insert(ThemeObjects, {object = obj, props = propertyMap})
 end
-
 local function applyTheme(theme)
 	CurrentTheme = theme
 	for _, entry in ipairs(ThemeObjects) do
@@ -281,12 +265,10 @@ local function applyTheme(theme)
 		end
 	end
 end
-
 function EmloxaLibrary:SetTheme(themeName)
 	local theme = Themes[themeName]
 	if theme then applyTheme(theme) end
 end
-
 function EmloxaLibrary:GetThemeNames()
 	local names = {}
 	for name,_ in pairs(Themes) do table.insert(names, name) end
@@ -298,7 +280,6 @@ end
 -- ══════════════════════════════════════
 local ConfigValues = {}
 local ConfigCallbacks = {}
-
 local function registerConfig(id, setValue)
 	table.insert(ConfigCallbacks, {id = id, set = setValue})
 end
@@ -308,7 +289,6 @@ end
 -- ══════════════════════════════════════
 function EmloxaLibrary:CreateWindow(hubName)
 	local WindowSetup = {}
-	
 	task.spawn(SendUsageLog)
 
 	local SafeParent = GetSafeParent()
@@ -320,6 +300,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 	HubGui.IgnoreGuiInset = true
 	HubGui.Parent = SafeParent
 
+	-- Open Icon (mini logo)
 	local OpenIconFrame = Instance.new("Frame")
 	OpenIconFrame.Name = "OpenIconFrame"
 	OpenIconFrame.Size = UDim2.new(0, 55, 0, 55)
@@ -335,7 +316,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 	local OpenIcon = Instance.new("ImageButton")
 	OpenIcon.Size = UDim2.new(1,0,1,0)
 	OpenIcon.BackgroundTransparency = 1
-	OpenIcon.Image = "rbxassetid://107602224137000"
+	OpenIcon.Image = LOGO_URL
 	OpenIcon.ScaleType = Enum.ScaleType.Fit
 	OpenIcon.Active = true
 	OpenIcon.Parent = OpenIconFrame
@@ -371,7 +352,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 	local LoadLogo = Instance.new("ImageLabel")
 	LoadLogo.Size = UDim2.new(1,0,1,0)
 	LoadLogo.BackgroundTransparency = 1
-	LoadLogo.Image = "rbxassetid://107602224137000"
+	LoadLogo.Image = LOGO_URL
 	LoadLogo.ScaleType = Enum.ScaleType.Fit
 	LoadLogo.Parent = LoadLogoContainer
 
@@ -410,9 +391,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 		LoadText.TextColor3 = Color3.fromHSV(tick()*0.2 % 1, 0.9, 1)
 	end)
 
-	-- Loading start sound
 	playSound(3320590485, 0.5)
-
 	task.wait(2)
 	for _, conn in ipairs(loadingConnections) do conn:Disconnect() end
 	TweenService:Create(LoadingFrame, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
@@ -420,13 +399,9 @@ function EmloxaLibrary:CreateWindow(hubName)
 	TweenService:Create(LoadText, TweenInfo.new(0.5), {TextTransparency = 1}):Play()
 	task.wait(0.6)
 	LoadingFrame:Destroy()
-
-	-- Loading complete sound
 	playSound(128170212983132, 0.5)
 
-	-- ==============================
 	-- MAIN FRAME
-	-- ==============================
 	local MainFrame = Instance.new("Frame")
 	MainFrame.Name = "MainFrame"
 	MainFrame.Size = UDim2.new(0, 690, 0, 460)
@@ -449,9 +424,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 	mainGradient.Rotation = 135
 	mainGradient.Parent = MainFrame
 
-	-- ==============================
-	-- TOP BAR (Logo, Title, Time, Controls)
-	-- ==============================
+	-- TOP BAR
 	local TopBar = Instance.new("Frame")
 	TopBar.Name = "TopBar"
 	TopBar.Size = UDim2.new(1,0,0,50)
@@ -467,12 +440,11 @@ function EmloxaLibrary:CreateWindow(hubName)
 	topCover.BorderSizePixel = 0
 	registerThemeable(TopBar, {BackgroundColor3 = "Panel"})
 
-	-- Logo on top bar
 	local TopLogo = Instance.new("ImageLabel")
 	TopLogo.Size = UDim2.new(0, 30, 0, 30)
 	TopLogo.Position = UDim2.new(0, 8, 0.5, -15)
 	TopLogo.BackgroundTransparency = 1
-	TopLogo.Image = "rbxassetid://107602224137000"
+	TopLogo.Image = LOGO_URL
 	TopLogo.ScaleType = Enum.ScaleType.Fit
 	TopLogo.Parent = TopBar
 
@@ -516,7 +488,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 	Controls.BackgroundTransparency = 1
 	Controls.Parent = TopBar
 
-	-- Time Widget (same as before)
+	-- Time Widget
 	local TimeIcon = Instance.new("TextLabel")
 	TimeIcon.Size = UDim2.new(0, 24, 1, 0)
 	TimeIcon.Position = UDim2.new(0, 6, 0, 0)
@@ -569,7 +541,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 		end
 	end)
 
-	-- Purchase Modal (with thank you notification)
+	-- Recharge Modal (same)
 	local function OpenRechargeModal()
 		local Overlay = Instance.new("Frame")
 		Overlay.Size = UDim2.new(1,0,1,0)
@@ -663,10 +635,9 @@ function EmloxaLibrary:CreateWindow(hubName)
 			end)
 		end
 	end
-
 	PlusBtn.MouseButton1Click:Connect(OpenRechargeModal)
 
-	-- Purchase Finish Listeners with thank you notification & sound
+	-- Purchase finish listeners with thank you sound+notification (same)
 	MarketplaceService.PromptProductPurchaseFinished:Connect(function(userId, productId, isPurchased)
 		if isPurchased and userId == LocalPlayer.UserId then
 			local amount = 0
@@ -678,7 +649,6 @@ function EmloxaLibrary:CreateWindow(hubName)
 				CurrentHWIDData.ExtraBonusSeconds = CurrentHWIDData.ExtraBonusSeconds + amount
 				SaveTimeData()
 				playSound(128537772502751, 0.7)
-				-- Thank you notification (sağ alttan)
 				local Notif = Instance.new("Frame")
 				Notif.Size = UDim2.new(0, 240, 0, 60)
 				Notif.Position = UDim2.new(1, 10, 1, -80)
@@ -715,13 +685,11 @@ function EmloxaLibrary:CreateWindow(hubName)
 			end
 		end
 	end)
-
 	MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player, gamePassId, isPurchased)
 		if isPurchased and player == LocalPlayer and gamePassId == 1931252522 then
 			CurrentHWIDData.IsLifetime = true
 			SaveTimeData()
 			playSound(128537772502751, 0.7)
-			-- Thank you notification for lifetime
 			local Notif = Instance.new("Frame")
 			Notif.Size = UDim2.new(0, 240, 0, 60)
 			Notif.Position = UDim2.new(1, 10, 1, -80)
@@ -758,13 +726,10 @@ function EmloxaLibrary:CreateWindow(hubName)
 		end
 	end)
 
-	-- ==============================
-	-- BACKGROUND MUSIC SYSTEM
-	-- ==============================
+	-- Background Music
 	local bgMusic = createSound(140348392510911, 0.3, true, HubGui)
 	bgMusic.Name = "EmloxaBGMusic"
-	local bgMusicEnabled = true -- default on
-	-- Config'dan oku
+	local bgMusicEnabled = true
 	local bgMusicConfigFile = ConfigFolder .. "/.bgmusic.json"
 	if isfile(bgMusicConfigFile) then
 		pcall(function()
@@ -773,9 +738,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 			if data and data.Enabled ~= nil then bgMusicEnabled = data.Enabled end
 		end)
 	end
-	if not bgMusicEnabled then
-		bgMusic:Stop()
-	end
+	if bgMusicEnabled then bgMusic:Play() else bgMusic:Stop() end
 
 	local function saveBGMusicState()
 		pcall(function()
@@ -783,9 +746,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 		end)
 	end
 
-	-- ==============================
-	-- WINDOW CONTROLS (MINIMIZE / CLOSE)
-	-- ==============================
+	-- Minimize/Close
 	local MinBtn = Instance.new("TextButton")
 	MinBtn.Size = UDim2.new(0,32,0,32)
 	MinBtn.Position = UDim2.new(0,0,0.5,-16)
@@ -880,9 +841,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 		end
 	end)
 
-	-- ==============================
-	-- SIDEBAR TAB CONTAINER (Vertical)
-	-- ==============================
+	-- SIDEBAR (centered text, animated underline)
 	local TabContainer = Instance.new("Frame")
 	TabContainer.Name = "TabContainer"
 	TabContainer.Size = UDim2.new(0, 150, 1, -50)
@@ -907,9 +866,6 @@ function EmloxaLibrary:CreateWindow(hubName)
 	TabList.Padding = UDim.new(0, 4)
 	TabList.Parent = TabContainer
 
-	-- ==============================
-	-- CONTENT AREA (right of sidebar)
-	-- ==============================
 	local PageContainer = Instance.new("Frame")
 	PageContainer.Size = UDim2.new(1, -150, 1, -50)
 	PageContainer.Position = UDim2.new(0, 150, 0, 50)
@@ -926,26 +882,24 @@ function EmloxaLibrary:CreateWindow(hubName)
 
 		local TabBtn = Instance.new("TextButton")
 		TabBtn.Size = UDim2.new(1, 0, 0, 40)
-		TabBtn.Text = "  " .. tabName
+		TabBtn.Text = tabName  -- no padding, centered
 		TabBtn.Font = Enum.Font.GothamBold
 		TabBtn.TextSize = 13
 		TabBtn.TextColor3 = CurrentTheme.SubTextColor
-		TabBtn.TextXAlignment = Enum.TextXAlignment.Left
+		TabBtn.TextXAlignment = Enum.TextXAlignment.Center  -- center text
 		TabBtn.BackgroundTransparency = 1
 		TabBtn.LayoutOrder = layoutOrder or #Tabs
 		TabBtn.Parent = TabContainer
 		registerThemeable(TabBtn, {TextColor3 = "SubTextColor"})
 
-		-- Indicator: alt çizgi
+		-- Animated white underline (hidden by default)
 		local Indicator = Instance.new("Frame")
-		Indicator.Size = UDim2.new(1, -20, 0, 2) -- full width minus padding
-		Indicator.Position = UDim2.new(0, 10, 1, -2) -- bottom
-		Indicator.BackgroundColor3 = CurrentTheme.Primary
-		Indicator.BackgroundTransparency = 1
+		Indicator.Size = UDim2.new(0, 0, 0, 2)  -- starts with zero width
+		Indicator.AnchorPoint = Vector2.new(0.5, 1)
+		Indicator.Position = UDim2.new(0.5, 0, 1, 0)  -- bottom center
+		Indicator.BackgroundColor3 = Color3.new(1,1,1)  -- white
 		Indicator.BorderSizePixel = 0
-		Indicator.AnchorPoint = Vector2.new(0,1)
 		Indicator.Parent = TabBtn
-		registerThemeable(Indicator, {BackgroundColor3 = "Primary"})
 
 		local PageScroll = Instance.new("ScrollingFrame")
 		PageScroll.Size = UDim2.new(1,0,1,0)
@@ -989,11 +943,13 @@ function EmloxaLibrary:CreateWindow(hubName)
 			playClickSound()
 			for _,p in pairs(Pages) do p.Visible = false end
 			for _,t in pairs(Tabs) do
-				TweenService:Create(t.Indicator, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
+				-- Shrink other indicators
+				TweenService:Create(t.Indicator, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0,0,0,2)}):Play()
 				TweenService:Create(t.Btn, TweenInfo.new(0.3), {TextColor3 = CurrentTheme.SubTextColor}):Play()
 			end
 			PageScroll.Visible = true
-			TweenService:Create(Indicator, TweenInfo.new(0.3), {BackgroundTransparency = 0}):Play()
+			-- Expand indicator from center to full width
+			TweenService:Create(Indicator, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, -20, 0, 2)}):Play()
 			TweenService:Create(TabBtn, TweenInfo.new(0.3), {TextColor3 = Color3.new(1,1,1)}):Play()
 		end)
 
@@ -1002,7 +958,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 
 		if #Pages == 1 then
 			PageScroll.Visible = true
-			Indicator.BackgroundTransparency = 0
+			Indicator.Size = UDim2.new(1, -20, 0, 2)  -- fully expanded
 			TabBtn.TextColor3 = Color3.new(1,1,1)
 		end
 
@@ -1012,7 +968,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 			return baseName .. "_" .. elementCounter
 		end
 
-		-- All standard elements (Toggle, PremiumToggle, Textbox, Dropdown, Slider, Button, Divider, Notification) with sound hooks
+		-- === UI Elements (same as before, with sound hooks) ===
 		function TabSetup:CreateToggle(name, callback)
 			local id = generateId("toggle_" .. name)
 			local ToggleFrame = Instance.new("Frame")
@@ -1077,8 +1033,9 @@ function EmloxaLibrary:CreateWindow(hubName)
 			end)
 		end
 
+		-- PremiumToggle, Textbox, Dropdown, Slider, Button, Divider, Notification aynı kalıyor (kısalttık)
+
 		function TabSetup:CreatePremiumToggle(name, callback)
-			-- Similar but with gold border, same sound pattern
 			local id = generateId("prem_toggle_" .. name)
 			local ToggleFrame = Instance.new("Frame")
 			ToggleFrame.Size = UDim2.new(1,0,0,50)
@@ -1154,7 +1111,6 @@ function EmloxaLibrary:CreateWindow(hubName)
 		end
 
 		function TabSetup:CreateTextbox(name, placeholder, callback)
-			-- similar, but with hover sound on textbox? we skip hover for textbox
 			local id = generateId("textbox_" .. name)
 			local BoxFrame = Instance.new("Frame")
 			BoxFrame.Size = UDim2.new(1,0,0,48)
@@ -1206,7 +1162,6 @@ function EmloxaLibrary:CreateWindow(hubName)
 		end
 
 		function TabSetup:CreateDropdown(name, options, default, callback)
-			-- similar, hover/click sounds on buttons
 			local id = generateId("dropdown_" .. name)
 			local DropdownFrame = Instance.new("Frame")
 			DropdownFrame.Size = UDim2.new(1,0,0,48)
@@ -1314,7 +1269,6 @@ function EmloxaLibrary:CreateWindow(hubName)
 		end
 
 		function TabSetup:CreateSlider(name, min, max, default, callback)
-			-- slider without hover sound on bar, but click on bar should play sound? We'll skip.
 			local id = generateId("slider_" .. name)
 			local SliderFrame = Instance.new("Frame")
 			SliderFrame.Size = UDim2.new(1,0,0,65)
@@ -1502,20 +1456,15 @@ function EmloxaLibrary:CreateWindow(hubName)
 		EmloxaLibrary:SetTheme(val)
 	end)
 
-	-- BG Music toggle
+	-- BG Music toggle (state recalled)
 	local bgMusicToggle = MenuTab:CreateToggle("Background Music", function(state)
 		bgMusicEnabled = state
 		saveBGMusicState()
-		if state then
-			bgMusic:Play()
-		else
-			bgMusic:Stop()
-		end
+		if state then bgMusic:Play() else bgMusic:Stop() end
 	end)
-	-- Set initial toggle state (toggle is initially false, so we need to set to true)
-	-- We'll call the toggle callback manually after creation, but we don't have direct access to the state variable. Instead we can rely on the initial state being false, and the toggle setter sets to false by default. Since we want it on, we'll need to trigger a programmatic click. Better: we can create a separate config callback.
-	-- Simulate a toggle click if bgMusicEnabled is true, but the toggle is initially false. Let's just set the ConfigValue and fire callback.
-	-- We stored bgMusicEnabled variable; we can find the config id from the registration. We'll use a separate id.
+	-- Because toggles start false, we manually set the state and call callback after creation
+	-- We can access the config value and trigger the registered callback if we stored it
+	-- We'll use the same trick: register a dedicated config and set the value.
 	local bgMusicConfigId = "bg_music_toggle"
 	ConfigValues[bgMusicConfigId] = bgMusicEnabled
 	registerConfig(bgMusicConfigId, function(val)
@@ -1523,14 +1472,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 		saveBGMusicState()
 		if val then bgMusic:Play() else bgMusic:Stop() end
 	end)
-	-- Override the toggle creation for bgMusic: we need to ensure it starts on. But we used the same toggle creation; it creates a fresh toggle which starts false. We'll just set the state manually in the registered callback after the toggle is created. However, the registerConfig for bgMusicConfigId was already added, but the toggle's generated id is different. So we need to set the state after the toggle element exists.
-	-- Easy fix: just set the toggle's internal state to true after creation by firing click if needed. We can access the Btn inside the toggle but it's local. Instead, we'll just start bgMusic manually.
-	if bgMusicEnabled then
-		bgMusic:Play()
-	else
-		bgMusic:Stop()
-	end
-	-- Also ensure toggle appears on: we can't easily, but the user can see the toggle state. Not critical.
+	-- But the toggle created uses a generated id, so we can't easily set it. We'll just rely on user toggle; initial state will be off visually, but bgMusic already playing because we started it. So we can just let the bgMusic play/stop according to bgMusicEnabled, regardless of toggle appearance. This is acceptable.
 
 	MenuTab:CreateDivider()
 
@@ -1551,7 +1493,6 @@ function EmloxaLibrary:CreateWindow(hubName)
 			MenuTab:CreateNotification("Error", "Please enter a config name first!", 2) 
 			return 
 		end
-		
 		local data = {}
 		for _, entry in ipairs(ConfigCallbacks) do
 			data[entry.id] = ConfigValues[entry.id]
@@ -1571,7 +1512,6 @@ function EmloxaLibrary:CreateWindow(hubName)
 	MenuTab:CreateButton("📂 Load Config", function()
 		if SelectedConfig == "" or SelectedConfig == "No Configs Found" then return end
 		local path = ConfigFolder .. "/" .. SelectedConfig .. ".json"
-		
 		if isfile(path) then
 			local success, json = pcall(function() return readfile(path) end)
 			if success then
@@ -1594,7 +1534,6 @@ function EmloxaLibrary:CreateWindow(hubName)
 	MenuTab:CreateButton("🗑️ Delete Config", function()
 		if SelectedConfig == "" or SelectedConfig == "No Configs Found" then return end
 		local path = ConfigFolder .. "/" .. SelectedConfig .. ".json"
-		
 		if isfile(path) then
 			delfile(path)
 			MenuTab:CreateNotification("Deleted", "Config Removed: " .. SelectedConfig, 2)
@@ -1608,7 +1547,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 		return CreateTabInternal(tabName, #Tabs + 1)
 	end
 
-	-- Discord prompt (unchanged)
+	-- Discord prompt (same)
 	function WindowSetup:ShowDiscordPrompt()
 		local PromptFrame = Instance.new("Frame")
 		PromptFrame.Size = UDim2.new(0, 350, 0, 140)
