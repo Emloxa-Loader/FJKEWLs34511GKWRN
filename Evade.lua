@@ -1,7 +1,6 @@
 -- =========================================================================
--- EMLOXA WARE: EVADE (PLACE ID: 9872472334) – GÜNCELLENMİŞ v2
--- DOWNED İMAGE LABEL DEDEKSİYONU, NEXTBOT ESP TARAMASI, SPEED YATAY,
--- FLY YUKARI/AŞAĞI, OYUNCU HIGHLIGHT SEÇENEĞİ
+-- EMLOXA WARE: EVADE (PLACE ID: 9872472334) – FPS OPTİMİZASYONLU v3
+-- SMART NEXTBOT SCAN, ANTI-LAG ESP (NO DUPLICATES), TRUE SPEED (X/Z ONLY)
 -- =========================================================================
 local GameModule = {}
 
@@ -144,12 +143,9 @@ function GameModule:Init(Window)
     local function IsPlayerDowned(p)
         if not p then return false end
         local char = p.Character
-        -- Standart karakter içi kontrol
         if char and (char:GetAttribute("Downed") or char:FindFirstChild("ImageLabel")) then 
             return true 
         end
-        
-        -- Workspace.Players.[Name].[Name].ImageLabel kontrolü (Evade özel dosya yapısı)
         local wsPlayers = Workspace:FindFirstChild("Players")
         if wsPlayers then
             local pFolder = wsPlayers:FindFirstChild(p.Name)
@@ -164,14 +160,19 @@ function GameModule:Init(Window)
     end
 
     -- ==========================================
-    -- ESP YARDIMCILARI
+    -- LAG-FREE ESP SİSTEMİ (DUPLICATE KORUMALI)
     -- ==========================================
     local function CreateESP(target, nameText, color, attachPart, yOffset, useHighlight)
-        if not target or not attachPart or target:FindFirstChild("EmloxaESP") then return end
+        -- Eğer hedefin üstünde halihazırda ESP Tag'i varsa asla ikinciyi oluşturma (LAG FIX)
+        if not target or not attachPart or target:FindFirstChild("EmloxaESP_Tag") then return end
+        
+        local tag = Instance.new("Folder")
+        tag.Name = "EmloxaESP_Tag"
+        tag.Parent = target
 
         if useHighlight then
             local highlight = Instance.new("Highlight")
-            highlight.Name = "EmloxaESP"
+            highlight.Name = "EmloxaHighlightESP"
             highlight.Adornee = target
             highlight.FillColor = color
             highlight.FillTransparency = 0.5
@@ -186,7 +187,7 @@ function GameModule:Init(Window)
                 BaseText = nameText,
                 Highlight = highlight,
                 Billboard = nil,
-                DefaultColor = color
+                CurrentColor = color
             })
             return
         end
@@ -216,13 +217,14 @@ function GameModule:Init(Window)
             BaseText = nameText,
             Highlight = nil,
             Billboard = billboard,
-            DefaultColor = color
+            CurrentColor = color
         })
     end
 
     local function RemoveESP(target)
         if not target then return end
-        if target:FindFirstChild("EmloxaESP") then target.EmloxaESP:Destroy() end
+        if target:FindFirstChild("EmloxaESP_Tag") then target.EmloxaESP_Tag:Destroy() end
+        if target:FindFirstChild("EmloxaHighlightESP") then target.EmloxaHighlightESP:Destroy() end
         for _, v in pairs(target:GetDescendants()) do
             if v.Name == "EmloxaTextESP" then v:Destroy() end
         end
@@ -276,7 +278,7 @@ function GameModule:Init(Window)
     end)
     EspTab:CreateToggle("Players Highlight Mode", function(s) 
         Settings.Visuals.PlayerHighlight = s 
-        for _, p in pairs(Players:GetPlayers()) do RemoveESP(p.Character) end -- Anında geçiş için ESP sıfırla
+        for _, p in pairs(Players:GetPlayers()) do RemoveESP(p.Character) end 
     end)
     EspTab:CreateToggle("Highlight Downed Players", function(s) Settings.Visuals.DownedColor = s end)
     EspTab:CreateToggle("Show Distance", function(s) Settings.Visuals.Distance = s end)
@@ -292,7 +294,6 @@ function GameModule:Init(Window)
     end)
     EspTab:CreateToggle("NextBots Highlight Mode", function(s) 
         Settings.Visuals.BotHighlight = s 
-        -- Anında geçiş için mevcut bot ESP'lerini siler
         for i = #ActiveESPs, 1, -1 do
             if ActiveESPs[i].Target and not Players:GetPlayerFromCharacter(ActiveESPs[i].Target) then
                 RemoveESP(ActiveESPs[i].Target)
@@ -330,13 +331,14 @@ function GameModule:Init(Window)
             local hum = char:FindFirstChildOfClass("Humanoid")
             if hum then hum.PlatformStand = false end
             if char.HumanoidRootPart:FindFirstChild("EmloxaVelocity") then char.HumanoidRootPart.EmloxaVelocity:Destroy() end
+            if char.HumanoidRootPart:FindFirstChild("EmloxaSpeed") then char.HumanoidRootPart.EmloxaSpeed:Destroy() end
         end
         local ui = game:GetService("CoreGui"):FindFirstChild("EmloxaWareUI") or LocalPlayer.PlayerGui:FindFirstChild("EmloxaWareUI")
         if ui then ui:Destroy() end
     end)
 
     -- ==========================================
-    -- TUŞ KONTROLLERİ (FLY İÇİN AŞAĞI İNME EKLENDİ)
+    -- TUŞ KONTROLLERİ
     -- ==========================================
     table.insert(Connections, UserInputService.InputBegan:Connect(function(input, gpe)
         if gpe then return end
@@ -411,32 +413,40 @@ function GameModule:Init(Window)
     end))
 
     -- ==========================================
-    -- ANA MOTOR (HEARTBEAT LOOP)
+    -- AKILLI NEXTBOT TARAMASI (SMART SCAN - LAG FIX)
     -- ==========================================
     local lastNextbotScan = 0
     local cachedNextbots = {}
 
     local function scanNextbots()
         local now = tick()
-        if now - lastNextbotScan < 1 then return cachedNextbots end
+        if now - lastNextbotScan < 2 then return cachedNextbots end -- 2 saniyede bir tarar (Asla lag yapmaz)
         lastNextbotScan = now
         
         local npcs = {}
         local npcsFolder = ReplicatedStorage:FindFirstChild("NPCs")
         if npcsFolder then
-            for _, v in pairs(Workspace:GetDescendants()) do
-                -- Eğer Model ise ve NPCs klasöründe aynı isimde bir modül varsa bu bir Nextbot'tur
-                if v:IsA("Model") and npcsFolder:FindFirstChild(v.Name) then
-                    table.insert(npcs, v)
+            -- Sadece ana klasörlerin yüzeyine bakar, GetDescendants kullanmaz
+            local function checkList(list)
+                for _, v in pairs(list) do
+                    if v:IsA("Model") and npcsFolder:FindFirstChild(v.Name) then
+                        table.insert(npcs, v)
+                    end
                 end
+            end
+            checkList(Workspace:GetChildren())
+            if Workspace:FindFirstChild("Game") then
+                checkList(Workspace.Game:GetChildren())
             end
         end
         cachedNextbots = npcs
         return npcs
     end
 
+    -- ==========================================
+    -- ANA MOTOR (HEARTBEAT LOOP)
+    -- ==========================================
     table.insert(Connections, RunService.Heartbeat:Connect(function(delta)
-        -- FullBright loop
         if Settings.World.FullBright then
             Lighting.Brightness = 5
             Lighting.GlobalShadows = false
@@ -448,9 +458,10 @@ function GameModule:Init(Window)
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
 
         if hum and hrp then
-            local bVel = hrp:FindFirstChild("EmloxaVelocity")
-
             if Settings.Movement.FlyEnabled then
+                if hrp:FindFirstChild("EmloxaSpeed") then hrp.EmloxaSpeed:Destroy() end -- Çakışmayı önle
+                
+                local bVel = hrp:FindFirstChild("EmloxaVelocity")
                 if not bVel then
                     bVel = Instance.new("BodyVelocity")
                     bVel.Name = "EmloxaVelocity"
@@ -465,17 +476,21 @@ function GameModule:Init(Window)
                 bVel.Velocity = flyDir * Settings.Movement.FlySpeed
             else
                 if hum.PlatformStand then hum.PlatformStand = false end
-                if bVel then bVel:Destroy() end -- Normal hareket için BodyVelocity silinir
+                if hrp:FindFirstChild("EmloxaVelocity") then hrp.EmloxaVelocity:Destroy() end
 
-                -- SPEED KONTROLÜ (Yerçekimi Bozulmaz)
+                -- KUSURSUZ TRUE SPEED (Sadece X/Z, Y Serbest Bırakıldı)
                 if Settings.Movement.SpeedEnabled and hum.MoveDirection.Magnitude > 0 then
-                    local moveDir = hum.MoveDirection * Vector3.new(1, 0, 1) -- Sadece X ve Z ekseni
-                    if moveDir.Magnitude > 0 then
-                        moveDir = moveDir.Unit
-                        local currentYVelocity = hrp.AssemblyLinearVelocity.Y
-                        -- Y hızını oyuna bırakıp sadece yatay hızı zorluyoruz
-                        hrp.AssemblyLinearVelocity = Vector3.new(moveDir.X * Settings.Movement.SpeedValue, currentYVelocity, moveDir.Z * Settings.Movement.SpeedValue)
+                    local bv = hrp:FindFirstChild("EmloxaSpeed")
+                    if not bv then
+                        bv = Instance.new("BodyVelocity")
+                        bv.Name = "EmloxaSpeed"
+                        bv.MaxForce = Vector3.new(100000, 0, 100000) -- Y'de HİÇBİR GÜÇ YOK (Yerçekimi çalışır)
+                        bv.Parent = hrp
                     end
+                    local moveDir = hum.MoveDirection.Unit
+                    bv.Velocity = Vector3.new(moveDir.X * Settings.Movement.SpeedValue, 0, moveDir.Z * Settings.Movement.SpeedValue)
+                else
+                    if hrp:FindFirstChild("EmloxaSpeed") then hrp.EmloxaSpeed:Destroy() end
                 end
             end
 
@@ -491,7 +506,6 @@ function GameModule:Init(Window)
             end
         end
 
-        -- Nextbot Loop TP
         if Settings.Exploits.LoopTPNextbot and hrp then
             if not TargetedNextbot or not TargetedNextbot.Parent or not TargetedNextbot:FindFirstChild("Hitbox") then
                 local npcs = scanNextbots()
@@ -507,7 +521,6 @@ function GameModule:Init(Window)
             end
         end
 
-        -- Downed oyuncu takibi
         for _, p in pairs(Players:GetPlayers()) do
             if p ~= LocalPlayer and p.Character then
                 if IsPlayerDowned(p) then
@@ -518,7 +531,6 @@ function GameModule:Init(Window)
             end
         end
 
-        -- Carry Otomasyonu
         if Settings.CarrySystem.AutoMode and hrp then
             if Settings.CarrySystem.State == "Idle" then
                 for p, startTime in pairs(DownedTimers) do
@@ -569,7 +581,6 @@ function GameModule:Init(Window)
             end
         end
 
-        -- Revive Aura
         if Settings.Exploits.AutoReviveAura and char and hrp then
             for _, p in pairs(Players:GetPlayers()) do
                 if p ~= LocalPlayer and IsPlayerDowned(p) then
@@ -582,7 +593,6 @@ function GameModule:Init(Window)
             end
         end
 
-        -- Auto Revive Loop (Self)
         if Settings.Exploits.AutoReviveSelf and char then
             if IsPlayerDowned(LocalPlayer) then
                 if Settings.Exploits.TeleportBackOnRevive and hrp and not AwaitingReviveTeleport then
@@ -599,11 +609,7 @@ function GameModule:Init(Window)
                     local targetCFrame = PreReviveCFrame
                     PreReviveCFrame = nil
                     task.spawn(function()
-                        if Settings.Exploits.ReviveTPDelay > 0 then
-                            task.wait(Settings.Exploits.ReviveTPDelay)
-                        else
-                            task.wait()
-                        end
+                        if Settings.Exploits.ReviveTPDelay > 0 then task.wait(Settings.Exploits.ReviveTPDelay) else task.wait() end
                         local curChar = LocalPlayer.Character
                         local curHrp = curChar and curChar:FindFirstChild("HumanoidRootPart")
                         if curHrp then curHrp.CFrame = targetCFrame end
@@ -612,7 +618,6 @@ function GameModule:Init(Window)
             end
         end
 
-        -- Auto Vote
         if Settings.Exploits.AutoVote then
             local ev = ReplicatedStorage:FindFirstChild("Events")
             if ev and ev:FindFirstChild("Player") and ev.Player:FindFirstChild("Vote") then
@@ -620,17 +625,15 @@ function GameModule:Init(Window)
             end
         end
 
-        -- ESP İşlemleri
+        -- ESP OLUŞTURMA (Artık sil-yükle yapmıyor, sadece olmayanlara ekliyor)
         if Settings.Visuals.PlayerESP then
             for _, p in pairs(Players:GetPlayers()) do
                 if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                    local color = Color3.new(0.4, 0.8, 0.4)
-                    local text = p.Name
-                    if Settings.Visuals.DownedColor and IsPlayerDowned(p) then
-                        color = Color3.new(0.9, 0.1, 0.1)
-                        text = p.Name .. " [DOWNED]"
+                    if not p.Character:FindFirstChild("EmloxaESP_Tag") then
+                        local color = IsPlayerDowned(p) and Color3.new(0.9, 0.1, 0.1) or Color3.new(0.4, 0.8, 0.4)
+                        local text = IsPlayerDowned(p) and (p.Name .. " [DOWNED]") or p.Name
+                        CreateESP(p.Character, text, color, p.Character.HumanoidRootPart, 2, Settings.Visuals.PlayerHighlight)
                     end
-                    CreateESP(p.Character, text, color, p.Character.HumanoidRootPart, 2, Settings.Visuals.PlayerHighlight)
                 end
             end
         end
@@ -639,7 +642,7 @@ function GameModule:Init(Window)
             local npcs = scanNextbots()
             for _, b in ipairs(npcs) do
                 local part = b:FindFirstChild("Hitbox") or b:FindFirstChild("HumanoidRootPart")
-                if part then
+                if part and not b:FindFirstChild("EmloxaESP_Tag") then
                     CreateESP(b, b.Name, Color3.new(0.8, 0.2, 0.2), part, 3, Settings.Visuals.BotHighlight)
                 end
             end
@@ -649,21 +652,38 @@ function GameModule:Init(Window)
             local tf = Workspace:FindFirstChild("Game") and Workspace.Game:FindFirstChild("Tickets")
             if tf then
                 for _, t in pairs(tf:GetChildren()) do
-                    if t:IsA("BasePart") then CreateESP(t, "Ticket", Color3.fromRGB(255, 215, 0), t, 1, false) end
+                    if t:IsA("BasePart") and not t:FindFirstChild("EmloxaESP_Tag") then 
+                        CreateESP(t, "Ticket", Color3.fromRGB(255, 215, 0), t, 1, false) 
+                    end
                 end
             end
         end
 
-        -- ESP mesafe güncelleme ve temizlik
+        -- ESP MESAFE VE DİNAMİK RENK GÜNCELLEMESİ (Lag olmadan renkleri anlık değiştirir)
         local camPos = Camera and Camera.CFrame.Position or Vector3.new(0,0,0)
         for i = #ActiveESPs, 1, -1 do
             local esp = ActiveESPs[i]
             if esp.Target and esp.Target.Parent and esp.Part and esp.Part.Parent then
-                if Settings.Visuals.Distance and esp.Label then
-                    local dist = math.floor((camPos - esp.Part.Position).Magnitude)
-                    esp.Label.Text = esp.BaseText .. " [" .. dist .. "m]"
-                elseif esp.Label then
-                    esp.Label.Text = esp.BaseText
+                local p = Players:GetPlayerFromCharacter(esp.Target)
+                if p then
+                    local isDown = IsPlayerDowned(p)
+                    esp.CurrentColor = isDown and Color3.new(0.9, 0.1, 0.1) or Color3.new(0.4, 0.8, 0.4)
+                    esp.BaseText = isDown and (p.Name .. " [DOWNED]") or p.Name
+                end
+
+                if esp.Label then
+                    esp.Label.TextColor3 = esp.CurrentColor
+                    if Settings.Visuals.Distance then
+                        local dist = math.floor((camPos - esp.Part.Position).Magnitude)
+                        esp.Label.Text = esp.BaseText .. " [" .. dist .. "m]"
+                    else
+                        esp.Label.Text = esp.BaseText
+                    end
+                end
+                
+                if esp.Highlight then
+                    esp.Highlight.FillColor = esp.CurrentColor
+                    esp.Highlight.OutlineColor = esp.CurrentColor
                 end
             else
                 if esp.Highlight then esp.Highlight:Destroy() end
