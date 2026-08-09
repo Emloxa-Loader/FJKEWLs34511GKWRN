@@ -1,6 +1,5 @@
 -- =========================================================================
--- EMLOXA WARE: EVADE (PLACE ID: 9872472334) – v7 CLEAN
--- CFrame Speed (Y untouched), Chams Highlight, NO Visual Boombox
+-- EMLOXA WARE: EVADE v8 – AUTOFARM (TICKETS & AUTO WIN)
 -- =========================================================================
 local GameModule = {}
 
@@ -39,11 +38,19 @@ function GameModule:Init(Window)
             DownedColor = true, Distance = true,
             PlayerHighlight = false, BotHighlight = false
         },
-        World = { FullBright = false, NoFog = false, FOV = 70, ThirdPerson = false }
+        World = { FullBright = false, NoFog = false, FOV = 70, ThirdPerson = false },
+        AutoFarm = {
+            AutoTickets = false,
+            AutoWin = false
+        }
     }
 
     local IsHoldingSpace = false
     local IsHoldingCtrl = false
+
+    -- Ticket hedef durumu
+    local currentTicketTarget = nil
+    local ticketSafePlatform = nil
 
     -- ==========================================
     -- HUD
@@ -53,7 +60,7 @@ function GameModule:Init(Window)
     StatusGui.Parent = HUIParent
 
     local MainHud = Instance.new("Frame")
-    MainHud.Size = UDim2.new(0, 240, 0, 180)
+    MainHud.Size = UDim2.new(0, 240, 0, 210)
     MainHud.Position = UDim2.new(1, -250, 0.3, 0)
     MainHud.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
     MainHud.BackgroundTransparency = 0.15
@@ -105,12 +112,30 @@ function GameModule:Init(Window)
     ManualKeyLabel.TextXAlignment = Enum.TextXAlignment.Left
     ManualKeyLabel.Parent = MainHud
 
+    local AutoFarmLabel = Instance.new("TextLabel")
+    AutoFarmLabel.Size = UDim2.new(1, -20, 0, 50)
+    AutoFarmLabel.Position = UDim2.new(0, 10, 0, 145)
+    AutoFarmLabel.BackgroundTransparency = 1
+    AutoFarmLabel.Text = "AutoFarm: IDLE"
+    AutoFarmLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
+    AutoFarmLabel.Font = Enum.Font.Gotham
+    AutoFarmLabel.TextSize = 11
+    AutoFarmLabel.TextXAlignment = Enum.TextXAlignment.Left
+    AutoFarmLabel.Parent = MainHud
+
     local function UpdateHUD()
         StateLabel.Text = "System State: " .. Settings.CarrySystem.State:upper()
         if Settings.CarrySystem.TargetPlayer then
             TargetLabel.Text = "Target: " .. Settings.CarrySystem.TargetPlayer.Name
         else
             TargetLabel.Text = "Target: None"
+        end
+        if currentTicketTarget then
+            AutoFarmLabel.Text = "AutoFarm: Collecting " .. currentTicketTarget.Name
+        elseif Settings.AutoFarm.AutoWin then
+            AutoFarmLabel.Text = "AutoFarm: Win Mode"
+        else
+            AutoFarmLabel.Text = "AutoFarm: IDLE"
         end
     end
 
@@ -210,6 +235,24 @@ function GameModule:Init(Window)
         UpdateHUD()
     end)
 
+    local AutoFarmTab = Window:CreateTab("Autofarm")
+    AutoFarmTab:CreateToggle("Auto Collect Tickets", function(s)
+        Settings.AutoFarm.AutoTickets = s
+        if not s then
+            currentTicketTarget = nil
+            if ticketSafePlatform then ticketSafePlatform:Destroy(); ticketSafePlatform = nil end
+            UpdateHUD()
+        end
+    end)
+    AutoFarmTab:CreateToggle("Auto Win", function(s)
+        Settings.AutoFarm.AutoWin = s
+        if not s and ticketSafePlatform then
+            ticketSafePlatform:Destroy()
+            ticketSafePlatform = nil
+        end
+        UpdateHUD()
+    end)
+
     local VoteTab = Window:CreateTab("Vote")
     VoteTab:CreateDropdown("Map", {"Map 1","Map 2","Map 3","Map 4"}, "Map 1", function(o) Settings.Vote.MapNumber = tonumber(o:match("%d")) end)
     VoteTab:CreateToggle("Auto Vote", function(s) Settings.Vote.AutoVote = s end)
@@ -250,6 +293,7 @@ function GameModule:Init(Window)
         for _,p in pairs(Players:GetPlayers()) do RemoveESP(p.Character) end
         StatusGui:Destroy()
         if CurrentPlatform then CurrentPlatform:Destroy() end
+        if ticketSafePlatform then ticketSafePlatform:Destroy() end
         local char = LocalPlayer.Character
         if char and char:FindFirstChild("HumanoidRootPart") then
             local hum = char:FindFirstChildOfClass("Humanoid")
@@ -356,12 +400,15 @@ function GameModule:Init(Window)
     end
     local lastNextbotScan = 0; local cachedNextbots = {}
     local function scanNextbots()
-        if tick()-lastNextbotScan < 2 then return cachedNextbots end
+        if tick()-lastNextbotScan < 1.5 then return cachedNextbots end
         lastNextbotScan = tick()
         local npcs = {}
         for _,v in ipairs(Workspace:GetDescendants()) do
             if v:IsA("Model") and npcNames[v.Name] and v:FindFirstChildOfClass("Humanoid") then
-                table.insert(npcs, v)
+                local hrp = v:FindFirstChild("HumanoidRootPart") or v:FindFirstChild("Hitbox")
+                if hrp then
+                    table.insert(npcs, {Model = v, Position = hrp.Position})
+                end
             end
         end
         cachedNextbots = npcs
@@ -369,9 +416,25 @@ function GameModule:Init(Window)
     end
 
     -- ==========================================
+    -- GÜVENLİ PLATFORM OLUŞTUR
+    -- ==========================================
+    local function createSafePlatform(position)
+        if ticketSafePlatform then ticketSafePlatform:Destroy() end
+        local plat = Instance.new("Part")
+        plat.Size = Vector3.new(30, 1, 30)
+        plat.CFrame = CFrame.new(position.X, position.Y + 1000, position.Z)
+        plat.Anchored = true
+        plat.Material = Enum.Material.Glass
+        plat.Parent = Workspace
+        ticketSafePlatform = plat
+        return plat.CFrame + Vector3.new(0, 3, 0)
+    end
+
+    -- ==========================================
     -- ANA MOTOR
     -- ==========================================
     table.insert(Connections, RunService.Heartbeat:Connect(function(delta)
+        -- FullBright/NoFog
         if Settings.World.FullBright then
             Lighting.Brightness = 5; Lighting.GlobalShadows = false; Lighting.Ambient = Color3.new(1,1,1)
         end
@@ -380,8 +443,9 @@ function GameModule:Init(Window)
         local char = LocalPlayer.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
+
         if hum and hrp then
-            -- Fly
+            -- Movement
             if Settings.Movement.FlyEnabled then
                 if hrp:FindFirstChild("EmloxaVelocity") then hrp.EmloxaVelocity:Destroy() end
                 local bv = Instance.new("BodyVelocity"); bv.Name = "EmloxaVelocity"; bv.MaxForce = Vector3.new(1e6,1e6,1e6); bv.Parent = hrp
@@ -393,14 +457,10 @@ function GameModule:Init(Window)
             else
                 if hum.PlatformStand then hum.PlatformStand = false end
                 if hrp:FindFirstChild("EmloxaVelocity") then hrp.EmloxaVelocity:Destroy() end
-
-                -- TRUE SPEED: Y'ye dokunma, sadece XZ düzleminde kay
-                if Settings.Movement.SpeedEnabled and hum.MoveDirection.Magnitude > 0 then
-                    local moveDir = hum.MoveDirection * Vector3.new(1,0,1)  -- yatay düzlem
+                if Settings.Movement.SpeedEnabled and hum.MoveDirection.Magnitude > 0 and not Settings.AutoFarm.AutoTickets then
+                    local moveDir = hum.MoveDirection * Vector3.new(1,0,1)
                     if moveDir.Magnitude > 0 then
-                        moveDir = moveDir.Unit
-                        local offset = moveDir * Settings.Movement.SpeedValue * delta
-                        hrp.CFrame = hrp.CFrame + Vector3.new(offset.X, 0, offset.Z)
+                        hrp.CFrame += moveDir.Unit * Settings.Movement.SpeedValue * delta
                     end
                 end
             end
@@ -415,109 +475,154 @@ function GameModule:Init(Window)
                 VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.G, false, game)
                 VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
             end
-        end
 
-        -- Downed tracking
-        for _,p in pairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer and p.Character then
-                if IsPlayerDowned(p) then
-                    if not DownedTimers[p] then DownedTimers[p] = tick() end
-                else
-                    DownedTimers[p] = nil
-                end
-            end
-        end
-
-        -- Carry automation
-        if Settings.CarrySystem.AutoMode and hrp then
-            if Settings.CarrySystem.State == "Idle" then
-                for p,st in pairs(DownedTimers) do
-                    if p.Character and p.Character:FindFirstChild("HumanoidRootPart") and tick()-st >= 5 then
-                        Settings.CarrySystem.TargetPlayer = p
-                        Settings.CarrySystem.State = "Teleporting"
-                        UpdateHUD()
+            -- AUTO WIN
+            if Settings.AutoFarm.AutoWin then
+                local npcs = scanNextbots()
+                local myPos = hrp.Position
+                local danger = false
+                for _, npc in ipairs(npcs) do
+                    local dist = (npc.Position - myPos).Magnitude
+                    local yDiff = math.abs(npc.Position.Y - myPos.Y)
+                    if dist < 60 and yDiff < 15 then
+                        danger = true
                         break
                     end
                 end
+                if danger then
+                    local safeCFrame = createSafePlatform(myPos)
+                    hrp.CFrame = safeCFrame
+                end
+            end
+
+            -- AUTO COLLECT TICKETS
+            if Settings.AutoFarm.AutoTickets then
+                local npcs = scanNextbots()
+                local myPos = hrp.Position
+
+                -- Eğer aktif hedef ticket yok olduysa veya hiç yoksa yeni hedef seç
+                if not currentTicketTarget or not currentTicketTarget.Parent then
+                    currentTicketTarget = nil
+                    local ticketsFolder = Workspace:FindFirstChild("Effects") and Workspace.Effects:FindFirstChild("Tickets") and Workspace.Effects.Tickets:FindFirstChild("Visual")
+                    if ticketsFolder then
+                        local bestTicket = nil
+                        local bestSafety = -1
+                        for _, ticket in ipairs(ticketsFolder:GetChildren()) do
+                            if ticket:IsA("BasePart") then
+                                local tPos = ticket.Position
+                                local distToMe = (tPos - myPos).Magnitude
+                                -- En yakın nextbot mesafesini bul
+                                local minNpcDist = math.huge
+                                for _, npc in ipairs(npcs) do
+                                    local d = (npc.Position - tPos).Magnitude
+                                    if d < minNpcDist then minNpcDist = d end
+                                end
+                                -- Güvenlik puanı: nextbota uzaklık (ne kadar fazla o kadar iyi)
+                                local safety = minNpcDist
+                                if safety > bestSafety then
+                                    bestSafety = safety
+                                    bestTicket = ticket
+                                end
+                            end
+                        end
+                        if bestTicket then
+                            currentTicketTarget = bestTicket
+                            UpdateHUD()
+                        end
+                    end
+                end
+
+                -- Hedefe git veya güvende kal
+                if currentTicketTarget then
+                    local tPos = currentTicketTarget.Position
+                    local distToTarget = (tPos - myPos).Magnitude
+                    -- Etraftaki nextbotları kontrol et
+                    local nearestNpcDist = math.huge
+                    local nearestNpcPos = nil
+                    for _, npc in ipairs(npcs) do
+                        local d = (npc.Position - myPos).Magnitude
+                        if d < nearestNpcDist then
+                            nearestNpcDist = d
+                            nearestNpcPos = npc.Position
+                        end
+                        -- Ticket'a yakın nextbot var mı?
+                        local dToTicket = (npc.Position - tPos).Magnitude
+                        if dToTicket < 50 and distToTarget < 80 then
+                            -- Ticket yakınında nextbot var, kaç!
+                            local safeCFrame = createSafePlatform(myPos)
+                            hrp.CFrame = safeCFrame
+                            currentTicketTarget = nil
+                            UpdateHUD()
+                            break
+                        end
+                    end
+
+                    -- Eğer güvendeysek ticket'a ışınlan
+                    if currentTicketTarget and nearestNpcDist > 80 then
+                        hrp.CFrame = CFrame.new(tPos)
+                    elseif currentTicketTarget and nearestNpcDist <= 80 then
+                        -- Yakında nextbot var ama ticket da yakın değilse platforma çık
+                        if distToTarget > 80 then
+                            local safeCFrame = createSafePlatform(myPos)
+                            hrp.CFrame = safeCFrame
+                        end
+                    end
+                end
+            else
+                -- AutoTickets kapalıysa temizlik yap
+                if currentTicketTarget then
+                    currentTicketTarget = nil
+                    UpdateHUD()
+                end
+            end
+        end
+
+        -- Downed tracking / Carry / Vote
+        for _,p in pairs(Players:GetPlayers()) do if p~=LocalPlayer and p.Character then if IsPlayerDowned(p) then if not DownedTimers[p] then DownedTimers[p]=tick() end else DownedTimers[p]=nil end end end
+        if Settings.CarrySystem.AutoMode and hrp then
+            if Settings.CarrySystem.State == "Idle" then
+                for p,st in pairs(DownedTimers) do if p.Character and p.Character:FindFirstChild("HumanoidRootPart") and tick()-st>=5 then Settings.CarrySystem.TargetPlayer=p; Settings.CarrySystem.State="Teleporting"; UpdateHUD() break end end
             elseif Settings.CarrySystem.State == "Teleporting" and Settings.CarrySystem.TargetPlayer then
                 local tHrp = Settings.CarrySystem.TargetPlayer.Character and Settings.CarrySystem.TargetPlayer.Character:FindFirstChild("HumanoidRootPart")
-                if tHrp then
-                    hrp.CFrame = tHrp.CFrame
-                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Q, false, game)
-                    task.wait(0.2)
-                    Settings.CarrySystem.State = "Lifting"
-                    UpdateHUD()
-                else
-                    Settings.CarrySystem.State = "Idle"
-                    UpdateHUD()
-                end
+                if tHrp then hrp.CFrame=tHrp.CFrame; VirtualInputManager:SendKeyEvent(true,Enum.KeyCode.Q,false,game); task.wait(0.2); Settings.CarrySystem.State="Lifting"; UpdateHUD() else Settings.CarrySystem.State="Idle"; UpdateHUD() end
             elseif Settings.CarrySystem.State == "Lifting" then
                 if CurrentPlatform then CurrentPlatform:Destroy() end
-                CurrentPlatform = Instance.new("Part")
-                CurrentPlatform.Size = Vector3.new(30,1,30)
-                CurrentPlatform.CFrame = hrp.CFrame + Vector3.new(0,100,0)
-                CurrentPlatform.Anchored = true
-                CurrentPlatform.Material = Enum.Material.Glass
-                CurrentPlatform.Parent = Workspace
-                task.wait(0.1)
-                hrp.CFrame = CurrentPlatform.CFrame + Vector3.new(0,3,0)
-                task.wait(0.2)
-                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Q, false, game)
-                Settings.CarrySystem.State = "Reviving"
-                UpdateHUD()
+                CurrentPlatform = Instance.new("Part"); CurrentPlatform.Size=Vector3.new(30,1,30); CurrentPlatform.CFrame=hrp.CFrame+Vector3.new(0,100,0); CurrentPlatform.Anchored=true; CurrentPlatform.Material=Enum.Material.Glass; CurrentPlatform.Parent=Workspace
+                task.wait(0.1); hrp.CFrame=CurrentPlatform.CFrame+Vector3.new(0,3,0); task.wait(0.2); VirtualInputManager:SendKeyEvent(false,Enum.KeyCode.Q,false,game); Settings.CarrySystem.State="Reviving"; UpdateHUD()
             elseif Settings.CarrySystem.State == "Reviving" and Settings.CarrySystem.TargetPlayer then
-                if IsPlayerDowned(Settings.CarrySystem.TargetPlayer) then
-                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-                    task.wait(0.05)
-                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-                else
-                    if CurrentPlatform then CurrentPlatform:Destroy(); CurrentPlatform = nil end
-                    Settings.CarrySystem.State = "Idle"
-                    Settings.CarrySystem.TargetPlayer = nil
-                    UpdateHUD()
-                end
+                if IsPlayerDowned(Settings.CarrySystem.TargetPlayer) then VirtualInputManager:SendKeyEvent(true,Enum.KeyCode.E,false,game); task.wait(0.05); VirtualInputManager:SendKeyEvent(false,Enum.KeyCode.E,false,game) else if CurrentPlatform then CurrentPlatform:Destroy(); CurrentPlatform=nil end; Settings.CarrySystem.State="Idle"; Settings.CarrySystem.TargetPlayer=nil; UpdateHUD() end
             end
         end
-
-        -- Auto vote
         if Settings.Vote.AutoVote then
             local ev = ReplicatedStorage:FindFirstChild("Events")
-            if ev and ev:FindFirstChild("Player") and ev.Player:FindFirstChild("Vote") then
-                ev.Player.Vote:FireServer(Settings.Vote.MapNumber)
-            end
+            if ev and ev:FindFirstChild("Player") and ev.Player:FindFirstChild("Vote") then ev.Player.Vote:FireServer(Settings.Vote.MapNumber) end
         end
 
-        -- ESP create
+        -- ESP
         if Settings.Visuals.PlayerESP then
             for _,p in pairs(Players:GetPlayers()) do
-                if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and not p.Character:FindFirstChild("EmloxaESP_Tag") then
-                    local isDown = IsPlayerDowned(p)
-                    local col = isDown and Color3.new(0.9,0.1,0.1) or Color3.new(0.4,0.8,0.4)
-                    local txt = isDown and (p.Name.." [DOWNED]") or p.Name
+                if p~=LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and not p.Character:FindFirstChild("EmloxaESP_Tag") then
+                    local down = IsPlayerDowned(p)
+                    local col = down and Color3.new(0.9,0.1,0.1) or Color3.new(0.4,0.8,0.4)
+                    local txt = down and (p.Name.." [DOWNED]") or p.Name
                     CreateESP(p.Character, txt, col, p.Character.HumanoidRootPart, 2, Settings.Visuals.PlayerHighlight)
                 end
             end
         end
         if Settings.Visuals.BotESP then
             for _,b in ipairs(scanNextbots()) do
-                local part = b:FindFirstChild("Hitbox") or b:FindFirstChild("HumanoidRootPart")
-                if part and not b:FindFirstChild("EmloxaESP_Tag") then
-                    CreateESP(b, b.Name, Color3.new(0.8,0.2,0.2), part, 3, Settings.Visuals.BotHighlight)
+                local part = b.Model:FindFirstChild("Hitbox") or b.Model:FindFirstChild("HumanoidRootPart")
+                if part and not b.Model:FindFirstChild("EmloxaESP_Tag") then
+                    CreateESP(b.Model, b.Model.Name, Color3.new(0.8,0.2,0.2), part, 3, Settings.Visuals.BotHighlight)
                 end
             end
         end
         if Settings.Visuals.TicketESP then
             local tf = Workspace:FindFirstChild("Game") and Workspace.Game:FindFirstChild("Tickets")
-            if tf then
-                for _,t in pairs(tf:GetChildren()) do
-                    if t:IsA("BasePart") and not t:FindFirstChild("EmloxaESP_Tag") then
-                        CreateESP(t, "Ticket", Color3.fromRGB(255,215,0), t, 1, false)
-                    end
-                end
-            end
+            if tf then for _,t in pairs(tf:GetChildren()) do if t:IsA("BasePart") and not t:FindFirstChild("EmloxaESP_Tag") then CreateESP(t, "Ticket", Color3.fromRGB(255,215,0), t, 1, false) end end end
         end
 
-        -- ESP update
+        -- ESP güncelleme
         local camPos = Camera and Camera.CFrame.Position or Vector3.new()
         for i=#ActiveESPs,1,-1 do
             local esp = ActiveESPs[i]
@@ -527,18 +632,13 @@ function GameModule:Init(Window)
                     local isDown = IsPlayerDowned(p)
                     esp.CurrentColor = isDown and Color3.new(0.9,0.1,0.1) or Color3.new(0.4,0.8,0.4)
                     if esp.Label then
-                        local dist = ""
                         if Settings.Visuals.Distance then
-                            dist = " ["..math.floor((camPos - esp.Part.Position).Magnitude).."m]"
-                        end
-                        esp.Label.Text = (isDown and (p.Name.." [DOWNED]") or p.Name) .. dist
+                            esp.Label.Text = (isDown and (p.Name.." [DOWNED]") or p.Name) .. " ["..math.floor((camPos-esp.Part.Position).Magnitude).."m]"
+                        else esp.Label.Text = isDown and (p.Name.." [DOWNED]") or p.Name end
                         esp.Label.TextColor3 = esp.CurrentColor
                     end
                 end
-                if esp.Highlight then
-                    esp.Highlight.FillColor = esp.CurrentColor
-                    esp.Highlight.OutlineColor = esp.CurrentColor
-                end
+                if esp.Highlight then esp.Highlight.FillColor = esp.CurrentColor; esp.Highlight.OutlineColor = esp.CurrentColor end
             else
                 if esp.Highlight then esp.Highlight:Destroy() end
                 if esp.Billboard then esp.Billboard:Destroy() end
@@ -549,7 +649,7 @@ function GameModule:Init(Window)
         if Settings.World.FOV ~= 70 and Camera then Camera.FieldOfView = Settings.World.FOV end
     end))
 
-    print("Emloxa Evade v7 (Clean) yüklendi.")
+    print("Emloxa Evade v8 (Autofarm) yüklendi.")
 end
 
 return GameModule
