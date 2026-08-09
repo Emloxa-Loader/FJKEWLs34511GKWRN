@@ -1,5 +1,5 @@
 -- =========================================================================
--- EMLOXA WARE: EVADE v8.5 – MUSIC TAB & FULL VISUALIZER (HATA DÜZELTİLDİ)
+-- EMLOXA WARE: EVADE v8.6 – OPTİMİZE EDİLMİŞ, MÜZİK SEKMESİZ
 -- =========================================================================
 local GameModule = {}
 
@@ -13,13 +13,11 @@ function GameModule:Init(Window)
     local Lighting = game:GetService("Lighting")
     local LocalPlayer = Players.LocalPlayer
     local Camera = Workspace.CurrentCamera
-    local TweenService = game:GetService("TweenService")
 
     local HUIParent = (gethui and gethui()) or game:GetService("CoreGui")
 
     local Connections = {}
     local ActiveESPs = {}
-    local DownedTimers = {}
     local CurrentPlatform = nil
 
     local Settings = {
@@ -42,15 +40,6 @@ function GameModule:Init(Window)
         AutoFarm = {
             AutoTickets = false,
             AutoWin = false
-        },
-        Music = {
-            CurrentSound = nil,
-            CurrentID = "",
-            Loop = true,
-            VisualizerEnabled = false,
-            VisualizerModel = nil,
-            VisualizerParts = {},
-            VisualizerConnection = nil
         }
     }
 
@@ -61,14 +50,14 @@ function GameModule:Init(Window)
     local ticketSafePlatform = nil
 
     -- ==========================================
-    -- HUD (şeffaf ve tıklanabilir)
+    -- HUD (şeffaf, tıklamaları engellemez)
     -- ==========================================
     local StatusGui = Instance.new("ScreenGui")
     StatusGui.Name = "EmloxaStatusUI"
     StatusGui.Parent = HUIParent
 
     local MainHud = Instance.new("Frame")
-    MainHud.Size = UDim2.new(0, 240, 0, 210)
+    MainHud.Size = UDim2.new(0, 240, 0, 180)
     MainHud.Position = UDim2.new(1, -250, 0.3, 0)
     MainHud.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
     MainHud.BackgroundTransparency = 0.6
@@ -148,7 +137,7 @@ function GameModule:Init(Window)
     end
 
     -- ==========================================
-    -- DOWNED CHECK
+    -- DOWNED CHECK (sadece manuel carry için)
     -- ==========================================
     local function IsPlayerDowned(p)
         if not p then return false end
@@ -166,7 +155,7 @@ function GameModule:Init(Window)
     end
 
     -- ==========================================
-    -- CHAMS HIGHLIGHT + ESP
+    -- ESP SİSTEMİ (Highlight / Billboard)
     -- ==========================================
     local function CreateESP(target, nameText, color, attachPart, yOffset, useHighlight)
         if not target or not attachPart or target:FindFirstChild("EmloxaESP_Tag") then return end
@@ -220,93 +209,7 @@ function GameModule:Init(Window)
     end
 
     -- ==========================================
-    -- VISUALIZER SYSTEM (tanımlandı, hata yok)
-    -- ==========================================
-    local function stopVisualizer()
-        if Settings.Music.VisualizerConnection then
-            Settings.Music.VisualizerConnection:Disconnect()
-            Settings.Music.VisualizerConnection = nil
-        end
-        if Settings.Music.VisualizerModel then
-            Settings.Music.VisualizerModel:Destroy()
-            Settings.Music.VisualizerModel = nil
-        end
-        Settings.Music.VisualizerParts = {}
-    end
-
-    local function startVisualizer(sound)
-        stopVisualizer()
-        local char = LocalPlayer.Character
-        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-        local hrp = char.HumanoidRootPart
-
-        local visModel = Instance.new("Model")
-        visModel.Name = "EmloxaVisualizer"
-        visModel.Parent = char
-
-        local holder = Instance.new("Model")
-        holder.Name = "Holder"
-        holder.Parent = visModel
-
-        local partsFolder = Instance.new("Folder")
-        partsFolder.Name = "VisualizeParts"
-        partsFolder.Parent = visModel
-
-        local numParts = 36
-        local radius = 5
-        local parts = {}
-        local motors = {}
-        for i=1, numParts do
-            local angle = math.rad((i-1) * (360/numParts))
-            local x = math.cos(angle) * radius
-            local z = math.sin(angle) * radius
-
-            local part = Instance.new("Part")
-            part.Size = Vector3.new(0.2, 1, 0.2)
-            part.Anchored = true
-            part.Parent = partsFolder
-            part.Name = "Bar" .. i
-            table.insert(parts, part)
-
-            local motor = Instance.new("Motor6D")
-            motor.Part0 = hrp
-            motor.Part1 = part
-            motor.Parent = holder
-            motor.C0 = CFrame.new(x, 0, z) * CFrame.Angles(0, angle, 0)
-            table.insert(motors, motor)
-        end
-
-        Settings.Music.VisualizerModel = visModel
-        Settings.Music.VisualizerParts = parts
-
-        local lastScale = 1
-        Settings.Music.VisualizerConnection = RunService.Heartbeat:Connect(function()
-            if not sound or not sound.Parent or not sound.IsPlaying then
-                stopVisualizer()
-                return
-            end
-            local loudness = sound.PlaybackLoudness
-            local scale = math.clamp(loudness / 100, 0.2, 2)
-            local smoothScale = lastScale + (scale - lastScale) * 0.1
-            lastScale = smoothScale
-
-            for i, motor in ipairs(motors) do
-                local baseCFrame = motor.C0
-                local newPos = baseCFrame.Position * smoothScale
-                motor.C0 = CFrame.new(newPos) * baseCFrame.Rotation
-            end
-
-            for i, part in ipairs(parts) do
-                local sizeY = math.clamp(0.5 + loudness * 0.02, 0.5, 5)
-                part.Size = Vector3.new(0.2, sizeY, 0.2)
-                local hue = (tick() * 50 + i * 10) % 360
-                part.Color = Color3.fromHSV(hue/360, 0.8, 0.9)
-            end
-        end)
-    end
-
-    -- ==========================================
-    -- MENÜ
+    -- MENÜ SEKMELERİ
     -- ==========================================
     local MoveTab = Window:CreateTab("Movement")
     MoveTab:CreateToggle("Enable True Speed", function(s) Settings.Movement.SpeedEnabled = s end)
@@ -359,55 +262,6 @@ function GameModule:Init(Window)
         if not s then local tf=Workspace:FindFirstChild("Game") and Workspace.Game:FindFirstChild("Tickets") if tf then for _,t in pairs(tf:GetChildren()) do RemoveESP(t) end end end
     end)
 
-    -- MUSIC TAB (hata giderildi)
-    local MusicTab = Window:CreateTab("Music")
-    MusicTab:CreateTextbox("Music ID", "Enter ID...", function(val)
-        Settings.Music.CurrentID = val
-    end)
-    MusicTab:CreateButton("Play", function()
-        local id = Settings.Music.CurrentID
-        if id == "" then return end
-        if Settings.Music.CurrentSound then
-            Settings.Music.CurrentSound:Destroy()
-        end
-        local sound = Instance.new("Sound")
-        sound.SoundId = "rbxassetid://" .. id
-        sound.Volume = 0.5
-        sound.Looped = Settings.Music.Loop
-        sound.Parent = Workspace
-        sound:Play()
-        Settings.Music.CurrentSound = sound
-        if Settings.Music.VisualizerEnabled then
-            startVisualizer(sound)
-        end
-    end)
-    MusicTab:CreateButton("Stop", function()
-        if Settings.Music.CurrentSound then
-            Settings.Music.CurrentSound:Destroy()
-            Settings.Music.CurrentSound = nil
-        end
-        stopVisualizer()
-    end)
-    MusicTab:CreateToggle("Loop", function(s)
-        Settings.Music.Loop = s
-        if Settings.Music.CurrentSound then
-            Settings.Music.CurrentSound.Looped = s
-        end
-    end)
-    MusicTab:CreateToggle("Visualizer", function(s)
-        Settings.Music.VisualizerEnabled = s
-        if s then
-            if Settings.Music.CurrentSound and Settings.Music.CurrentSound.IsPlaying then
-                startVisualizer(Settings.Music.CurrentSound)
-            end
-        else
-            stopVisualizer()
-        end
-    end)
-
-    -- ==========================================
-    -- WORLD TAB
-    -- ==========================================
     local WorldTab = Window:CreateTab("World")
     WorldTab:CreateToggle("FullBright", function(s) Settings.World.FullBright = s end)
     WorldTab:CreateToggle("No Fog", function(s) Settings.World.NoFog = s end)
@@ -424,7 +278,6 @@ function GameModule:Init(Window)
         StatusGui:Destroy()
         if CurrentPlatform then CurrentPlatform:Destroy() end
         if ticketSafePlatform then ticketSafePlatform:Destroy() end
-        stopVisualizer()
         local char = LocalPlayer.Character
         if char and char:FindFirstChild("HumanoidRootPart") then
             local hum = char:FindFirstChildOfClass("Humanoid")
@@ -436,7 +289,7 @@ function GameModule:Init(Window)
     end)
 
     -- ==========================================
-    -- TUŞLAR (Manuel Carry)
+    -- MANUEL CARRY FONKSİYONLARI
     -- ==========================================
     local function CarryPick()
         local closest, minDist = nil, math.huge
@@ -532,7 +385,7 @@ function GameModule:Init(Window)
     end))
 
     -- ==========================================
-    -- NEXTBOT SCAN
+    -- NEXTBOT TARAMA (NPC isimlerine göre, optimize)
     -- ==========================================
     local npcNames = {}
     local function updateNpcNames()
@@ -550,10 +403,12 @@ function GameModule:Init(Window)
         ReplicatedStorage.NPCs.ChildAdded:Connect(updateNpcNames)
         ReplicatedStorage.NPCs.ChildRemoved:Connect(updateNpcNames)
     end
-    local lastNextbotScan = 0; local cachedNextbots = {}
+    local lastNextbotScan = 0
+    local cachedNextbots = {}
     local function scanNextbots()
-        if tick()-lastNextbotScan < 0.8 then return cachedNextbots end
-        lastNextbotScan = tick()
+        local now = tick()
+        if now - lastNextbotScan < 1.2 then return cachedNextbots end  -- saniyede 1 kere
+        lastNextbotScan = now
         local npcs = {}
         for _,v in ipairs(Workspace:GetDescendants()) do
             if v:IsA("Model") and npcNames[v.Name] and v:FindFirstChildOfClass("Humanoid") then
@@ -568,7 +423,7 @@ function GameModule:Init(Window)
     end
 
     -- ==========================================
-    -- GÜVENLİ PLATFORM
+    -- GÜVENLİ PLATFORM (tekrar oluşturmaz, taşır)
     -- ==========================================
     local function createSafePlatform(position)
         if ticketSafePlatform then
@@ -599,6 +454,7 @@ function GameModule:Init(Window)
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
 
         if hum and hrp then
+            -- Hareket sistemi
             if Settings.Movement.FlyEnabled then
                 if hrp:FindFirstChild("EmloxaVelocity") then hrp.EmloxaVelocity:Destroy() end
                 local bv = Instance.new("BodyVelocity"); bv.Name = "EmloxaVelocity"; bv.MaxForce = Vector3.new(1e6,1e6,1e6); bv.Parent = hrp
@@ -627,6 +483,7 @@ function GameModule:Init(Window)
                 VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
             end
 
+            -- AUTO WIN
             if Settings.AutoFarm.AutoWin then
                 local npcs = scanNextbots()
                 local myPos = hrp.Position
@@ -640,11 +497,11 @@ function GameModule:Init(Window)
                     end
                 end
                 if danger then
-                    local safeCFrame = createSafePlatform(myPos)
-                    hrp.CFrame = safeCFrame
+                    hrp.CFrame = createSafePlatform(myPos)
                 end
             end
 
+            -- AUTO COLLECT TICKETS
             if Settings.AutoFarm.AutoTickets then
                 local npcs = scanNextbots()
                 local myPos = hrp.Position
@@ -656,8 +513,7 @@ function GameModule:Init(Window)
                 end
 
                 if nearestNpcDist < 70 then
-                    local safeCFrame = createSafePlatform(myPos)
-                    hrp.CFrame = safeCFrame
+                    hrp.CFrame = createSafePlatform(myPos)
                     currentTicketTarget = nil
                     UpdateHUD()
                 else
@@ -702,8 +558,7 @@ function GameModule:Init(Window)
                         if stillSafe then
                             hrp.CFrame = CFrame.new(tPos)
                         else
-                            local safeCFrame = createSafePlatform(myPos)
-                            hrp.CFrame = safeCFrame
+                            hrp.CFrame = createSafePlatform(myPos)
                             currentTicketTarget = nil
                             UpdateHUD()
                         end
@@ -717,16 +572,7 @@ function GameModule:Init(Window)
             end
         end
 
-        for _,p in pairs(Players:GetPlayers()) do
-            if p~=LocalPlayer and p.Character then
-                if IsPlayerDowned(p) then
-                    if not DownedTimers[p] then DownedTimers[p]=tick() end
-                else
-                    DownedTimers[p]=nil
-                end
-            end
-        end
-
+        -- Auto Vote
         if Settings.Vote.AutoVote then
             local ev = ReplicatedStorage:FindFirstChild("Events")
             if ev and ev:FindFirstChild("Player") and ev.Player:FindFirstChild("Vote") then
@@ -734,6 +580,7 @@ function GameModule:Init(Window)
             end
         end
 
+        -- ESP oluşturma
         if Settings.Visuals.PlayerESP then
             for _,p in pairs(Players:GetPlayers()) do
                 if p~=LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and not p.Character:FindFirstChild("EmloxaESP_Tag") then
@@ -757,6 +604,7 @@ function GameModule:Init(Window)
             if tf then for _,t in pairs(tf:GetChildren()) do if t:IsA("BasePart") and not t:FindFirstChild("EmloxaESP_Tag") then CreateESP(t, "Ticket", Color3.fromRGB(255,215,0), t, 1, false) end end end
         end
 
+        -- ESP güncelleme
         local camPos = Camera and Camera.CFrame.Position or Vector3.new()
         for i=#ActiveESPs,1,-1 do
             local esp = ActiveESPs[i]
@@ -783,7 +631,7 @@ function GameModule:Init(Window)
         if Settings.World.FOV ~= 70 and Camera then Camera.FieldOfView = Settings.World.FOV end
     end))
 
-    print("Emloxa Evade v8.5 yüklendi – Music + Visualizer çalışıyor.")
+    print("Emloxa Evade v8.6 (Optimized) yüklendi.")
 end
 
 return GameModule
