@@ -1,5 +1,5 @@
 -- =========================================================================
--- EMLOXA WARE: EVADE v8.2 – MANUEL TAŞIMA, SERBEST Y, HIZLI LIFT
+-- EMLOXA WARE: EVADE v8.3 – FASTER AUTOFARM, TRANSPARENT HUD
 -- =========================================================================
 local GameModule = {}
 
@@ -51,7 +51,7 @@ function GameModule:Init(Window)
     local ticketSafePlatform = nil
 
     -- ==========================================
-    -- HUD
+    -- HUD (şeffaf ve tıklanabilir arka plan)
     -- ==========================================
     local StatusGui = Instance.new("ScreenGui")
     StatusGui.Name = "EmloxaStatusUI"
@@ -61,9 +61,9 @@ function GameModule:Init(Window)
     MainHud.Size = UDim2.new(0, 240, 0, 210)
     MainHud.Position = UDim2.new(1, -250, 0.3, 0)
     MainHud.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-    MainHud.BackgroundTransparency = 0.15
+    MainHud.BackgroundTransparency = 0.6  -- daha şeffaf
     MainHud.BorderSizePixel = 0
-    MainHud.Active = true
+    MainHud.Active = false  -- tıklamaları altındaki nesnelere iletir
     Instance.new("UICorner", MainHud).CornerRadius = UDim.new(0, 10)
     MainHud.Parent = StatusGui
     Instance.new("UIStroke", MainHud).Color = Color3.fromRGB(102, 85, 255)
@@ -388,7 +388,7 @@ function GameModule:Init(Window)
     end))
 
     -- ==========================================
-    -- NEXTBOT SCAN
+    -- NEXTBOT SCAN (daha sık tarama)
     -- ==========================================
     local npcNames = {}
     local function updateNpcNames()
@@ -408,7 +408,7 @@ function GameModule:Init(Window)
     end
     local lastNextbotScan = 0; local cachedNextbots = {}
     local function scanNextbots()
-        if tick()-lastNextbotScan < 1.5 then return cachedNextbots end
+        if tick()-lastNextbotScan < 0.8 then return cachedNextbots end  -- daha sık güncelleme
         lastNextbotScan = tick()
         local npcs = {}
         for _,v in ipairs(Workspace:GetDescendants()) do
@@ -424,18 +424,22 @@ function GameModule:Init(Window)
     end
 
     -- ==========================================
-    -- GÜVENLİ PLATFORM OLUŞTUR
+    -- GÜVENLİ PLATFORM (hızlı oluşturma)
     -- ==========================================
     local function createSafePlatform(position)
-        if ticketSafePlatform then ticketSafePlatform:Destroy() end
-        local plat = Instance.new("Part")
-        plat.Size = Vector3.new(30, 1, 30)
-        plat.CFrame = CFrame.new(position.X, position.Y + 1000, position.Z)
-        plat.Anchored = true
-        plat.Material = Enum.Material.Glass
-        plat.Parent = Workspace
-        ticketSafePlatform = plat
-        return plat.CFrame + Vector3.new(0, 3, 0)
+        if ticketSafePlatform then
+            -- Mevcut platformu hızlıca yeni konuma taşı
+            ticketSafePlatform.CFrame = CFrame.new(position.X, position.Y + 1000, position.Z)
+        else
+            local plat = Instance.new("Part")
+            plat.Size = Vector3.new(30, 1, 30)
+            plat.CFrame = CFrame.new(position.X, position.Y + 1000, position.Z)
+            plat.Anchored = true
+            plat.Material = Enum.Material.Glass
+            plat.Parent = Workspace
+            ticketSafePlatform = plat
+        end
+        return ticketSafePlatform.CFrame + Vector3.new(0, 3, 0)
     end
 
     -- ==========================================
@@ -465,7 +469,7 @@ function GameModule:Init(Window)
             else
                 if hum.PlatformStand then hum.PlatformStand = false end
                 if hrp:FindFirstChild("EmloxaVelocity") then hrp.EmloxaVelocity:Destroy() end
-                -- TRUE SPEED – Y serbest, doğal fizik
+                -- TRUE SPEED – Y serbest
                 if Settings.Movement.SpeedEnabled and hum.MoveDirection.Magnitude > 0 and not Settings.AutoFarm.AutoTickets then
                     local moveDir = hum.MoveDirection.Unit
                     hrp.CFrame = hrp.CFrame + moveDir * Settings.Movement.SpeedValue * delta
@@ -483,7 +487,7 @@ function GameModule:Init(Window)
                 VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
             end
 
-            -- AUTO WIN
+            -- AUTO WIN (daha hızlı tepki)
             if Settings.AutoFarm.AutoWin then
                 local npcs = scanNextbots()
                 local myPos = hrp.Position
@@ -491,7 +495,7 @@ function GameModule:Init(Window)
                 for _, npc in ipairs(npcs) do
                     local dist = (npc.Position - myPos).Magnitude
                     local yDiff = math.abs(npc.Position.Y - myPos.Y)
-                    if dist < 60 and yDiff < 15 then
+                    if dist < 70 and yDiff < 15 then  -- eşik yükseltildi
                         danger = true
                         break
                     end
@@ -502,7 +506,7 @@ function GameModule:Init(Window)
                 end
             end
 
-            -- AUTO COLLECT TICKETS (güvenlikli)
+            -- AUTO COLLECT TICKETS (daha hızlı kaçış)
             if Settings.AutoFarm.AutoTickets then
                 local npcs = scanNextbots()
                 local myPos = hrp.Position
@@ -513,7 +517,7 @@ function GameModule:Init(Window)
                     if d < nearestNpcDist then nearestNpcDist = d end
                 end
 
-                if nearestNpcDist < 60 then
+                if nearestNpcDist < 70 then  -- daha erken kaç
                     local safeCFrame = createSafePlatform(myPos)
                     hrp.CFrame = safeCFrame
                     currentTicketTarget = nil
@@ -533,7 +537,7 @@ function GameModule:Init(Window)
                                         local d = (npc.Position - tPos).Magnitude
                                         if d < minNpcToTicket then minNpcToTicket = d end
                                     end
-                                    if minNpcToTicket > 80 then
+                                    if minNpcToTicket > 70 then  -- daha güvenli
                                         if minNpcToTicket > bestSafety then
                                             bestSafety = minNpcToTicket
                                             bestTicket = ticket
@@ -645,7 +649,7 @@ function GameModule:Init(Window)
         if Settings.World.FOV ~= 70 and Camera then Camera.FieldOfView = Settings.World.FOV end
     end))
 
-    print("Emloxa Evade v8.2 yüklendi.")
+    print("Emloxa Evade v8.3 yüklendi.")
 end
 
 return GameModule
