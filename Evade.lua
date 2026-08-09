@@ -1,5 +1,5 @@
 -- =========================================================================
--- EMLOXA WARE: EVADE v8.3 – FASTER AUTOFARM, TRANSPARENT HUD
+-- EMLOXA WARE: EVADE v8.4 – MUSIC TAB & VISUALIZER ADDED
 -- =========================================================================
 local GameModule = {}
 
@@ -13,6 +13,7 @@ function GameModule:Init(Window)
     local Lighting = game:GetService("Lighting")
     local LocalPlayer = Players.LocalPlayer
     local Camera = Workspace.CurrentCamera
+    local TweenService = game:GetService("TweenService")
 
     local HUIParent = (gethui and gethui()) or game:GetService("CoreGui")
 
@@ -41,6 +42,15 @@ function GameModule:Init(Window)
         AutoFarm = {
             AutoTickets = false,
             AutoWin = false
+        },
+        Music = {
+            CurrentSound = nil,
+            CurrentID = "",
+            Loop = true,
+            VisualizerEnabled = false,
+            VisualizerModel = nil,
+            VisualizerParts = {},
+            VisualizerConnection = nil
         }
     }
 
@@ -51,7 +61,7 @@ function GameModule:Init(Window)
     local ticketSafePlatform = nil
 
     -- ==========================================
-    -- HUD (şeffaf ve tıklanabilir arka plan)
+    -- HUD (şeffaf ve tıklanabilir)
     -- ==========================================
     local StatusGui = Instance.new("ScreenGui")
     StatusGui.Name = "EmloxaStatusUI"
@@ -61,9 +71,9 @@ function GameModule:Init(Window)
     MainHud.Size = UDim2.new(0, 240, 0, 210)
     MainHud.Position = UDim2.new(1, -250, 0.3, 0)
     MainHud.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-    MainHud.BackgroundTransparency = 0.6  -- daha şeffaf
+    MainHud.BackgroundTransparency = 0.6
     MainHud.BorderSizePixel = 0
-    MainHud.Active = false  -- tıklamaları altındaki nesnelere iletir
+    MainHud.Active = false
     Instance.new("UICorner", MainHud).CornerRadius = UDim.new(0, 10)
     MainHud.Parent = StatusGui
     Instance.new("UIStroke", MainHud).Color = Color3.fromRGB(102, 85, 255)
@@ -263,6 +273,145 @@ function GameModule:Init(Window)
         if not s then local tf=Workspace:FindFirstChild("Game") and Workspace.Game:FindFirstChild("Tickets") if tf then for _,t in pairs(tf:GetChildren()) do RemoveESP(t) end end end
     end)
 
+    -- MUSIC TAB
+    local MusicTab = Window:CreateTab("Music")
+    MusicTab:CreateTextbox("Music ID", "Enter ID...", function(val)
+        Settings.Music.CurrentID = val
+    end)
+    MusicTab:CreateButton("Play", function()
+        local id = Settings.Music.CurrentID
+        if id == "" then return end
+        if Settings.Music.CurrentSound then
+            Settings.Music.CurrentSound:Destroy()
+        end
+        local sound = Instance.new("Sound")
+        sound.SoundId = "rbxassetid://" .. id
+        sound.Volume = 0.5
+        sound.Looped = Settings.Music.Loop
+        sound.Parent = Workspace
+        sound:Play()
+        Settings.Music.CurrentSound = sound
+        -- Start visualizer if enabled
+        if Settings.Music.VisualizerEnabled then
+            startVisualizer(sound)
+        end
+    end)
+    MusicTab:CreateButton("Stop", function()
+        if Settings.Music.CurrentSound then
+            Settings.Music.CurrentSound:Destroy()
+            Settings.Music.CurrentSound = nil
+        end
+        stopVisualizer()
+    end)
+    MusicTab:CreateToggle("Loop", function(s)
+        Settings.Music.Loop = s
+        if Settings.Music.CurrentSound then
+            Settings.Music.CurrentSound.Looped = s
+        end
+    end)
+    MusicTab:CreateToggle("Visualizer", function(s)
+        Settings.Music.VisualizerEnabled = s
+        if s then
+            if Settings.Music.CurrentSound and Settings.Music.CurrentSound.IsPlaying then
+                startVisualizer(Settings.Music.CurrentSound)
+            end
+        else
+            stopVisualizer()
+        end
+    end)
+
+    -- VISUALIZER SYSTEM
+    local function stopVisualizer()
+        if Settings.Music.VisualizerConnection then
+            Settings.Music.VisualizerConnection:Disconnect()
+            Settings.Music.VisualizerConnection = nil
+        end
+        if Settings.Music.VisualizerModel then
+            Settings.Music.VisualizerModel:Destroy()
+            Settings.Music.VisualizerModel = nil
+        end
+        Settings.Music.VisualizerParts = {}
+    end
+
+    local function startVisualizer(sound)
+        stopVisualizer()
+        local char = LocalPlayer.Character
+        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+        local hrp = char.HumanoidRootPart
+
+        local visModel = Instance.new("Model")
+        visModel.Name = "EmloxaVisualizer"
+        visModel.Parent = char
+
+        local holder = Instance.new("Model")
+        holder.Name = "Holder"
+        holder.Parent = visModel
+
+        local partsFolder = Instance.new("Folder")
+        partsFolder.Name = "VisualizeParts"
+        partsFolder.Parent = visModel
+
+        local numParts = 36
+        local radius = 5
+        local parts = {}
+        local motors = {}
+        for i=1, numParts do
+            local angle = math.rad((i-1) * (360/numParts))
+            local x = math.cos(angle) * radius
+            local z = math.sin(angle) * radius
+
+            local part = Instance.new("Part")
+            part.Size = Vector3.new(0.2, 1, 0.2)
+            part.Anchored = true
+            part.Parent = partsFolder
+            part.Name = "Bar" .. i
+            table.insert(parts, part)
+
+            local motor = Instance.new("Motor6D")
+            motor.Part0 = hrp
+            motor.Part1 = part
+            motor.Parent = holder
+            motor.C0 = CFrame.new(x, 0, z) * CFrame.Angles(0, angle, 0) -- face outward
+            table.insert(motors, motor)
+        end
+
+        Settings.Music.VisualizerModel = visModel
+        Settings.Music.VisualizerParts = parts
+
+        -- Run visualizer loop
+        local lastScale = 1
+        Settings.Music.VisualizerConnection = RunService.Heartbeat:Connect(function()
+            if not sound or not sound.Parent or not sound.IsPlaying then
+                stopVisualizer()
+                return
+            end
+            local loudness = sound.PlaybackLoudness
+            local maxLoudness = 100
+            local scale = math.clamp(loudness / maxLoudness, 0.2, 2)
+            -- Smooth transition
+            local smoothScale = lastScale + (scale - lastScale) * 0.1
+            lastScale = smoothScale
+
+            -- Update motor C0 positions
+            for i, motor in ipairs(motors) do
+                local baseCFrame = motor.C0
+                local newPos = baseCFrame.Position * smoothScale
+                motor.C0 = CFrame.new(newPos) * baseCFrame.Rotation
+            end
+
+            -- Update part sizes and colors
+            for i, part in ipairs(parts) do
+                local sizeY = math.clamp(0.5 + loudness * 0.02, 0.5, 5)
+                part.Size = Vector3.new(0.2, sizeY, 0.2)
+                local hue = (tick() * 50 + i * 10) % 360
+                part.Color = Color3.fromHSV(hue/360, 0.8, 0.9)
+            end
+        end)
+    end
+
+    -- ==========================================
+    -- WORLD TAB
+    -- ==========================================
     local WorldTab = Window:CreateTab("World")
     WorldTab:CreateToggle("FullBright", function(s) Settings.World.FullBright = s end)
     WorldTab:CreateToggle("No Fog", function(s) Settings.World.NoFog = s end)
@@ -279,6 +428,7 @@ function GameModule:Init(Window)
         StatusGui:Destroy()
         if CurrentPlatform then CurrentPlatform:Destroy() end
         if ticketSafePlatform then ticketSafePlatform:Destroy() end
+        stopVisualizer()
         local char = LocalPlayer.Character
         if char and char:FindFirstChild("HumanoidRootPart") then
             local hum = char:FindFirstChildOfClass("Humanoid")
@@ -322,7 +472,6 @@ function GameModule:Init(Window)
     local function CarryLift()
         local myHrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         if not myHrp then return end
-        -- Eğer hedef yoksa en yakın downed oyuncuyu bulup hedef yap
         if not Settings.CarrySystem.TargetPlayer then
             local closest, minDist = nil, math.huge
             for _,p in pairs(Players:GetPlayers()) do
@@ -344,7 +493,6 @@ function GameModule:Init(Window)
                 return
             end
         end
-        -- Şimdi lift yap
         Settings.CarrySystem.State = "Lifting"; UpdateHUD()
         if CurrentPlatform then CurrentPlatform:Destroy() end
         CurrentPlatform = Instance.new("Part")
@@ -388,7 +536,7 @@ function GameModule:Init(Window)
     end))
 
     -- ==========================================
-    -- NEXTBOT SCAN (daha sık tarama)
+    -- NEXTBOT SCAN
     -- ==========================================
     local npcNames = {}
     local function updateNpcNames()
@@ -408,7 +556,7 @@ function GameModule:Init(Window)
     end
     local lastNextbotScan = 0; local cachedNextbots = {}
     local function scanNextbots()
-        if tick()-lastNextbotScan < 0.8 then return cachedNextbots end  -- daha sık güncelleme
+        if tick()-lastNextbotScan < 0.8 then return cachedNextbots end
         lastNextbotScan = tick()
         local npcs = {}
         for _,v in ipairs(Workspace:GetDescendants()) do
@@ -424,11 +572,10 @@ function GameModule:Init(Window)
     end
 
     -- ==========================================
-    -- GÜVENLİ PLATFORM (hızlı oluşturma)
+    -- GÜVENLİ PLATFORM
     -- ==========================================
     local function createSafePlatform(position)
         if ticketSafePlatform then
-            -- Mevcut platformu hızlıca yeni konuma taşı
             ticketSafePlatform.CFrame = CFrame.new(position.X, position.Y + 1000, position.Z)
         else
             local plat = Instance.new("Part")
@@ -446,7 +593,6 @@ function GameModule:Init(Window)
     -- ANA MOTOR
     -- ==========================================
     table.insert(Connections, RunService.Heartbeat:Connect(function(delta)
-        -- FullBright/NoFog
         if Settings.World.FullBright then
             Lighting.Brightness = 5; Lighting.GlobalShadows = false; Lighting.Ambient = Color3.new(1,1,1)
         end
@@ -469,7 +615,6 @@ function GameModule:Init(Window)
             else
                 if hum.PlatformStand then hum.PlatformStand = false end
                 if hrp:FindFirstChild("EmloxaVelocity") then hrp.EmloxaVelocity:Destroy() end
-                -- TRUE SPEED – Y serbest
                 if Settings.Movement.SpeedEnabled and hum.MoveDirection.Magnitude > 0 and not Settings.AutoFarm.AutoTickets then
                     local moveDir = hum.MoveDirection.Unit
                     hrp.CFrame = hrp.CFrame + moveDir * Settings.Movement.SpeedValue * delta
@@ -487,7 +632,7 @@ function GameModule:Init(Window)
                 VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
             end
 
-            -- AUTO WIN (daha hızlı tepki)
+            -- AUTO WIN
             if Settings.AutoFarm.AutoWin then
                 local npcs = scanNextbots()
                 local myPos = hrp.Position
@@ -495,7 +640,7 @@ function GameModule:Init(Window)
                 for _, npc in ipairs(npcs) do
                     local dist = (npc.Position - myPos).Magnitude
                     local yDiff = math.abs(npc.Position.Y - myPos.Y)
-                    if dist < 70 and yDiff < 15 then  -- eşik yükseltildi
+                    if dist < 70 and yDiff < 15 then
                         danger = true
                         break
                     end
@@ -506,7 +651,7 @@ function GameModule:Init(Window)
                 end
             end
 
-            -- AUTO COLLECT TICKETS (daha hızlı kaçış)
+            -- AUTO COLLECT TICKETS
             if Settings.AutoFarm.AutoTickets then
                 local npcs = scanNextbots()
                 local myPos = hrp.Position
@@ -517,7 +662,7 @@ function GameModule:Init(Window)
                     if d < nearestNpcDist then nearestNpcDist = d end
                 end
 
-                if nearestNpcDist < 70 then  -- daha erken kaç
+                if nearestNpcDist < 70 then
                     local safeCFrame = createSafePlatform(myPos)
                     hrp.CFrame = safeCFrame
                     currentTicketTarget = nil
@@ -537,7 +682,7 @@ function GameModule:Init(Window)
                                         local d = (npc.Position - tPos).Magnitude
                                         if d < minNpcToTicket then minNpcToTicket = d end
                                     end
-                                    if minNpcToTicket > 70 then  -- daha güvenli
+                                    if minNpcToTicket > 70 then
                                         if minNpcToTicket > bestSafety then
                                             bestSafety = minNpcToTicket
                                             bestTicket = ticket
@@ -649,7 +794,7 @@ function GameModule:Init(Window)
         if Settings.World.FOV ~= 70 and Camera then Camera.FieldOfView = Settings.World.FOV end
     end))
 
-    print("Emloxa Evade v8.3 yüklendi.")
+    print("Emloxa Evade v8.4 yüklendi. Music, Visualizer ve tüm özellikler aktif.")
 end
 
 return GameModule
