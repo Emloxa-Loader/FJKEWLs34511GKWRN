@@ -1,5 +1,5 @@
 -- =========================================================================
--- EMLOXA WARE: EVADE v8 – AUTOFARM (TICKETS & AUTO WIN)
+-- EMLOXA WARE: EVADE v8.2 – MANUEL TAŞIMA, SERBEST Y, HIZLI LIFT
 -- =========================================================================
 local GameModule = {}
 
@@ -28,7 +28,6 @@ function GameModule:Init(Window)
             AutoBhop = false, EmoteDash = false
         },
         CarrySystem = {
-            AutoMode = false,
             State = "Idle",
             TargetPlayer = nil
         },
@@ -48,7 +47,6 @@ function GameModule:Init(Window)
     local IsHoldingSpace = false
     local IsHoldingCtrl = false
 
-    -- Ticket hedef durumu
     local currentTicketTarget = nil
     local ticketSafePlatform = nil
 
@@ -222,19 +220,6 @@ function GameModule:Init(Window)
     MoveTab:CreateToggle("Auto Bhop", function(s) Settings.Movement.AutoBhop = s end)
     MoveTab:CreateToggle("Emote Dash Spam", function(s) Settings.Movement.EmoteDash = s end)
 
-    local CarryTab = Window:CreateTab("Carry")
-    CarryTab:CreateToggle("Enable Auto Carry", function(s)
-        Settings.CarrySystem.AutoMode = s
-        if not s then Settings.CarrySystem.State = "Idle"; Settings.CarrySystem.TargetPlayer = nil; UpdateHUD() end
-    end)
-    CarryTab:CreateButton("Reset Carry", function()
-        Settings.CarrySystem.State = "Idle"; Settings.CarrySystem.TargetPlayer = nil
-        if CurrentPlatform then CurrentPlatform:Destroy(); CurrentPlatform = nil end
-        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Q, false, game)
-        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-        UpdateHUD()
-    end)
-
     local AutoFarmTab = Window:CreateTab("Autofarm")
     AutoFarmTab:CreateToggle("Auto Collect Tickets", function(s)
         Settings.AutoFarm.AutoTickets = s
@@ -305,7 +290,7 @@ function GameModule:Init(Window)
     end)
 
     -- ==========================================
-    -- TUŞLAR
+    -- TUŞLAR (Manuel Carry – H olmadan J de çalışır)
     -- ==========================================
     local function CarryPick()
         local closest, minDist = nil, math.huge
@@ -336,7 +321,30 @@ function GameModule:Init(Window)
 
     local function CarryLift()
         local myHrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if not myHrp or not Settings.CarrySystem.TargetPlayer then return end
+        if not myHrp then return end
+        -- Eğer hedef yoksa en yakın downed oyuncuyu bulup hedef yap
+        if not Settings.CarrySystem.TargetPlayer then
+            local closest, minDist = nil, math.huge
+            for _,p in pairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and IsPlayerDowned(p) then
+                    local pHrp = p.Character and p.Character:FindFirstChild("HumanoidRootPart")
+                    if pHrp then
+                        local d = (pHrp.Position - myHrp.Position).Magnitude
+                        if d < minDist then minDist = d; closest = p end
+                    end
+                end
+            end
+            if closest then
+                Settings.CarrySystem.TargetPlayer = closest
+                Settings.CarrySystem.State = "Teleporting"
+                UpdateHUD()
+                myHrp.CFrame = closest.Character.HumanoidRootPart.CFrame
+                task.wait(0.15)
+            else
+                return
+            end
+        end
+        -- Şimdi lift yap
         Settings.CarrySystem.State = "Lifting"; UpdateHUD()
         if CurrentPlatform then CurrentPlatform:Destroy() end
         CurrentPlatform = Instance.new("Part")
@@ -457,11 +465,10 @@ function GameModule:Init(Window)
             else
                 if hum.PlatformStand then hum.PlatformStand = false end
                 if hrp:FindFirstChild("EmloxaVelocity") then hrp.EmloxaVelocity:Destroy() end
+                -- TRUE SPEED – Y serbest, doğal fizik
                 if Settings.Movement.SpeedEnabled and hum.MoveDirection.Magnitude > 0 and not Settings.AutoFarm.AutoTickets then
-                    local moveDir = hum.MoveDirection * Vector3.new(1,0,1)
-                    if moveDir.Magnitude > 0 then
-                        hrp.CFrame += moveDir.Unit * Settings.Movement.SpeedValue * delta
-                    end
+                    local moveDir = hum.MoveDirection.Unit
+                    hrp.CFrame = hrp.CFrame + moveDir * Settings.Movement.SpeedValue * delta
                 end
             end
 
@@ -495,81 +502,72 @@ function GameModule:Init(Window)
                 end
             end
 
-            -- AUTO COLLECT TICKETS
+            -- AUTO COLLECT TICKETS (güvenlikli)
             if Settings.AutoFarm.AutoTickets then
                 local npcs = scanNextbots()
                 local myPos = hrp.Position
 
-                -- Eğer aktif hedef ticket yok olduysa veya hiç yoksa yeni hedef seç
-                if not currentTicketTarget or not currentTicketTarget.Parent then
-                    currentTicketTarget = nil
-                    local ticketsFolder = Workspace:FindFirstChild("Effects") and Workspace.Effects:FindFirstChild("Tickets") and Workspace.Effects.Tickets:FindFirstChild("Visual")
-                    if ticketsFolder then
-                        local bestTicket = nil
-                        local bestSafety = -1
-                        for _, ticket in ipairs(ticketsFolder:GetChildren()) do
-                            if ticket:IsA("BasePart") then
-                                local tPos = ticket.Position
-                                local distToMe = (tPos - myPos).Magnitude
-                                -- En yakın nextbot mesafesini bul
-                                local minNpcDist = math.huge
-                                for _, npc in ipairs(npcs) do
-                                    local d = (npc.Position - tPos).Magnitude
-                                    if d < minNpcDist then minNpcDist = d end
-                                end
-                                -- Güvenlik puanı: nextbota uzaklık (ne kadar fazla o kadar iyi)
-                                local safety = minNpcDist
-                                if safety > bestSafety then
-                                    bestSafety = safety
-                                    bestTicket = ticket
-                                end
-                            end
-                        end
-                        if bestTicket then
-                            currentTicketTarget = bestTicket
-                            UpdateHUD()
-                        end
-                    end
+                local nearestNpcDist = math.huge
+                for _, npc in ipairs(npcs) do
+                    local d = (npc.Position - myPos).Magnitude
+                    if d < nearestNpcDist then nearestNpcDist = d end
                 end
 
-                -- Hedefe git veya güvende kal
-                if currentTicketTarget then
-                    local tPos = currentTicketTarget.Position
-                    local distToTarget = (tPos - myPos).Magnitude
-                    -- Etraftaki nextbotları kontrol et
-                    local nearestNpcDist = math.huge
-                    local nearestNpcPos = nil
-                    for _, npc in ipairs(npcs) do
-                        local d = (npc.Position - myPos).Magnitude
-                        if d < nearestNpcDist then
-                            nearestNpcDist = d
-                            nearestNpcPos = npc.Position
+                if nearestNpcDist < 60 then
+                    local safeCFrame = createSafePlatform(myPos)
+                    hrp.CFrame = safeCFrame
+                    currentTicketTarget = nil
+                    UpdateHUD()
+                else
+                    if not currentTicketTarget or not currentTicketTarget.Parent then
+                        currentTicketTarget = nil
+                        local ticketsFolder = Workspace:FindFirstChild("Effects") and Workspace.Effects:FindFirstChild("Tickets") and Workspace.Effects.Tickets:FindFirstChild("Visual")
+                        if ticketsFolder then
+                            local bestTicket = nil
+                            local bestSafety = -1
+                            for _, ticket in ipairs(ticketsFolder:GetChildren()) do
+                                if ticket:IsA("BasePart") then
+                                    local tPos = ticket.Position
+                                    local minNpcToTicket = math.huge
+                                    for _, npc in ipairs(npcs) do
+                                        local d = (npc.Position - tPos).Magnitude
+                                        if d < minNpcToTicket then minNpcToTicket = d end
+                                    end
+                                    if minNpcToTicket > 80 then
+                                        if minNpcToTicket > bestSafety then
+                                            bestSafety = minNpcToTicket
+                                            bestTicket = ticket
+                                        end
+                                    end
+                                end
+                            end
+                            if bestTicket then
+                                currentTicketTarget = bestTicket
+                                UpdateHUD()
+                            end
                         end
-                        -- Ticket'a yakın nextbot var mı?
-                        local dToTicket = (npc.Position - tPos).Magnitude
-                        if dToTicket < 50 and distToTarget < 80 then
-                            -- Ticket yakınında nextbot var, kaç!
+                    end
+
+                    if currentTicketTarget then
+                        local tPos = currentTicketTarget.Position
+                        local stillSafe = true
+                        for _, npc in ipairs(npcs) do
+                            if (npc.Position - tPos).Magnitude < 50 then
+                                stillSafe = false
+                                break
+                            end
+                        end
+                        if stillSafe then
+                            hrp.CFrame = CFrame.new(tPos)
+                        else
                             local safeCFrame = createSafePlatform(myPos)
                             hrp.CFrame = safeCFrame
                             currentTicketTarget = nil
                             UpdateHUD()
-                            break
-                        end
-                    end
-
-                    -- Eğer güvendeysek ticket'a ışınlan
-                    if currentTicketTarget and nearestNpcDist > 80 then
-                        hrp.CFrame = CFrame.new(tPos)
-                    elseif currentTicketTarget and nearestNpcDist <= 80 then
-                        -- Yakında nextbot var ama ticket da yakın değilse platforma çık
-                        if distToTarget > 80 then
-                            local safeCFrame = createSafePlatform(myPos)
-                            hrp.CFrame = safeCFrame
                         end
                     end
                 end
             else
-                -- AutoTickets kapalıysa temizlik yap
                 if currentTicketTarget then
                     currentTicketTarget = nil
                     UpdateHUD()
@@ -577,25 +575,23 @@ function GameModule:Init(Window)
             end
         end
 
-        -- Downed tracking / Carry / Vote
-        for _,p in pairs(Players:GetPlayers()) do if p~=LocalPlayer and p.Character then if IsPlayerDowned(p) then if not DownedTimers[p] then DownedTimers[p]=tick() end else DownedTimers[p]=nil end end end
-        if Settings.CarrySystem.AutoMode and hrp then
-            if Settings.CarrySystem.State == "Idle" then
-                for p,st in pairs(DownedTimers) do if p.Character and p.Character:FindFirstChild("HumanoidRootPart") and tick()-st>=5 then Settings.CarrySystem.TargetPlayer=p; Settings.CarrySystem.State="Teleporting"; UpdateHUD() break end end
-            elseif Settings.CarrySystem.State == "Teleporting" and Settings.CarrySystem.TargetPlayer then
-                local tHrp = Settings.CarrySystem.TargetPlayer.Character and Settings.CarrySystem.TargetPlayer.Character:FindFirstChild("HumanoidRootPart")
-                if tHrp then hrp.CFrame=tHrp.CFrame; VirtualInputManager:SendKeyEvent(true,Enum.KeyCode.Q,false,game); task.wait(0.2); Settings.CarrySystem.State="Lifting"; UpdateHUD() else Settings.CarrySystem.State="Idle"; UpdateHUD() end
-            elseif Settings.CarrySystem.State == "Lifting" then
-                if CurrentPlatform then CurrentPlatform:Destroy() end
-                CurrentPlatform = Instance.new("Part"); CurrentPlatform.Size=Vector3.new(30,1,30); CurrentPlatform.CFrame=hrp.CFrame+Vector3.new(0,100,0); CurrentPlatform.Anchored=true; CurrentPlatform.Material=Enum.Material.Glass; CurrentPlatform.Parent=Workspace
-                task.wait(0.1); hrp.CFrame=CurrentPlatform.CFrame+Vector3.new(0,3,0); task.wait(0.2); VirtualInputManager:SendKeyEvent(false,Enum.KeyCode.Q,false,game); Settings.CarrySystem.State="Reviving"; UpdateHUD()
-            elseif Settings.CarrySystem.State == "Reviving" and Settings.CarrySystem.TargetPlayer then
-                if IsPlayerDowned(Settings.CarrySystem.TargetPlayer) then VirtualInputManager:SendKeyEvent(true,Enum.KeyCode.E,false,game); task.wait(0.05); VirtualInputManager:SendKeyEvent(false,Enum.KeyCode.E,false,game) else if CurrentPlatform then CurrentPlatform:Destroy(); CurrentPlatform=nil end; Settings.CarrySystem.State="Idle"; Settings.CarrySystem.TargetPlayer=nil; UpdateHUD() end
+        -- Downed tracking
+        for _,p in pairs(Players:GetPlayers()) do
+            if p~=LocalPlayer and p.Character then
+                if IsPlayerDowned(p) then
+                    if not DownedTimers[p] then DownedTimers[p]=tick() end
+                else
+                    DownedTimers[p]=nil
+                end
             end
         end
+
+        -- Auto Vote
         if Settings.Vote.AutoVote then
             local ev = ReplicatedStorage:FindFirstChild("Events")
-            if ev and ev:FindFirstChild("Player") and ev.Player:FindFirstChild("Vote") then ev.Player.Vote:FireServer(Settings.Vote.MapNumber) end
+            if ev and ev:FindFirstChild("Player") and ev.Player:FindFirstChild("Vote") then
+                ev.Player.Vote:FireServer(Settings.Vote.MapNumber)
+            end
         end
 
         -- ESP
@@ -622,7 +618,7 @@ function GameModule:Init(Window)
             if tf then for _,t in pairs(tf:GetChildren()) do if t:IsA("BasePart") and not t:FindFirstChild("EmloxaESP_Tag") then CreateESP(t, "Ticket", Color3.fromRGB(255,215,0), t, 1, false) end end end
         end
 
-        -- ESP güncelleme
+        -- ESP update
         local camPos = Camera and Camera.CFrame.Position or Vector3.new()
         for i=#ActiveESPs,1,-1 do
             local esp = ActiveESPs[i]
@@ -649,7 +645,7 @@ function GameModule:Init(Window)
         if Settings.World.FOV ~= 70 and Camera then Camera.FieldOfView = Settings.World.FOV end
     end))
 
-    print("Emloxa Evade v8 (Autofarm) yüklendi.")
+    print("Emloxa Evade v8.2 yüklendi.")
 end
 
 return GameModule
