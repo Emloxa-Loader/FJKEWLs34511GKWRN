@@ -1,5 +1,5 @@
 -- =========================================================================
--- EMLOXA WARE: EVADE v8.4 – MUSIC TAB & VISUALIZER ADDED
+-- EMLOXA WARE: EVADE v8.5 – MUSIC TAB & FULL VISUALIZER (HATA DÜZELTİLDİ)
 -- =========================================================================
 local GameModule = {}
 
@@ -220,6 +220,92 @@ function GameModule:Init(Window)
     end
 
     -- ==========================================
+    -- VISUALIZER SYSTEM (tanımlandı, hata yok)
+    -- ==========================================
+    local function stopVisualizer()
+        if Settings.Music.VisualizerConnection then
+            Settings.Music.VisualizerConnection:Disconnect()
+            Settings.Music.VisualizerConnection = nil
+        end
+        if Settings.Music.VisualizerModel then
+            Settings.Music.VisualizerModel:Destroy()
+            Settings.Music.VisualizerModel = nil
+        end
+        Settings.Music.VisualizerParts = {}
+    end
+
+    local function startVisualizer(sound)
+        stopVisualizer()
+        local char = LocalPlayer.Character
+        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+        local hrp = char.HumanoidRootPart
+
+        local visModel = Instance.new("Model")
+        visModel.Name = "EmloxaVisualizer"
+        visModel.Parent = char
+
+        local holder = Instance.new("Model")
+        holder.Name = "Holder"
+        holder.Parent = visModel
+
+        local partsFolder = Instance.new("Folder")
+        partsFolder.Name = "VisualizeParts"
+        partsFolder.Parent = visModel
+
+        local numParts = 36
+        local radius = 5
+        local parts = {}
+        local motors = {}
+        for i=1, numParts do
+            local angle = math.rad((i-1) * (360/numParts))
+            local x = math.cos(angle) * radius
+            local z = math.sin(angle) * radius
+
+            local part = Instance.new("Part")
+            part.Size = Vector3.new(0.2, 1, 0.2)
+            part.Anchored = true
+            part.Parent = partsFolder
+            part.Name = "Bar" .. i
+            table.insert(parts, part)
+
+            local motor = Instance.new("Motor6D")
+            motor.Part0 = hrp
+            motor.Part1 = part
+            motor.Parent = holder
+            motor.C0 = CFrame.new(x, 0, z) * CFrame.Angles(0, angle, 0)
+            table.insert(motors, motor)
+        end
+
+        Settings.Music.VisualizerModel = visModel
+        Settings.Music.VisualizerParts = parts
+
+        local lastScale = 1
+        Settings.Music.VisualizerConnection = RunService.Heartbeat:Connect(function()
+            if not sound or not sound.Parent or not sound.IsPlaying then
+                stopVisualizer()
+                return
+            end
+            local loudness = sound.PlaybackLoudness
+            local scale = math.clamp(loudness / 100, 0.2, 2)
+            local smoothScale = lastScale + (scale - lastScale) * 0.1
+            lastScale = smoothScale
+
+            for i, motor in ipairs(motors) do
+                local baseCFrame = motor.C0
+                local newPos = baseCFrame.Position * smoothScale
+                motor.C0 = CFrame.new(newPos) * baseCFrame.Rotation
+            end
+
+            for i, part in ipairs(parts) do
+                local sizeY = math.clamp(0.5 + loudness * 0.02, 0.5, 5)
+                part.Size = Vector3.new(0.2, sizeY, 0.2)
+                local hue = (tick() * 50 + i * 10) % 360
+                part.Color = Color3.fromHSV(hue/360, 0.8, 0.9)
+            end
+        end)
+    end
+
+    -- ==========================================
     -- MENÜ
     -- ==========================================
     local MoveTab = Window:CreateTab("Movement")
@@ -273,7 +359,7 @@ function GameModule:Init(Window)
         if not s then local tf=Workspace:FindFirstChild("Game") and Workspace.Game:FindFirstChild("Tickets") if tf then for _,t in pairs(tf:GetChildren()) do RemoveESP(t) end end end
     end)
 
-    -- MUSIC TAB
+    -- MUSIC TAB (hata giderildi)
     local MusicTab = Window:CreateTab("Music")
     MusicTab:CreateTextbox("Music ID", "Enter ID...", function(val)
         Settings.Music.CurrentID = val
@@ -291,7 +377,6 @@ function GameModule:Init(Window)
         sound.Parent = Workspace
         sound:Play()
         Settings.Music.CurrentSound = sound
-        -- Start visualizer if enabled
         if Settings.Music.VisualizerEnabled then
             startVisualizer(sound)
         end
@@ -319,95 +404,6 @@ function GameModule:Init(Window)
             stopVisualizer()
         end
     end)
-
-    -- VISUALIZER SYSTEM
-    local function stopVisualizer()
-        if Settings.Music.VisualizerConnection then
-            Settings.Music.VisualizerConnection:Disconnect()
-            Settings.Music.VisualizerConnection = nil
-        end
-        if Settings.Music.VisualizerModel then
-            Settings.Music.VisualizerModel:Destroy()
-            Settings.Music.VisualizerModel = nil
-        end
-        Settings.Music.VisualizerParts = {}
-    end
-
-    local function startVisualizer(sound)
-        stopVisualizer()
-        local char = LocalPlayer.Character
-        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-        local hrp = char.HumanoidRootPart
-
-        local visModel = Instance.new("Model")
-        visModel.Name = "EmloxaVisualizer"
-        visModel.Parent = char
-
-        local holder = Instance.new("Model")
-        holder.Name = "Holder"
-        holder.Parent = visModel
-
-        local partsFolder = Instance.new("Folder")
-        partsFolder.Name = "VisualizeParts"
-        partsFolder.Parent = visModel
-
-        local numParts = 36
-        local radius = 5
-        local parts = {}
-        local motors = {}
-        for i=1, numParts do
-            local angle = math.rad((i-1) * (360/numParts))
-            local x = math.cos(angle) * radius
-            local z = math.sin(angle) * radius
-
-            local part = Instance.new("Part")
-            part.Size = Vector3.new(0.2, 1, 0.2)
-            part.Anchored = true
-            part.Parent = partsFolder
-            part.Name = "Bar" .. i
-            table.insert(parts, part)
-
-            local motor = Instance.new("Motor6D")
-            motor.Part0 = hrp
-            motor.Part1 = part
-            motor.Parent = holder
-            motor.C0 = CFrame.new(x, 0, z) * CFrame.Angles(0, angle, 0) -- face outward
-            table.insert(motors, motor)
-        end
-
-        Settings.Music.VisualizerModel = visModel
-        Settings.Music.VisualizerParts = parts
-
-        -- Run visualizer loop
-        local lastScale = 1
-        Settings.Music.VisualizerConnection = RunService.Heartbeat:Connect(function()
-            if not sound or not sound.Parent or not sound.IsPlaying then
-                stopVisualizer()
-                return
-            end
-            local loudness = sound.PlaybackLoudness
-            local maxLoudness = 100
-            local scale = math.clamp(loudness / maxLoudness, 0.2, 2)
-            -- Smooth transition
-            local smoothScale = lastScale + (scale - lastScale) * 0.1
-            lastScale = smoothScale
-
-            -- Update motor C0 positions
-            for i, motor in ipairs(motors) do
-                local baseCFrame = motor.C0
-                local newPos = baseCFrame.Position * smoothScale
-                motor.C0 = CFrame.new(newPos) * baseCFrame.Rotation
-            end
-
-            -- Update part sizes and colors
-            for i, part in ipairs(parts) do
-                local sizeY = math.clamp(0.5 + loudness * 0.02, 0.5, 5)
-                part.Size = Vector3.new(0.2, sizeY, 0.2)
-                local hue = (tick() * 50 + i * 10) % 360
-                part.Color = Color3.fromHSV(hue/360, 0.8, 0.9)
-            end
-        end)
-    end
 
     -- ==========================================
     -- WORLD TAB
@@ -440,7 +436,7 @@ function GameModule:Init(Window)
     end)
 
     -- ==========================================
-    -- TUŞLAR (Manuel Carry – H olmadan J de çalışır)
+    -- TUŞLAR (Manuel Carry)
     -- ==========================================
     local function CarryPick()
         local closest, minDist = nil, math.huge
@@ -603,7 +599,6 @@ function GameModule:Init(Window)
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
 
         if hum and hrp then
-            -- Movement
             if Settings.Movement.FlyEnabled then
                 if hrp:FindFirstChild("EmloxaVelocity") then hrp.EmloxaVelocity:Destroy() end
                 local bv = Instance.new("BodyVelocity"); bv.Name = "EmloxaVelocity"; bv.MaxForce = Vector3.new(1e6,1e6,1e6); bv.Parent = hrp
@@ -632,7 +627,6 @@ function GameModule:Init(Window)
                 VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
             end
 
-            -- AUTO WIN
             if Settings.AutoFarm.AutoWin then
                 local npcs = scanNextbots()
                 local myPos = hrp.Position
@@ -651,7 +645,6 @@ function GameModule:Init(Window)
                 end
             end
 
-            -- AUTO COLLECT TICKETS
             if Settings.AutoFarm.AutoTickets then
                 local npcs = scanNextbots()
                 local myPos = hrp.Position
@@ -724,7 +717,6 @@ function GameModule:Init(Window)
             end
         end
 
-        -- Downed tracking
         for _,p in pairs(Players:GetPlayers()) do
             if p~=LocalPlayer and p.Character then
                 if IsPlayerDowned(p) then
@@ -735,7 +727,6 @@ function GameModule:Init(Window)
             end
         end
 
-        -- Auto Vote
         if Settings.Vote.AutoVote then
             local ev = ReplicatedStorage:FindFirstChild("Events")
             if ev and ev:FindFirstChild("Player") and ev.Player:FindFirstChild("Vote") then
@@ -743,7 +734,6 @@ function GameModule:Init(Window)
             end
         end
 
-        -- ESP
         if Settings.Visuals.PlayerESP then
             for _,p in pairs(Players:GetPlayers()) do
                 if p~=LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and not p.Character:FindFirstChild("EmloxaESP_Tag") then
@@ -767,7 +757,6 @@ function GameModule:Init(Window)
             if tf then for _,t in pairs(tf:GetChildren()) do if t:IsA("BasePart") and not t:FindFirstChild("EmloxaESP_Tag") then CreateESP(t, "Ticket", Color3.fromRGB(255,215,0), t, 1, false) end end end
         end
 
-        -- ESP update
         local camPos = Camera and Camera.CFrame.Position or Vector3.new()
         for i=#ActiveESPs,1,-1 do
             local esp = ActiveESPs[i]
@@ -794,7 +783,7 @@ function GameModule:Init(Window)
         if Settings.World.FOV ~= 70 and Camera then Camera.FieldOfView = Settings.World.FOV end
     end))
 
-    print("Emloxa Evade v8.4 yüklendi. Music, Visualizer ve tüm özellikler aktif.")
+    print("Emloxa Evade v8.5 yüklendi – Music + Visualizer çalışıyor.")
 end
 
 return GameModule
