@@ -1,6 +1,6 @@
 -- =========================================================================
 -- EMLOXA WARE: MURDER MYSTERY 2
--- ULTIMATE STEALTH & COMBAT ENGINE (DYNAMIC MAP, FLING FIX & ROLE DETECTION)
+-- ULTIMATE STEALTH & COMBAT ENGINE (AGGRO FLING, DIRECT FARM, TEXT ESP)
 -- =========================================================================
 local GameModule = {}
 
@@ -15,7 +15,6 @@ function GameModule:Init(Window)
     -- 1. DİNAMİK ALTYAPI & YARDIMCI FONKSİYONLAR
     -- ==========================================
     
-    -- DebugId sürekli değişeceği için Remote'ları sadece ismiyle bulan sistem
     local function GetNilByName(Name)
         if getnilinstances then
             for _, Object in pairs(getnilinstances()) do
@@ -54,7 +53,7 @@ function GameModule:Init(Window)
         return nil
     end
 
-    -- Geliştirilmiş Kusursuz Fling Motoru
+    -- Yeni Agresif (Çıldıran) Fling Motoru
     local function FlingTarget(TargetPlayer)
         local Char = LocalPlayer.Character
         local TargetChar = TargetPlayer.Character
@@ -64,31 +63,26 @@ function GameModule:Init(Window)
         local targetHrp = TargetChar.HumanoidRootPart
         local originalPos = hrp.CFrame
         
-        -- Dönme Hızı
-        local bg = Instance.new("BodyAngularVelocity", hrp)
-        bg.AngularVelocity = Vector3.new(999999, 999999, 999999)
-        bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-        bg.P = 9000
-        
-        -- Karakterimizin uçup gitmesini önleyen sabitleyici
-        local bv = Instance.new("BodyVelocity", hrp)
-        bv.Velocity = Vector3.new(0,0,0)
-        bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        -- Agresif Fırlatma Kuvveti (Senin verdiğin mantık)
+        local thr = Instance.new("BodyThrust")
+        thr.Name = "EmloxaFlingThrust"
+        thr.Force = Vector3.new(99999, 99999, 99999)
+        thr.Location = hrp.Position
+        thr.Parent = hrp
         
         local startTime = tick()
-        -- Hedef fırlayana kadar (Hızı 50'yi geçene kadar) veya max 3 saniye dön
+        -- Hedef fırlayana kadar (Hızı 50'yi geçene kadar) veya max 3 saniye çıldırarak yapış
         while tick() - startTime < 3 and targetHrp.Velocity.Magnitude < 50 do
             RunService.Heartbeat:Wait()
-            if targetHrp.Parent then
-                hrp.CFrame = targetHrp.CFrame * CFrame.new(0, 0, 0)
-                bv.Velocity = Vector3.new(0,0,0)
+            if targetHrp.Parent and targetHrp:FindFirstChild("HumanoidRootPart") then
+                hrp.CFrame = targetHrp.CFrame
+                thr.Location = targetHrp.Position
             else
                 break
             end
         end
         
-        bg:Destroy()
-        bv:Destroy()
+        thr:Destroy()
         
         -- Karakterini sakinleştir ve eski yerine koy
         hrp.Velocity = Vector3.new(0,0,0)
@@ -102,8 +96,8 @@ function GameModule:Init(Window)
     local FarmTab = Window:CreateTab("Auto Farm")
     local MurdererTab = Window:CreateTab("Murderer Options")
     local SheriffTab = Window:CreateTab("Sheriff Options")
-    local FlingTab = Window:CreateTab("Fling & Kill")
-    local ESPTab = Window:CreateTab("Visuals & ESP")
+    local FlingTab = Window:CreateTab("Fling Options")
+    local ESPTab = Window:CreateTab("Visuals and ESP")
     local TeleportTab = Window:CreateTab("Teleports")
     local LocalTab = Window:CreateTab("Local Player")
 
@@ -114,7 +108,9 @@ function GameModule:Init(Window)
     local ESP_Settings = {
         Murderer = false,
         Sheriff = false,
-        Innocent = false
+        Innocent = false,
+        ShowNames = false,
+        ShowDistance = false
     }
     local NoclipActive = false
     local FakeDeathEnabled = false
@@ -139,19 +135,13 @@ function GameModule:Init(Window)
                     task.wait(0.1)
                     local Map = GetMap()
                     if Map and Map:FindFirstChild("CoinContainer") then
-                        -- Daha derin tarama ile tüm paraları bul
                         for _, coin in pairs(Map.CoinContainer:GetDescendants()) do
                             if not FarmEnabled then break end
                             if coin.Name == "CoinVisual" and coin.Parent.Name == "Coin_Server" then
                                 local Char = LocalPlayer.Character
                                 if Char and Char:FindFirstChild("HumanoidRootPart") then
-                                    local targetCFrame = coin.CFrame * CFrame.new(0, -3.5, 0)
-                                    
-                                    local plat = Instance.new("Part", workspace)
-                                    plat.Size = Vector3.new(5, 1, 5)
-                                    plat.Anchored = true
-                                    plat.Transparency = 1
-                                    plat.CFrame = targetCFrame * CFrame.new(0, -3, 0)
+                                    -- Doğrudan paranın konumuna ışınlanır
+                                    local targetCFrame = coin.CFrame
 
                                     if FarmMode == "Legit" then
                                         local dist = (Char.HumanoidRootPart.Position - targetCFrame.Position).Magnitude
@@ -163,9 +153,6 @@ function GameModule:Init(Window)
                                         Char.HumanoidRootPart.CFrame = targetCFrame
                                         task.wait(0.3) 
                                     end
-                                    
-                                    task.wait(0.1)
-                                    plat:Destroy()
                                 end
                             end
                         end
@@ -178,7 +165,7 @@ function GameModule:Init(Window)
     -- ==========================================
     -- 4. COMBAT (MURDERER & SHERIFF)
     -- ==========================================
-    MurdererTab:CreateButton("🔪 Kill All (Require Knife)", function()
+    MurdererTab:CreateButton("Kill All (Require Knife)", function()
         local Char = LocalPlayer.Character
         local Knife = LocalPlayer.Backpack:FindFirstChild("Knife") or Char:FindFirstChild("Knife")
         if not Knife then return end
@@ -201,7 +188,7 @@ function GameModule:Init(Window)
         Char.HumanoidRootPart.CFrame = originalPos
     end)
 
-    SheriffTab:CreateButton("🔫 Kill Murderer (Require Gun)", function()
+    SheriffTab:CreateButton("Kill Murderer (Require Gun)", function()
         local Char = LocalPlayer.Character
         local Gun = LocalPlayer.Backpack:FindFirstChild("Gun") or Char:FindFirstChild("Gun")
         local Murderer = GetMurderer()
@@ -264,7 +251,7 @@ function GameModule:Init(Window)
     end)
 
     -- Fling Options
-    FlingTab:CreateButton("🌪️ Kill All (Fling Mode)", function()
+    FlingTab:CreateButton("Kill All (Fling Mode)", function()
         for _, p in pairs(Players:GetPlayers()) do
             if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
                 FlingTarget(p)
@@ -273,13 +260,13 @@ function GameModule:Init(Window)
         end
     end)
 
-    FlingTab:CreateButton("🌪️ Kill Murderer (Fling Mode)", function()
+    FlingTab:CreateButton("Kill Murderer (Fling Mode)", function()
         local Murderer = GetMurderer()
         if Murderer then FlingTarget(Murderer) end
     end)
 
     -- ==========================================
-    -- 5. VISUALS & ESP (AYRILMIŞ ROLLER)
+    -- 5. VISUALS & ESP (AYRILMIŞ ROLLER & TEXT)
     -- ==========================================
     local ESPFolder = Instance.new("Folder", game:GetService("CoreGui"))
     ESPFolder.Name = "EmloxaMM2ESP"
@@ -291,7 +278,7 @@ function GameModule:Init(Window)
     local function RefreshESP()
         ClearESP()
         for _, p in pairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer and p.Character then
+            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
                 local isMurderer = (p == GetMurderer())
                 local isSheriff = (p == GetSheriff())
                 local isInnocent = not isMurderer and not isSheriff
@@ -318,11 +305,34 @@ function GameModule:Init(Window)
                     hl.FillTransparency = 0.5
                     hl.Adornee = p.Character
                     hl.Parent = ESPFolder
+
+                    -- İsim veya Mesafe açıksa metin kutusunu ekle
+                    if ESP_Settings.ShowNames or ESP_Settings.ShowDistance then
+                        local bgui = Instance.new("BillboardGui")
+                        bgui.Name = p.Name .. "_TextESP"
+                        bgui.Adornee = p.Character.HumanoidRootPart
+                        bgui.Size = UDim2.new(0, 200, 0, 40)
+                        bgui.StudsOffset = Vector3.new(0, 3, 0)
+                        bgui.AlwaysOnTop = true
+                        bgui.Parent = ESPFolder
+
+                        local txt = Instance.new("TextLabel")
+                        txt.Size = UDim2.new(1, 0, 1, 0)
+                        txt.BackgroundTransparency = 1
+                        txt.TextColor3 = drawColor
+                        txt.TextStrokeColor3 = Color3.new(0, 0, 0)
+                        txt.TextStrokeTransparency = 0
+                        txt.Font = Enum.Font.GothamBold
+                        txt.TextSize = 13
+                        txt.Text = ""
+                        txt.Parent = bgui
+                    end
                 end
             end
         end
     end
 
+    -- Highlightları (Renkleri) 1 Saniyede Bir Güncelle
     task.spawn(function()
         while task.wait(1) do
             if ESP_Settings.Murderer or ESP_Settings.Sheriff or ESP_Settings.Innocent then
@@ -333,18 +343,60 @@ function GameModule:Init(Window)
         end
     end)
 
-    ESPTab:CreateToggle("ESP Murderer (Red)", function(state)
+    -- Mesafeleri ve İsimleri Çok Hızlı (0.1s) Güncelle
+    task.spawn(function()
+        while task.wait(0.1) do
+            if ESP_Settings.Murderer or ESP_Settings.Sheriff or ESP_Settings.Innocent then
+                for _, child in pairs(ESPFolder:GetChildren()) do
+                    if child:IsA("BillboardGui") and child.Adornee then
+                        local txt = child:FindFirstChildOfClass("TextLabel")
+                        if txt then
+                            local pName = string.gsub(child.Name, "_TextESP", "")
+                            local textStr = ""
+                            
+                            if ESP_Settings.ShowNames then
+                                textStr = pName
+                            end
+                            
+                            if ESP_Settings.ShowDistance and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                                local dist = math.floor((LocalPlayer.Character.HumanoidRootPart.Position - child.Adornee.Position).Magnitude)
+                                if textStr ~= "" then
+                                    textStr = textStr .. "\n[" .. dist .. "m]"
+                                else
+                                    textStr = "[" .. dist .. "m]"
+                                end
+                            end
+                            
+                            txt.Text = textStr
+                        end
+                    end
+                end
+            end
+        end
+    end)
+
+    ESPTab:CreateToggle("ESP Murderer", function(state)
         ESP_Settings.Murderer = state
         RefreshESP()
     end)
 
-    ESPTab:CreateToggle("ESP Sheriff (Blue)", function(state)
+    ESPTab:CreateToggle("ESP Sheriff", function(state)
         ESP_Settings.Sheriff = state
         RefreshESP()
     end)
 
-    ESPTab:CreateToggle("ESP Innocent (Green)", function(state)
+    ESPTab:CreateToggle("ESP Innocent", function(state)
         ESP_Settings.Innocent = state
+        RefreshESP()
+    end)
+
+    ESPTab:CreateToggle("Show Names", function(state)
+        ESP_Settings.ShowNames = state
+        RefreshESP()
+    end)
+
+    ESPTab:CreateToggle("Show Distance", function(state)
+        ESP_Settings.ShowDistance = state
         RefreshESP()
     end)
 
@@ -416,7 +468,6 @@ function GameModule:Init(Window)
                 if not Char.Humanoid.PlatformStand then
                     Char.Humanoid.PlatformStand = true
                     HRP.Anchored = true
-                    -- Yere girmesini önlemek için hafifçe yukarı (1.5) kaydırılarak yatırılır
                     HRP.CFrame = HRP.CFrame * CFrame.Angles(math.rad(90), 0, 0) + Vector3.new(0, -1.5, 0)
                 else
                     Char.Humanoid.PlatformStand = false
