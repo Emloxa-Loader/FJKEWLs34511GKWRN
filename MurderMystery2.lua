@@ -1,6 +1,6 @@
 -- =========================================================================
 -- EMLOXA WARE: MURDER MYSTERY 2
--- ULTIMATE STEALTH & COMBAT ENGINE (AGGRO FLING, DIRECT FARM, TEXT ESP)
+-- ULTIMATE STEALTH & COMBAT ENGINE (CRAZY FLING & BRING KILL ALL)
 -- =========================================================================
 local GameModule = {}
 
@@ -53,7 +53,9 @@ function GameModule:Init(Window)
         return nil
     end
 
-    -- Yeni Agresif (Çıldıran) Fling Motoru
+    -- ==========================================
+    -- 🔥 YENİ: ÇILDIRAN (CRAZY) FLING MOTORU
+    -- ==========================================
     local function FlingTarget(TargetPlayer)
         local Char = LocalPlayer.Character
         local TargetChar = TargetPlayer.Character
@@ -63,31 +65,51 @@ function GameModule:Init(Window)
         local targetHrp = TargetChar.HumanoidRootPart
         local originalPos = hrp.CFrame
         
-        -- Agresif Fırlatma Kuvveti (Senin verdiğin mantık)
-        local thr = Instance.new("BodyThrust")
-        thr.Name = "EmloxaFlingThrust"
-        thr.Force = Vector3.new(99999, 99999, 99999)
-        thr.Location = hrp.Position
-        thr.Parent = hrp
+        -- Fling esnasında takılmamak için duvarlardan geçmeyi (Noclip) aç
+        for _, v in pairs(Char:GetDescendants()) do
+            if v:IsA("BasePart") then v.CanCollide = false end
+        end
+
+        -- Fırıldak gibi dönme (Angular)
+        local bg = Instance.new("BodyAngularVelocity")
+        bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+        bg.AngularVelocity = Vector3.new(50000, 50000, 50000)
+        bg.Parent = hrp
+        
+        -- Şiddetli çarpma (Thrust)
+        local thrust = Instance.new("BodyThrust")
+        thrust.Force = Vector3.new(99999, 99999, 99999)
+        thrust.Location = hrp.Position
+        thrust.Parent = hrp
         
         local startTime = tick()
-        -- Hedef fırlayana kadar (Hızı 50'yi geçene kadar) veya max 3 saniye çıldırarak yapış
-        while tick() - startTime < 3 and targetHrp.Velocity.Magnitude < 50 do
+        
+        -- Hedef fırlayana kadar (Hızı 100'ü geçene kadar) veya max 2.5 saniye boyunca ÇILDIR
+        while tick() - startTime < 2.5 and targetHrp.Velocity.Magnitude < 100 do
             RunService.Heartbeat:Wait()
-            if targetHrp.Parent and targetHrp:FindFirstChild("HumanoidRootPart") then
-                hrp.CFrame = targetHrp.CFrame
-                thr.Location = targetHrp.Position
+            if targetHrp.Parent then
+                -- Konum olarak çıldırma: Saniyenin her anında rastgele milimetrik sapmalarla hedefin içine gir
+                hrp.CFrame = targetHrp.CFrame * CFrame.new(math.random(-1,1), math.random(-1,1), math.random(-1,1))
+                -- Fiziksel olarak çıldırma:
+                hrp.Velocity = Vector3.new(10000, 10000, 10000)
+                hrp.RotVelocity = Vector3.new(10000, 10000, 10000)
             else
                 break
             end
         end
         
-        thr:Destroy()
+        -- Objeleri Temizle
+        bg:Destroy()
+        thrust:Destroy()
         
-        -- Karakterini sakinleştir ve eski yerine koy
+        -- KARAKTERİ DÜZELT (Anchor > Sıfırla > Unanchor > Geri Işınla)
+        hrp.Anchored = true
+        task.wait(0.1)
         hrp.Velocity = Vector3.new(0,0,0)
         hrp.RotVelocity = Vector3.new(0,0,0)
         hrp.CFrame = originalPos
+        task.wait(0.1)
+        hrp.Anchored = false
     end
 
     -- ==========================================
@@ -140,7 +162,6 @@ function GameModule:Init(Window)
                             if coin.Name == "CoinVisual" and coin.Parent.Name == "Coin_Server" then
                                 local Char = LocalPlayer.Character
                                 if Char and Char:FindFirstChild("HumanoidRootPart") then
-                                    -- Doğrudan paranın konumuna ışınlanır
                                     local targetCFrame = coin.CFrame
 
                                     if FarmMode == "Legit" then
@@ -165,6 +186,8 @@ function GameModule:Init(Window)
     -- ==========================================
     -- 4. COMBAT (MURDERER & SHERIFF)
     -- ==========================================
+    
+    -- 🔥 YENİ: Kurbanları önüne çekip dondurarak kesme (Bring & Freeze)
     MurdererTab:CreateButton("Kill All (Require Knife)", function()
         local Char = LocalPlayer.Character
         local Knife = LocalPlayer.Backpack:FindFirstChild("Knife") or Char:FindFirstChild("Knife")
@@ -173,19 +196,30 @@ function GameModule:Init(Window)
         Char.Humanoid:EquipTool(Knife)
         task.wait(0.2)
 
-        local originalPos = Char.HumanoidRootPart.CFrame
+        local LocalHRP = Char:FindFirstChild("HumanoidRootPart")
+        if not LocalHRP then return end
+
         for _, p in pairs(Players:GetPlayers()) do
             if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                Char.HumanoidRootPart.CFrame = p.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, -2)
+                local TargetHRP = p.Character.HumanoidRootPart
+                
+                -- Adamı senin tam 3 stud ön hizana (karşına) ışınla
+                TargetHRP.CFrame = LocalHRP.CFrame * CFrame.new(0, 0, -3)
+                
+                -- Karakterini mühürle ki kaçamasın
+                TargetHRP.Anchored = true 
                 task.wait(0.1)
                 
+                -- Bıçağı hedefe salla
                 local Event = GetNilByName("KnifeStabbed")
                 if Event then pcall(function() Event:FireServer() end) end
                 
-                task.wait(0.2)
+                task.wait(0.1)
+                
+                -- İşlem bitince adamın kilidini aç (Öldüyse zaten düşecek)
+                pcall(function() TargetHRP.Anchored = false end)
             end
         end
-        Char.HumanoidRootPart.CFrame = originalPos
     end)
 
     SheriffTab:CreateButton("Kill Murderer (Require Gun)", function()
@@ -266,7 +300,7 @@ function GameModule:Init(Window)
     end)
 
     -- ==========================================
-    -- 5. VISUALS & ESP (AYRILMIŞ ROLLER & TEXT)
+    -- 5. VISUALS & ESP
     -- ==========================================
     local ESPFolder = Instance.new("Folder", game:GetService("CoreGui"))
     ESPFolder.Name = "EmloxaMM2ESP"
@@ -306,7 +340,6 @@ function GameModule:Init(Window)
                     hl.Adornee = p.Character
                     hl.Parent = ESPFolder
 
-                    -- İsim veya Mesafe açıksa metin kutusunu ekle
                     if ESP_Settings.ShowNames or ESP_Settings.ShowDistance then
                         local bgui = Instance.new("BillboardGui")
                         bgui.Name = p.Name .. "_TextESP"
@@ -332,7 +365,6 @@ function GameModule:Init(Window)
         end
     end
 
-    -- Highlightları (Renkleri) 1 Saniyede Bir Güncelle
     task.spawn(function()
         while task.wait(1) do
             if ESP_Settings.Murderer or ESP_Settings.Sheriff or ESP_Settings.Innocent then
@@ -343,7 +375,6 @@ function GameModule:Init(Window)
         end
     end)
 
-    -- Mesafeleri ve İsimleri Çok Hızlı (0.1s) Güncelle
     task.spawn(function()
         while task.wait(0.1) do
             if ESP_Settings.Murderer or ESP_Settings.Sheriff or ESP_Settings.Innocent then
@@ -438,7 +469,7 @@ function GameModule:Init(Window)
     end)
 
     -- ==========================================
-    -- 7. LOCAL PLAYER (FAKE DEATH, NOCLIP, SPEED)
+    -- 7. LOCAL PLAYER
     -- ==========================================
     LocalTab:CreateToggle("Fake Death (Press H)", function(state)
         FakeDeathEnabled = state
