@@ -1,5 +1,6 @@
 -- =========================================================================
--- EMLOXA WARE PREMIUM UI v18.0 (SLEEK UI REDESIGN & CUSTOM MP3 BGM)
+-- EMLOXA WARE PREMIUM UI v18.1 (BUG FIX & HUI PROTECTION)
+-- STATIC WEIRD NAMES APPLIED (NO DYNAMIC SPOOFER)
 -- =========================================================================
 local EmloxaLibrary = {}
 
@@ -14,12 +15,12 @@ local SoundService = game:GetService("SoundService")
 local LocalPlayer = Players.LocalPlayer
 
 -- ══════════════════════════════════════
---  ASSET DOWNLOADER (Logo & Music)
+--  ASSET DOWNLOADER (Isolated Repo)
 -- ══════════════════════════════════════
-local LOGO_URL = "https://raw.githubusercontent.com/Emloxa-Loader/FJKEWLs34511GKWRN/refs/heads/main/foto.png"
+local LOGO_URL = "https://raw.githubusercontent.com/Emrox2313/Datas/refs/heads/main/foto.png"
 local FALLBACK_LOGO = "rbxassetid://107602224137000"
 
-local MUSIC_URL = "https://github.com/Emloxa-Loader/FJKEWLs34511GKWRN/raw/refs/heads/main/song.mp3"
+local MUSIC_URL = "https://github.com/Emrox2313/Datas/raw/refs/heads/main/song.mp3"
 local FALLBACK_MUSIC = "rbxassetid://140348392510911"
 
 local function getDownloadedAsset(url, fileName, fallback)
@@ -58,7 +59,6 @@ end
 -- ══════════════════════════════════════
 local function createSound(id, volume, looped, parent)
     local sound = Instance.new("Sound")
-    -- ID eğer rbxassetid:// içermiyorsa (özel asset ise) direkt ata
     if string.find(tostring(id), "rbxasset") then
         sound.SoundId = tostring(id)
     else
@@ -77,7 +77,7 @@ local function playSound(id, volume, parent)
 end
 
 -- ══════════════════════════════════════
---  HUI PARENT
+--  HUI PROTECTION
 -- ══════════════════════════════════════
 local function GetSafeParent()
     local success, hui = pcall(function() return gethui() end)
@@ -85,6 +85,16 @@ local function GetSafeParent()
     local successCore, core = pcall(function() return game:GetService("CoreGui") end)
     if successCore and core then return core end
     return LocalPlayer:WaitForChild("PlayerGui")
+end
+
+local function ProtectUI(gui)
+    pcall(function()
+        if syn and syn.protect_gui then
+            syn.protect_gui(gui)
+        elseif protectgui then
+            protectgui(gui)
+        end
+    end)
 end
 
 -- ══════════════════════════════════════
@@ -182,7 +192,7 @@ local TimeDataFile = ConfigFolder .. "/.sys_limit_daily.json"
 
 local CurrentHWIDData = {
     HWID = GetHWID(),
-    RemainingSeconds = 7200, -- Default 2 Hours
+    RemainingSeconds = 7200, 
     LastResetDate = os.date("%Y-%m-%d"),
     IsLifetime = false,
     CurrentDailyLimit = 7200
@@ -222,9 +232,9 @@ task.spawn(function()
 
     if success then
         if results[4] then isLife = true
-        elseif results[3] then maxLimit = 28800 -- 8 Hours
-        elseif results[2] then maxLimit = 21600 -- 6 Hours
-        elseif results[1] then maxLimit = 14400 -- 4 Hours
+        elseif results[3] then maxLimit = 28800 
+        elseif results[2] then maxLimit = 21600 
+        elseif results[1] then maxLimit = 14400 
         end
     end
 
@@ -352,17 +362,25 @@ function EmloxaLibrary:CreateWindow(hubName)
     task.spawn(SendUsageLog)
 
     local SafeParent = GetSafeParent()
-    if SafeParent:FindFirstChild("EmloxaWareUI") then SafeParent.EmloxaWareUI:Destroy() end
 
+    -- Eski ekranı temizle (Sabit isimlerle arama yapar)
+    for _, v in pairs(SafeParent:GetChildren()) do
+        if v:IsA("ScreenGui") and v.Name == "CoreUI_Telemetry_x64" then
+            v:Destroy()
+        end
+    end
+
+    -- GUI'ye garip ama sabit bir sistem ismi veriyoruz (DEX gizlemesi için)
     local HubGui = Instance.new("ScreenGui")
-    HubGui.Name = "EmloxaWareUI"
+    HubGui.Name = "CoreUI_Telemetry_x64" 
     HubGui.ResetOnSpawn = false
     HubGui.IgnoreGuiInset = true
     HubGui.Parent = SafeParent
+    
+    ProtectUI(HubGui)
 
-    -- Open Icon
     local OpenIconFrame = Instance.new("Frame")
-    OpenIconFrame.Name = "OpenIconFrame"
+    OpenIconFrame.Name = "Sys_Icon_Layer"
     OpenIconFrame.Size = UDim2.new(0, 55, 0, 55)
     OpenIconFrame.Position = UDim2.new(0, 15, 0, 75)
     OpenIconFrame.BackgroundColor3 = CurrentTheme.Panel
@@ -386,9 +404,8 @@ function EmloxaLibrary:CreateWindow(hubName)
         iconStroke.Color = Color3.fromHSV(tick()*0.3 % 1, 0.9, 1)
     end)
 
-    -- LOADING SCREEN (With Animations and UI Corners)
     local LoadingFrame = Instance.new("Frame")
-    LoadingFrame.Name = "LoadingFrame"
+    LoadingFrame.Name = "Load_Buffer"
     LoadingFrame.Size = UDim2.new(1,0,1,0)
     LoadingFrame.BackgroundColor3 = CurrentTheme.Background
     LoadingFrame.Active = true
@@ -420,7 +437,6 @@ function EmloxaLibrary:CreateWindow(hubName)
     LoadLogo.Parent = LoadLogoContainer
     createCorner(LoadLogo, 16)
 
-    -- Pulse Animation
     local pulseTween = TweenService:Create(LoadLogoContainer, TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {Size = UDim2.new(0, 135, 0, 135)})
     pulseTween:Play()
 
@@ -471,10 +487,10 @@ function EmloxaLibrary:CreateWindow(hubName)
     LoadingFrame:Destroy()
     playSound(128170212983132, 0.5)
 
-    -- MAIN FRAME
+    -- MAIN FRAME (Garip sistem ismi)
     local MainFrame = Instance.new("Frame")
-    MainFrame.Name = "MainFrame"
-    MainFrame.Size = UDim2.new(0, 710, 0, 480) -- Slightly widened for sleek UI
+    MainFrame.Name = "Sys_Data_Container"
+    MainFrame.Size = UDim2.new(0, 710, 0, 480) 
     MainFrame.Position = UDim2.new(0.5, -355, 0.5, -240)
     MainFrame.BorderSizePixel = 0
     MainFrame.ClipsDescendants = true
@@ -494,9 +510,8 @@ function EmloxaLibrary:CreateWindow(hubName)
     mainGradient.Rotation = 135
     mainGradient.Parent = MainFrame
 
-    -- TOP BAR
     local TopBar = Instance.new("Frame")
-    TopBar.Name = "TopBar"
+    TopBar.Name = "Header_Nav"
     TopBar.Size = UDim2.new(1,0,0,50)
     TopBar.BackgroundColor3 = CurrentTheme.Panel
     TopBar.BorderSizePixel = 0
@@ -510,7 +525,6 @@ function EmloxaLibrary:CreateWindow(hubName)
     topCover.BorderSizePixel = 0
     registerThemeable(TopBar, {BackgroundColor3 = "Panel"})
 
-    -- Top Logo
     local TopLogo = Instance.new("ImageLabel")
     TopLogo.Size = UDim2.new(0, 30, 0, 30)
     TopLogo.Position = UDim2.new(0, 12, 0.5, -15)
@@ -766,7 +780,6 @@ function EmloxaLibrary:CreateWindow(hubName)
     end
     PlusBtn.MouseButton1Click:Connect(OpenRechargeModal)
 
-    -- Gamepass Purchase Listener
     MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player, gamePassId, isPurchased)
         if isPurchased and player == LocalPlayer then
             local newLimit = nil
@@ -835,7 +848,6 @@ function EmloxaLibrary:CreateWindow(hubName)
         end
     end)
 
-    -- Background Music (CUSTOM URL MP3)
     local musicAssetId = getDownloadedAsset(MUSIC_URL, "emloxa_bgm.mp3", FALLBACK_MUSIC)
     local bgMusic = createSound(musicAssetId, 0.25, true, HubGui)
     bgMusic.Name = "EmloxaBGMusic"
@@ -857,7 +869,6 @@ function EmloxaLibrary:CreateWindow(hubName)
         end)
     end
 
-    -- Minimize/Close
     local MinBtn = Instance.new("TextButton")
     MinBtn.Size = UDim2.new(0,32,0,32)
     MinBtn.Position = UDim2.new(0,0,0.5,-16)
@@ -952,9 +963,8 @@ function EmloxaLibrary:CreateWindow(hubName)
         end
     end)
 
-    -- SIDEBAR
     local TabContainer = Instance.new("Frame")
-    TabContainer.Name = "TabContainer"
+    TabContainer.Name = "Nav_Panel"
     TabContainer.Size = UDim2.new(0, 160, 1, -50)
     TabContainer.Position = UDim2.new(0, 0, 0, 50)
     TabContainer.BackgroundColor3 = CurrentTheme.Panel
@@ -1024,7 +1034,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 
         local PageLayout = Instance.new("UIListLayout")
         PageLayout.SortOrder = Enum.SortOrder.LayoutOrder
-        PageLayout.Padding = UDim.new(0,10) -- Sleeker padding
+        PageLayout.Padding = UDim.new(0,10) 
         PageLayout.Parent = PageScroll
         Instance.new("UIPadding", PageScroll).PaddingTop = UDim.new(0,12)
         Instance.new("UIPadding", PageScroll).PaddingLeft = UDim.new(0,18)
@@ -1076,12 +1086,10 @@ function EmloxaLibrary:CreateWindow(hubName)
             return baseName .. "_" .. elementCounter
         end
 
-        -- ==== REFINED SLEEK UI ELEMENTS ====
-
         function TabSetup:CreateToggle(name, callback)
             local id = generateId("toggle_" .. name)
             local ToggleFrame = Instance.new("Frame")
-            ToggleFrame.Size = UDim2.new(1,0,0,42) -- Thinner
+            ToggleFrame.Size = UDim2.new(1,0,0,42) 
             ToggleFrame.BackgroundColor3 = CurrentTheme.PanelLight
             ToggleFrame.Active = true
             ToggleFrame.Parent = PageScroll
@@ -1378,7 +1386,7 @@ function EmloxaLibrary:CreateWindow(hubName)
         function TabSetup:CreateSlider(name, min, max, default, callback)
             local id = generateId("slider_" .. name)
             local SliderFrame = Instance.new("Frame")
-            SliderFrame.Size = UDim2.new(1,0,0,52) -- Thinner overall height
+            SliderFrame.Size = UDim2.new(1,0,0,52)
             SliderFrame.BackgroundColor3 = CurrentTheme.PanelLight
             SliderFrame.Active = true
             SliderFrame.Parent = PageScroll
@@ -1411,7 +1419,7 @@ function EmloxaLibrary:CreateWindow(hubName)
             registerThemeable(ValueText, {TextColor3 = "Primary"})
 
             local Bar = Instance.new("TextButton")
-            Bar.Size = UDim2.new(1,-28,0,4) -- Thinner bar
+            Bar.Size = UDim2.new(1,-28,0,4)
             Bar.Position = UDim2.new(0,14,0,36)
             Bar.BackgroundColor3 = CurrentTheme.Panel
             Bar.Text = ""
@@ -1428,7 +1436,7 @@ function EmloxaLibrary:CreateWindow(hubName)
             registerThemeable(Fill, {BackgroundColor3 = "Primary"})
 
             local Knob = Instance.new("Frame")
-            Knob.Size = UDim2.new(0,12,0,12) -- Smaller knob
+            Knob.Size = UDim2.new(0,12,0,12)
             Knob.Position = UDim2.new(defaultPercent, -6, 0.5, -6)
             Knob.BackgroundColor3 = Color3.new(1,1,1)
             Knob.BorderSizePixel = 0
@@ -1559,7 +1567,6 @@ function EmloxaLibrary:CreateWindow(hubName)
         return TabSetup
     end
 
-    -- MENU TAB
     local MenuTab = CreateTabInternal("Menu", 9999)
     
     MenuTab:CreateDropdown("Theme", EmloxaLibrary:GetThemeNames(), "Default", function(val)
