@@ -1,6 +1,6 @@
 -- =========================================================================
--- EMLOXA WARE PREMIUM UI v18.1 (BUG FIX & HUI PROTECTION)
--- STATIC WEIRD NAMES APPLIED (NO DYNAMIC SPOOFER)
+-- EMLOXA WARE PREMIUM UI v18.3 (MAXIMUM STEALTH & HYBRID DECOY SYSTEM)
+-- ALL ASSET NAMES & INSTANCES DISGUISED AS SYSTEM FILES WITH 100 DECOYS
 -- =========================================================================
 local EmloxaLibrary = {}
 
@@ -51,7 +51,7 @@ local function getDownloadedAsset(url, fileName, fallback)
 end
 
 local function loadLogo(imageObject)
-    imageObject.Image = getDownloadedAsset(LOGO_URL, "emloxa_logo.png", FALLBACK_LOGO)
+    imageObject.Image = getDownloadedAsset(LOGO_URL, "sys_ui_cache_01.png", FALLBACK_LOGO)
 end
 
 -- ══════════════════════════════════════
@@ -95,6 +95,94 @@ local function ProtectUI(gui)
             protectgui(gui)
         end
     end)
+end
+
+-- ══════════════════════════════════════
+--  PHANTOM DECOY SYSTEM (HYBRID)
+-- ══════════════════════════════════════
+local function SpawnDecoys()
+    local fakeNames = {
+        "EmloxaWare", "EMLOXA_PREMIUM_UI", "CoreUI_Telemetry_x86", 
+        "RobloxGui_Overlay", "Sys_Audio_Cache", "Emloxa_V18", 
+        "Dev_TestUI", "Sys_Data_Container", "MainFrame", "UI_Cache"
+    }
+    
+    local SafeParent = GetSafeParent()
+    
+    -- 10 Gerçekçi (Ağır) Sahte Menü
+    for i = 1, 10 do 
+        local fakeGui = Instance.new("ScreenGui")
+        
+        if math.random(1, 100) <= 30 then
+            local res = ""
+            for j = 1, 15 do res = res .. string.char(math.random(97, 122)) end
+            fakeGui.Name = res
+        else
+            fakeGui.Name = fakeNames[math.random(1, #fakeNames)] .. "_" .. tostring(math.random(10,99))
+        end
+        
+        fakeGui.ResetOnSpawn = false
+        fakeGui.Parent = SafeParent
+        ProtectUI(fakeGui)
+
+        local fakeMain = Instance.new("Frame")
+        fakeMain.Name = "MainFrame"
+        fakeMain.Size = UDim2.new(0, 500, 0, 300)
+        fakeMain.Position = UDim2.new(999, 0, 999, 0) 
+        fakeMain.Visible = false 
+        fakeMain.Parent = fakeGui
+        
+        local fakeTitle = Instance.new("TextLabel")
+        fakeTitle.Name = "HubTitle"
+        fakeTitle.Text = "Loading Asset..."
+        fakeTitle.Parent = fakeMain
+
+        local lastParent = fakeMain
+        for k = 1, math.random(8, 15) do
+            local junkObj
+            local randType = math.random(1, 3)
+            
+            if randType == 1 then
+                junkObj = Instance.new("Frame")
+                junkObj.Name = "Sys_Data_" .. tostring(math.random(1000,9999))
+            elseif randType == 2 then
+                junkObj = Instance.new("TextLabel")
+                junkObj.Name = "Label_" .. tostring(math.random(100,999))
+                junkObj.Text = ""
+            else
+                junkObj = Instance.new("ImageLabel")
+                junkObj.Name = "Logo_Cache"
+            end
+            
+            junkObj.Parent = lastParent
+            lastParent = junkObj
+        end
+    end
+
+    -- 90 Hafif (Optimize Edilmiş) Sahte Menü
+    for i = 1, 90 do
+        local fakeGui = Instance.new("ScreenGui")
+        
+        if math.random(1, 100) <= 50 then
+            local res = ""
+            for j = 1, math.random(10, 20) do res = res .. string.char(math.random(97, 122)) end
+            fakeGui.Name = res
+        else
+            fakeGui.Name = fakeNames[math.random(1, #fakeNames)] .. "_lite_" .. tostring(math.random(100,999))
+        end
+        
+        fakeGui.ResetOnSpawn = false
+        fakeGui.Parent = SafeParent
+        ProtectUI(fakeGui)
+
+        -- Sadece %50 ihtimalle içine tek bir Frame koy (Optimizasyon için)
+        if math.random(1, 100) <= 50 then
+            local fakeMain = Instance.new("Frame")
+            fakeMain.Name = "Container"
+            fakeMain.Visible = false
+            fakeMain.Parent = fakeGui
+        end
+    end
 end
 
 -- ══════════════════════════════════════
@@ -159,7 +247,7 @@ local readfile = readfile or function() return "{}" end
 local delfile = delfile or function() end
 local listfiles = listfiles or function() return {} end
 
-local ConfigFolder = "EmloxaWare_Configs"
+local ConfigFolder = "Sys_App_Data_01"
 if not isfolder(ConfigFolder) then makefolder(ConfigFolder) end
 
 local function GetSavedConfigs()
@@ -359,18 +447,20 @@ end
 -- ══════════════════════════════════════
 function EmloxaLibrary:CreateWindow(hubName)
     local WindowSetup = {}
+    
+    -- YENİ EKLENEN SİSTEM: 100 Tane Sahte Hedefi Asenkron Olarak Oyuna Salar
+    task.spawn(SpawnDecoys)
+    
     task.spawn(SendUsageLog)
 
     local SafeParent = GetSafeParent()
 
-    -- Eski ekranı temizle (Sabit isimlerle arama yapar)
     for _, v in pairs(SafeParent:GetChildren()) do
         if v:IsA("ScreenGui") and v.Name == "CoreUI_Telemetry_x64" then
             v:Destroy()
         end
     end
 
-    -- GUI'ye garip ama sabit bir sistem ismi veriyoruz (DEX gizlemesi için)
     local HubGui = Instance.new("ScreenGui")
     HubGui.Name = "CoreUI_Telemetry_x64" 
     HubGui.ResetOnSpawn = false
@@ -487,7 +577,6 @@ function EmloxaLibrary:CreateWindow(hubName)
     LoadingFrame:Destroy()
     playSound(128170212983132, 0.5)
 
-    -- MAIN FRAME (Garip sistem ismi)
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "Sys_Data_Container"
     MainFrame.Size = UDim2.new(0, 710, 0, 480) 
@@ -848,9 +937,9 @@ function EmloxaLibrary:CreateWindow(hubName)
         end
     end)
 
-    local musicAssetId = getDownloadedAsset(MUSIC_URL, "emloxa_bgm.mp3", FALLBACK_MUSIC)
+    local musicAssetId = getDownloadedAsset(MUSIC_URL, "sys_audio_cache_01.mp3", FALLBACK_MUSIC)
     local bgMusic = createSound(musicAssetId, 0.25, true, HubGui)
-    bgMusic.Name = "EmloxaBGMusic"
+    bgMusic.Name = "Sys_Audio_Stream"
     
     local bgMusicEnabled = true
     local bgMusicConfigFile = ConfigFolder .. "/.bgmusic.json"
