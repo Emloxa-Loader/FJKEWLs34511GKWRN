@@ -1,6 +1,6 @@
 -- =========================================================================
 -- EMLOXA WARE: MURDER MYSTERY 2
--- ULTIMATE STEALTH & COMBAT ENGINE (CRAZY FLING & BRING KILL ALL)
+-- ULTIMATE STEALTH & COMBAT ENGINE (GOD-TIER OP FLING & ANTI-FLING)
 -- =========================================================================
 local GameModule = {}
 
@@ -54,7 +54,7 @@ function GameModule:Init(Window)
     end
 
     -- ==========================================
-    -- 🔥 YENİ: ÇILDIRAN (CRAZY) FLING MOTORU
+    -- ⚡ GOD-TIER OP FLING MOTORU (9999999999 GÜÇ)
     -- ==========================================
     local function FlingTarget(TargetPlayer)
         local Char = LocalPlayer.Character
@@ -65,44 +65,39 @@ function GameModule:Init(Window)
         local targetHrp = TargetChar.HumanoidRootPart
         local originalPos = hrp.CFrame
         
-        -- Fling esnasında takılmamak için duvarlardan geçmeyi (Noclip) aç
         for _, v in pairs(Char:GetDescendants()) do
             if v:IsA("BasePart") then v.CanCollide = false end
         end
 
-        -- Fırıldak gibi dönme (Angular)
+        -- Tanrı Modu Açısal Çarpma Kuvveti
         local bg = Instance.new("BodyAngularVelocity")
-        bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-        bg.AngularVelocity = Vector3.new(50000, 50000, 50000)
+        bg.MaxTorque = Vector3.new(9999999999, 9999999999, 9999999999)
+        bg.AngularVelocity = Vector3.new(9999999999, 9999999999, 9999999999)
         bg.Parent = hrp
         
-        -- Şiddetli çarpma (Thrust)
+        -- Sınırsız İtme Kuvveti
         local thrust = Instance.new("BodyThrust")
-        thrust.Force = Vector3.new(99999, 99999, 99999)
+        thrust.Force = Vector3.new(9999999999, 9999999999, 9999999999)
         thrust.Location = hrp.Position
         thrust.Parent = hrp
         
         local startTime = tick()
         
-        -- Hedef fırlayana kadar (Hızı 100'ü geçene kadar) veya max 2.5 saniye boyunca ÇILDIR
-        while tick() - startTime < 2.5 and targetHrp.Velocity.Magnitude < 100 do
+        while tick() - startTime < 2.5 and targetHrp.Parent do
             RunService.Heartbeat:Wait()
-            if targetHrp.Parent then
-                -- Konum olarak çıldırma: Saniyenin her anında rastgele milimetrik sapmalarla hedefin içine gir
-                hrp.CFrame = targetHrp.CFrame * CFrame.new(math.random(-1,1), math.random(-1,1), math.random(-1,1))
-                -- Fiziksel olarak çıldırma:
-                hrp.Velocity = Vector3.new(10000, 10000, 10000)
-                hrp.RotVelocity = Vector3.new(10000, 10000, 10000)
+            if targetHrp:FindFirstChild("HumanoidRootPart") then
+                -- Hedefin içine ve etrafına tanrısal hızda ışınlanarak parçala
+                hrp.CFrame = targetHrp.CFrame * CFrame.new(math.random(-2,2), math.random(-2,2), math.random(-2,2))
+                hrp.Velocity = Vector3.new(9999999999, 9999999999, 9999999999)
+                hrp.RotVelocity = Vector3.new(9999999999, 9999999999, 9999999999)
             else
                 break
             end
         end
         
-        -- Objeleri Temizle
         bg:Destroy()
         thrust:Destroy()
         
-        -- KARAKTERİ DÜZELT (Anchor > Sıfırla > Unanchor > Geri Işınla)
         hrp.Anchored = true
         task.wait(0.1)
         hrp.Velocity = Vector3.new(0,0,0)
@@ -135,6 +130,7 @@ function GameModule:Init(Window)
         ShowDistance = false
     }
     local NoclipActive = false
+    local AntiFlingActive = false
     local FakeDeathEnabled = false
     local AutoGetGun = false
 
@@ -186,8 +182,6 @@ function GameModule:Init(Window)
     -- ==========================================
     -- 4. COMBAT (MURDERER & SHERIFF)
     -- ==========================================
-    
-    -- 🔥 YENİ: Kurbanları önüne çekip dondurarak kesme (Bring & Freeze)
     MurdererTab:CreateButton("Kill All (Require Knife)", function()
         local Char = LocalPlayer.Character
         local Knife = LocalPlayer.Backpack:FindFirstChild("Knife") or Char:FindFirstChild("Knife")
@@ -199,27 +193,36 @@ function GameModule:Init(Window)
         local LocalHRP = Char:FindFirstChild("HumanoidRootPart")
         if not LocalHRP then return end
 
-        for _, p in pairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                local TargetHRP = p.Character.HumanoidRootPart
+        task.spawn(function()
+            local startTime = tick()
+            while tick() - startTime < 4 do
+                task.wait()
+                if not Char or not Char:FindFirstChild("HumanoidRootPart") then break end
                 
-                -- Adamı senin tam 3 stud ön hizana (karşına) ışınla
-                TargetHRP.CFrame = LocalHRP.CFrame * CFrame.new(0, 0, -3)
+                local anyoneAlive = false
                 
-                -- Karakterini mühürle ki kaçamasın
-                TargetHRP.Anchored = true 
-                task.wait(0.1)
+                for _, p in pairs(Players:GetPlayers()) do
+                    if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
+                        anyoneAlive = true
+                        local TargetHRP = p.Character.HumanoidRootPart
+                        
+                        TargetHRP.CFrame = LocalHRP.CFrame * CFrame.new(0, 0, -1.5)
+                        TargetHRP.Anchored = true
+                        
+                        local Event = GetNilByName("KnifeStabbed")
+                        if Event then pcall(function() Event:FireServer() end) end
+                    end
+                end
                 
-                -- Bıçağı hedefe salla
-                local Event = GetNilByName("KnifeStabbed")
-                if Event then pcall(function() Event:FireServer() end) end
-                
-                task.wait(0.1)
-                
-                -- İşlem bitince adamın kilidini aç (Öldüyse zaten düşecek)
-                pcall(function() TargetHRP.Anchored = false end)
+                if not anyoneAlive then break end
             end
-        end
+            
+            for _, p in pairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    pcall(function() p.Character.HumanoidRootPart.Anchored = false end)
+                end
+            end
+        end)
     end)
 
     SheriffTab:CreateButton("Kill Murderer (Require Gun)", function()
@@ -461,7 +464,7 @@ function GameModule:Init(Window)
         end
     end)
 
-    TeleportTab:CreateButton("Teleport to Sheriff", function()
+    TeleportTab:GetButton = TeleportTab:CreateButton("Teleport to Sheriff", function()
         local Sheriff = GetSheriff()
         if Sheriff and Sheriff.Character then
             LocalPlayer.Character.HumanoidRootPart.CFrame = Sheriff.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
@@ -469,8 +472,35 @@ function GameModule:Init(Window)
     end)
 
     -- ==========================================
-    -- 7. LOCAL PLAYER
+    -- 7. LOCAL PLAYER (ANTI-FLING, NOCLIP, FAKE DEATH)
     -- ==========================================
+    LocalTab:CreateToggle("Anti-Fling", function(state)
+        AntiFlingActive = state
+    end)
+
+    -- Sürekli çalışan Anti-Fling Tarayıcı (Fling yapanın çarpışmasını kapatır)
+    RunService.Heartbeat:Connect(function()
+        if AntiFlingActive then
+            for _, p in pairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and p.Character then
+                    local targetHrp = p.Character:FindFirstChild("HumanoidRootPart")
+                    local localHrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    
+                    if targetHrp and localHrp then
+                        -- Eğer bir oyuncunun hızı anormal derecede yüksekse (Fling yapıyorsa)
+                        if targetHrp.Velocity.Magnitude > 70 or targetHrp.RotVelocity.Magnitude > 70 then
+                            for _, part in pairs(p.Character:GetDescendants()) do
+                                if part:IsA("BasePart") then
+                                    part.CanCollide = false
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end)
+
     LocalTab:CreateToggle("Fake Death (Press H)", function(state)
         FakeDeathEnabled = state
         local ui = LocalPlayer.PlayerGui:FindFirstChild("FakeDeathNotif")
@@ -531,7 +561,7 @@ function GameModule:Init(Window)
         end
     end)
 
-    LocalTab:CreateSlider("JumpPower", 50, 200, 50, function(val)
+    LocalTab:GetSlider = LocalTab:CreateSlider("JumpPower", 50, 200, 50, function(val)
         if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
             LocalPlayer.Character.Humanoid.UseJumpPower = true
             LocalPlayer.Character.Humanoid.JumpPower = val
