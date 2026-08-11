@@ -1,6 +1,6 @@
 -- =========================================================================
 -- EMLOXA WARE: MURDER MYSTERY 2
--- ULTIMATE STEALTH & COMBAT ENGINE (GOD-TIER OP FLING & ANTI-FLING)
+-- ULTIMATE STEALTH & COMBAT ENGINE (GOD-TIER OP FLING & ANTI-FLING FIX)
 -- =========================================================================
 local GameModule = {}
 
@@ -69,13 +69,11 @@ function GameModule:Init(Window)
             if v:IsA("BasePart") then v.CanCollide = false end
         end
 
-        -- Tanrı Modu Açısal Çarpma Kuvveti
         local bg = Instance.new("BodyAngularVelocity")
         bg.MaxTorque = Vector3.new(9999999999, 9999999999, 9999999999)
         bg.AngularVelocity = Vector3.new(9999999999, 9999999999, 9999999999)
         bg.Parent = hrp
         
-        -- Sınırsız İtme Kuvveti
         local thrust = Instance.new("BodyThrust")
         thrust.Force = Vector3.new(9999999999, 9999999999, 9999999999)
         thrust.Location = hrp.Position
@@ -86,7 +84,6 @@ function GameModule:Init(Window)
         while tick() - startTime < 2.5 and targetHrp.Parent do
             RunService.Heartbeat:Wait()
             if targetHrp:FindFirstChild("HumanoidRootPart") then
-                -- Hedefin içine ve etrafına tanrısal hızda ışınlanarak parçala
                 hrp.CFrame = targetHrp.CFrame * CFrame.new(math.random(-2,2), math.random(-2,2), math.random(-2,2))
                 hrp.Velocity = Vector3.new(9999999999, 9999999999, 9999999999)
                 hrp.RotVelocity = Vector3.new(9999999999, 9999999999, 9999999999)
@@ -464,7 +461,7 @@ function GameModule:Init(Window)
         end
     end)
 
-    TeleportTab:GetButton = TeleportTab:CreateButton("Teleport to Sheriff", function()
+    TeleportTab:CreateButton("Teleport to Sheriff", function()
         local Sheriff = GetSheriff()
         if Sheriff and Sheriff.Character then
             LocalPlayer.Character.HumanoidRootPart.CFrame = Sheriff.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
@@ -478,7 +475,6 @@ function GameModule:Init(Window)
         AntiFlingActive = state
     end)
 
-    -- Sürekli çalışan Anti-Fling Tarayıcı (Fling yapanın çarpışmasını kapatır)
     RunService.Heartbeat:Connect(function()
         if AntiFlingActive then
             for _, p in pairs(Players:GetPlayers()) do
@@ -487,7 +483,6 @@ function GameModule:Init(Window)
                     local localHrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
                     
                     if targetHrp and localHrp then
-                        -- Eğer bir oyuncunun hızı anormal derecede yüksekse (Fling yapıyorsa)
                         if targetHrp.Velocity.Magnitude > 70 or targetHrp.RotVelocity.Magnitude > 70 then
                             for _, part in pairs(p.Character:GetDescendants()) do
                                 if part:IsA("BasePart") then
@@ -561,7 +556,7 @@ function GameModule:Init(Window)
         end
     end)
 
-    LocalTab:GetSlider = LocalTab:CreateSlider("JumpPower", 50, 200, 50, function(val)
+    LocalTab:CreateSlider("JumpPower", 50, 200, 50, function(val)
         if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
             LocalPlayer.Character.Humanoid.UseJumpPower = true
             LocalPlayer.Character.Humanoid.JumpPower = val
