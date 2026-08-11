@@ -1,542 +1,409 @@
 -- =========================================================================
--- EMLOXA WARE: MURDER MYSTERY 2 (PLACE: 13042495892)
--- V1.0 ULTIMATE TOOL
+-- EMLOXA WARE: MURDER MYSTERY 2
+-- ULTIMATE STEALTH & COMBAT ENGINE (DYNAMIC MAP & ROLE DETECTION)
 -- =========================================================================
 local GameModule = {}
 
 function GameModule:Init(Window)
     local Players = game:GetService("Players")
     local RunService = game:GetService("RunService")
-    local UserInputService = game:GetService("UserInputService")
     local TweenService = game:GetService("TweenService")
-    local VirtualInputManager = game:GetService("VirtualInputManager")
-    local Workspace = game:GetService("Workspace")
+    local UserInputService = game:GetService("UserInputService")
+    local VirtualUser = game:GetService("VirtualUser")
     local LocalPlayer = Players.LocalPlayer
 
-    -- ========== UTILITY FUNCTIONS ==========
+    -- ==========================================
+    -- 1. DİNAMİK ALTYAPI & YARDIMCI FONKSİYONLAR
+    -- ==========================================
     local function GetNil(Name, DebugId)
-        for _, Object in getnilinstances() do
-            if Object.Name == Name and Object:GetDebugId() == DebugId then
-                return Object
-            end
-        end
-    end
-
-    local function findMapFolder()
-        -- Harita klasörünü bulur (BeachResort, MilBase vs.)
-        for _, obj in ipairs(Workspace:GetChildren()) do
-            if obj:IsA("Folder") and obj:FindFirstChild("Spawns") then
-                return obj
-            end
-        end
-        return nil
-    end
-
-    local function getCoinContainer()
-        -- CoinContainer'ı her haritada bulur
-        for _, obj in ipairs(Workspace:GetChildren()) do
-            if obj:IsA("Folder") then
-                local coinContainer = obj:FindFirstChild("CoinContainer")
-                if coinContainer then
-                    return coinContainer
+        if getnilinstances then
+            for _, Object in pairs(getnilinstances()) do
+                if Object.Name == Name and Object:GetDebugId() == DebugId then
+                    return Object
                 end
             end
         end
         return nil
     end
 
-    local function getGunDrop()
-        local map = findMapFolder()
-        if map then
-            return map:FindFirstChild("GunDrop")
+    -- Dinamik Harita Bulucu (İsmi ne olursa olsun haritayı bulur)
+    local function GetMap()
+        for _, v in pairs(workspace:GetChildren()) do
+            if v:IsA("Model") and v.Name ~= "Lobby" and (v:FindFirstChild("CoinContainer") or v:FindFirstChild("Spawns")) then
+                return v
+            end
         end
         return nil
     end
 
-    local function teleportTo(pos)
-        local char = LocalPlayer.Character
-        if char and char:FindFirstChild("HumanoidRootPart") then
-            char:SetPrimaryPartCFrame(CFrame.new(pos))
+    -- Rol Bulucular
+    local function GetMurderer()
+        for _, p in pairs(Players:GetPlayers()) do
+            if p.Character and p.Character:FindFirstChild("Knife") or p.Backpack and p.Backpack:FindFirstChild("Knife") then
+                return p
+            end
         end
+        return nil
     end
 
-    local function equipTool(toolName)
-        local backpack = LocalPlayer.Backpack
-        local char = LocalPlayer.Character
-        local tool = backpack:FindFirstChild(toolName) or (char and char:FindFirstChild(toolName))
-        if tool and tool.Parent ~= char then
-            local hum = char and char:FindFirstChild("Humanoid")
-            if hum then
-                hum:EquipTool(tool)
+    local function GetSheriff()
+        for _, p in pairs(Players:GetPlayers()) do
+            if p.Character and p.Character:FindFirstChild("Gun") or p.Backpack and p.Backpack:FindFirstChild("Gun") then
+                return p
             end
         end
+        return nil
     end
 
-    local function getPlayersExceptSelf()
-        local list = {}
-        for _, plr in ipairs(Players:GetPlayers()) do
-            if plr ~= LocalPlayer then
-                table.insert(list, plr)
+    -- Fling (Fırlatma) Motoru
+    local function FlingTarget(TargetPlayer)
+        local Char = LocalPlayer.Character
+        if not Char or not Char:FindFirstChild("HumanoidRootPart") or not TargetPlayer.Character or not TargetPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
+        
+        local hrp = Char.HumanoidRootPart
+        local bg = Instance.new("BodyAngularVelocity", hrp)
+        bg.AngularVelocity = Vector3.new(99999, 99999, 99999)
+        bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+        bg.P = 9000
+        
+        local startTime = tick()
+        while tick() - startTime < 0.5 do
+            RunService.Heartbeat:Wait()
+            if TargetPlayer.Character and TargetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                hrp.CFrame = TargetPlayer.Character.HumanoidRootPart.CFrame
             end
         end
-        return list
+        bg:Destroy()
     end
 
-    -- ========== COIN AUTOFARM ==========
-    local CoinFarmEnabled = false
-    local CoinFarmMode = "Legit" -- "Legit" / "Rage"
-    local CoinFarmSpeed = 0.5 -- Tween süresi (saniye, düşük = hızlı)
+    -- ==========================================
+    -- 2. TABS & DEĞİŞKENLER
+    -- ==========================================
+    local FarmTab = Window:CreateTab("Auto Farm")
+    local CombatTab = Window:CreateTab("Combat (Roles)")
+    local ESPTab = Window:CreateTab("Visuals & ESP")
+    local TeleportTab = Window:CreateTab("Teleports")
+    local LocalTab = Window:CreateTab("Local Player")
 
-    local CoinTab = Window:CreateTab("Coin Farm")
+    local FarmEnabled = false
+    local FarmMode = "Legit" -- Legit (Tween) veya Rage (Instant)
+    local FarmSpeed = 1.5
 
-    CoinTab:CreateToggle("AutoFarm Coins", function(val)
-        CoinFarmEnabled = val
-    end)
-
-    CoinTab:CreateDropdown("Farm Mode", {"Legit", "Rage"}, "Legit", function(val)
-        CoinFarmMode = val
-    end)
-
-    CoinTab:CreateSlider("Tween Speed (Legit)", 0.1, 2, 0.5, function(val)
-        CoinFarmSpeed = val
-    end)
-
-    local lastRageTime = 0
-    local rageCooldown = 0.3 -- Rage modunda TP bekleme süresi
-
-    RunService.Heartbeat:Connect(function()
-        if not CoinFarmEnabled then return end
-
-        local container = getCoinContainer()
-        if not container then return end
-
-        local char = LocalPlayer.Character
-        if not char then return end
-        local root = char:FindFirstChild("HumanoidRootPart")
-        if not root then return end
-
-        -- Noclip aç
-        for _, part in ipairs(char:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = false
-            end
-        end
-
-        -- Haritanın altına ışınla (y koordinatı sabit düşük)
-        if root.Position.Y > -10 then
-            root.CFrame = CFrame.new(root.Position.X, -30, root.Position.Z)
-        end
-
-        -- CoinVisual'ları tara
-        local coinServer = container:FindFirstChild("Coin_Server")
-        if not coinServer then return end
-        local coinVisuals = coinServer:GetChildren()
-
-        local closestCoin = nil
-        local closestDist = math.huge
-
-        for _, coin in ipairs(coinVisuals) do
-            if coin:IsA("BasePart") and coin.Name == "CoinVisual" then
-                local dist = (coin.Position - root.Position).Magnitude
-                if dist < closestDist then
-                    closestDist = dist
-                    closestCoin = coin
-                end
-            end
-        end
-
-        if closestCoin then
-            if CoinFarmMode == "Legit" then
-                -- Tween ile yumuşak toplama
-                local goal = {}
-                goal.CFrame = CFrame.new(closestCoin.Position)
-                local tweenInfo = TweenInfo.new(CoinFarmSpeed, Enum.EasingStyle.Linear)
-                local tween = TweenService:Create(root, tweenInfo, goal)
-                tween:Play()
-            elseif CoinFarmMode == "Rage" then
-                -- Bekleme süresiyle direkt ışınlanma
-                if tick() - lastRageTime > rageCooldown then
-                    lastRageTime = tick()
-                    root.CFrame = CFrame.new(closestCoin.Position)
-                end
-            end
-        end
-    end)
-
-    -- ========== MURDER TAB ==========
-    local MurderTab = Window:CreateTab("Murder")
     local FakeDeathEnabled = false
+    local AutoGetGun = false
+    
+    local NoclipActive = false
 
-    MurderTab:CreateToggle("Fake Death (H)", function(val)
-        FakeDeathEnabled = val
-        -- Ekran bildirimi
-        local gui = Instance.new("ScreenGui")
-        gui.Name = "FakeDeathHint"
-        gui.ResetOnSpawn = false
-        local label = Instance.new("TextLabel")
-        label.Size = UDim2.new(0, 200, 0, 30)
-        label.Position = UDim2.new(0.5, -100, 0, 100)
-        label.BackgroundTransparency = 0.5
-        label.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-        label.Text = val and "FAKE DEATH: ON" or "FAKE DEATH: OFF"
-        label.TextColor3 = Color3.fromRGB(255, 255, 255)
-        label.Font = Enum.Font.GothamBold
-        label.TextSize = 14
-        label.Parent = gui
-        gui.Parent = LocalPlayer.PlayerGui
-        task.delay(2, function() gui:Destroy() end)
+    -- ==========================================
+    -- 3. AUTO FARM (COINS)
+    -- ==========================================
+    FarmTab:CreateDropdown("Coin Farm Mode", {"Legit", "Rage"}, "Legit", function(val)
+        FarmMode = val
     end)
 
-    -- H tuşu fake death toggle
-    UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
-        if input.KeyCode == Enum.KeyCode.H then
-            FakeDeathEnabled = not FakeDeathEnabled
-            local char = LocalPlayer.Character
-            if char and char:FindFirstChild("Humanoid") then
-                if FakeDeathEnabled then
-                    -- Yüz üstü yatma efekti: root'u yere yatır
-                    local root = char:FindFirstChild("HumanoidRootPart")
-                    if root then
-                        root.CFrame = CFrame.new(root.Position) * CFrame.Angles(math.rad(90), 0, 0)
-                    end
-                else
-                    -- Düzelt
-                    local root = char:FindFirstChild("HumanoidRootPart")
-                    if root then
-                        root.CFrame = CFrame.new(root.Position)
-                    end
-                end
-            end
-        end
+    FarmTab:CreateSlider("Legit Tween Speed", 1, 5, 2, function(val)
+        FarmSpeed = val
     end)
 
-    MurderTab:CreateButton("Kill All (Knife)", function()
-        local char = LocalPlayer.Character
-        if not char then return end
-        local root = char:FindFirstChild("HumanoidRootPart")
-        if not root then return end
+    FarmTab:CreateToggle("Enable Coin Farm", function(state)
+        FarmEnabled = state
+        if FarmEnabled then
+            task.spawn(function()
+                while FarmEnabled do
+                    task.wait(0.1)
+                    local Map = GetMap()
+                    if Map and Map:FindFirstChild("CoinContainer") and Map.CoinContainer:FindFirstChild("Coin_Server") then
+                        for _, coin in pairs(Map.CoinContainer.Coin_Server:GetChildren()) do
+                            if not FarmEnabled then break end
+                            if coin.Name == "CoinVisual" and coin.Transparency == 0 then
+                                local Char = LocalPlayer.Character
+                                if Char and Char:FindFirstChild("HumanoidRootPart") then
+                                    -- Haritanın altından (gizli) yaklaşır
+                                    local targetCFrame = coin.CFrame * CFrame.new(0, -3.5, 0)
+                                    
+                                    -- Yere düşmemesi için platform oluştur
+                                    local plat = Instance.new("Part", workspace)
+                                    plat.Size = Vector3.new(5, 1, 5)
+                                    plat.Anchored = true
+                                    plat.Transparency = 1
+                                    plat.CFrame = targetCFrame * CFrame.new(0, -3, 0)
 
-        -- Bıçak var mı kontrol et, kuşan
-        local knife = LocalPlayer.Backpack:FindFirstChild("Knife") or char:FindFirstChild("Knife")
-        if not knife then return end
-        equipTool("Knife")
-
-        -- Tüm oyuncuları karakterin önüne ışınla
-        for _, plr in ipairs(getPlayersExceptSelf()) do
-            local targetChar = plr.Character
-            if targetChar and targetChar:FindFirstChild("HumanoidRootPart") then
-                local tpPos = root.CFrame * CFrame.new(0, 0, -5) -- Önü
-                targetChar:SetPrimaryPartCFrame(tpPos)
-            end
-        end
-
-        task.wait(0.3)
-
-        -- Bıçak olayını tetikle
-        local knifeEvent = GetNil("KnifeStabbed", "1_1294408")
-        if knifeEvent then
-            knifeEvent:FireServer()
-        else
-            -- Yedek sol tık
-            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
-            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
-        end
-    end)
-
-    -- ========== SHERIFF TAB ==========
-    local SheriffTab = Window:CreateTab("Sheriff")
-
-    SheriffTab:CreateButton("Kill Murderer", function()
-        local char = LocalPlayer.Character
-        if not char then return end
-        local root = char:FindFirstChild("HumanoidRootPart")
-        if not root then return end
-
-        -- Katili bul (sheriff'te katil genelde tek bir kişidir, basitçe tüm oyuncuları tara)
-        local murderer = nil
-        for _, plr in ipairs(Players:GetPlayers()) do
-            if plr ~= LocalPlayer then
-                local c = plr.Character
-                if c and c:FindFirstChild("Knife") then
-                    murderer = plr
-                    break
-                end
-            end
-        end
-
-        if not murderer or not murderer.Character or not murderer.Character:FindFirstChild("HumanoidRootPart") then
-            return
-        end
-
-        local mRoot = murderer.Character.HumanoidRootPart
-
-        -- Kendini katilin biraz gerisine ışınla
-        local behindPos = mRoot.CFrame * CFrame.new(0, 0, 5)
-        root.CFrame = behindPos * CFrame.Angles(0, math.rad(180), 0) -- Katile dön
-
-        task.wait(0.5)
-
-        -- Shoot eventi dene
-        local shootEvent = GetNil("Shoot", "1_1411212")
-        if shootEvent then
-            local myGun = char:FindFirstChild("Gun") or LocalPlayer.Backpack:FindFirstChild("Gun")
-            local gunHandle = myGun and myGun:FindFirstChild("Handle")
-            local startCF = gunHandle and gunHandle.CFrame or root.CFrame
-            local targetCF = CFrame.new(mRoot.Position)
-            shootEvent:FireServer(startCF, targetCF)
-        else
-            -- Alternatif GunFired
-            local ws = game:GetService("ReplicatedStorage"):FindFirstChild("ClientServices")
-            if ws then
-                local weaponService = ws:FindFirstChild("WeaponService")
-                if weaponService then
-                    local gunFired = weaponService:FindFirstChild("GunFired")
-                    if gunFired then
-                        local handleObj = GetNil("Handle", "1_1578716") or (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Gun") and LocalPlayer.Character.Gun:FindFirstChild("Handle"))
-                        local startV3 = handleObj and handleObj.Position or root.Position
-                        firesignal(gunFired.OnClientEvent, handleObj, startV3, mRoot.Position, handleObj)
+                                    if FarmMode == "Legit" then
+                                        local dist = (Char.HumanoidRootPart.Position - targetCFrame.Position).Magnitude
+                                        local tweenTime = math.clamp(dist / (FarmSpeed * 50), 0.5, 3)
+                                        local tween = TweenService:Create(Char.HumanoidRootPart, TweenInfo.new(tweenTime, Enum.EasingStyle.Linear), {CFrame = targetCFrame})
+                                        tween:Play()
+                                        tween.Completed:Wait()
+                                    else
+                                        -- Rage Modu (Anında TP ama anti-cheat için küçük bekleme)
+                                        Char.HumanoidRootPart.CFrame = targetCFrame
+                                        task.wait(0.3) 
+                                    end
+                                    
+                                    task.wait(0.1)
+                                    plat:Destroy()
+                                end
+                            end
+                        end
                     end
                 end
-            end
-            -- Sol tık yedek
-            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
-            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+            end)
         end
     end)
 
-    -- ========== TELEPORT TAB ==========
-    local TeleportTab = Window:CreateTab("Teleport")
+    -- ==========================================
+    -- 4. COMBAT (MURDERER & SHERIFF)
+    -- ==========================================
+    local function AttackFallback()
+        -- Cobalt kodu çalışmazsa fare ile garanti tıklar
+        if mouse1click then mouse1click() end
+        VirtualUser:ClickButton1(Vector2.new())
+    end
 
-    TeleportTab:CreateButton("Teleport Lobby", function()
-        local lobby = Workspace:FindFirstChild("Lobby")
-        if lobby then
-            local spawns = lobby:FindFirstChild("Spawns")
-            if spawns then
-                local spawnParts = spawns:GetChildren()
-                if #spawnParts >= 14 then
-                    teleportTo(spawnParts[14].Position)
+    CombatTab:CreateButton("🔪 Kill All (Murderer - Knife)", function()
+        local Char = LocalPlayer.Character
+        local Knife = LocalPlayer.Backpack:FindFirstChild("Knife") or Char:FindFirstChild("Knife")
+        if not Knife then return end
+
+        Char.Humanoid:EquipTool(Knife)
+        task.wait(0.2)
+
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                Char.HumanoidRootPart.CFrame = p.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, -2)
+                task.wait(0.1)
+                
+                -- Senin sağladığın Cobalt Kodu
+                local Event = GetNil("KnifeStabbed", "1_1294408")
+                if Event then pcall(function() Event:FireServer() end) end
+                AttackFallback()
+                task.wait(0.2)
+            end
+        end
+    end)
+
+    CombatTab:CreateButton("🔪 Kill All (Fling Mode)", function()
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                FlingTarget(p)
+                task.wait(0.1)
+            end
+        end
+    end)
+
+    CombatTab:CreateButton("🔫 Kill Murderer (Sheriff - Gun)", function()
+        local Char = LocalPlayer.Character
+        local Gun = LocalPlayer.Backpack:FindFirstChild("Gun") or Char:FindFirstChild("Gun")
+        local Murderer = GetMurderer()
+        
+        if not Gun or not Murderer or not Murderer.Character then return end
+        
+        Char.Humanoid:EquipTool(Gun)
+        Char.HumanoidRootPart.CFrame = Murderer.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 4)
+        task.wait(0.2)
+
+        -- Senin sağladığın Cobalt Silah Kodu
+        pcall(function()
+            local Event = game:GetService("ReplicatedStorage").ClientServices.WeaponService.GunFired
+            firesignal(Event.OnClientEvent, 
+                Gun.Handle,
+                Char.HumanoidRootPart.Position,
+                Murderer.Character.HumanoidRootPart.Position,
+                GetNil("Handle", "1_1578716")
+            )
+        end)
+        
+        pcall(function()
+            local Event2 = GetNil("Shoot", "1_1411212")
+            if Event2 then
+                Event2:FireServer(
+                    Char.HumanoidRootPart.CFrame,
+                    Murderer.Character.HumanoidRootPart.CFrame
+                )
+            end
+        end)
+
+        AttackFallback()
+    end)
+
+    CombatTab:CreateButton("🔫 Kill Murderer (Fling Mode)", function()
+        local Murderer = GetMurderer()
+        if Murderer then FlingTarget(Murderer) end
+    end)
+
+    CombatTab:CreateToggle("Auto Get Gun (When Dropped)", function(state)
+        AutoGetGun = state
+        if AutoGetGun then
+            task.spawn(function()
+                while AutoGetGun do
+                    task.wait(0.1)
+                    local Map = GetMap()
+                    if Map and Map:FindFirstChild("GunDrop") then
+                        local Char = LocalPlayer.Character
+                        if Char and Char:FindFirstChild("HumanoidRootPart") then
+                            local SavedCFrame = Char.HumanoidRootPart.CFrame
+                            Char.HumanoidRootPart.CFrame = Map.GunDrop.CFrame
+                            
+                            -- Silah alınana veya harita değişene kadar bekle
+                            while Map:FindFirstChild("GunDrop") and AutoGetGun do task.wait(0.1) end
+                            
+                            -- Eski yerine geri dön
+                            if Char and Char:FindFirstChild("HumanoidRootPart") then
+                                Char.HumanoidRootPart.CFrame = SavedCFrame
+                            end
+                        end
+                    end
                 end
+            end)
+        end
+    end)
+
+    -- ==========================================
+    -- 5. TELEPORTS
+    -- ==========================================
+    TeleportTab:CreateButton("Teleport to Lobby", function()
+        if workspace:FindFirstChild("Lobby") and workspace.Lobby:FindFirstChild("Spawns") then
+            local spawns = workspace.Lobby.Spawns:GetChildren()
+            if #spawns > 0 then
+                LocalPlayer.Character.HumanoidRootPart.CFrame = spawns[math.random(1, #spawns)].CFrame * CFrame.new(0,3,0)
             end
         end
     end)
 
-    TeleportTab:CreateButton("Teleport Map", function()
-        local map = findMapFolder()
-        if map then
-            local spawns = map:FindFirstChild("Spawns")
-            if spawns then
-                local spawnParts = spawns:GetChildren()
-                if #spawnParts >= 12 then
-                    teleportTo(spawnParts[12].Position)
-                end
+    TeleportTab:CreateButton("Teleport to Map", function()
+        local Map = GetMap()
+        if Map and Map:FindFirstChild("Spawns") then
+            local spawns = Map.Spawns:GetChildren()
+            if #spawns > 0 then
+                -- 12. spawnı bulmaya çalışır, yoksa rastgele atar
+                local targetSpawn = spawns[12] or spawns[math.random(1, #spawns)]
+                LocalPlayer.Character.HumanoidRootPart.CFrame = targetSpawn.CFrame * CFrame.new(0,3,0)
             end
         end
     end)
 
-    TeleportTab:CreateButton("Teleport Murder", function()
-        for _, plr in ipairs(Players:GetPlayers()) do
-            if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Knife") then
-                teleportTo(plr.Character.HumanoidRootPart.Position)
-                return
-            end
+    TeleportTab:CreateButton("Teleport to Murderer", function()
+        local Murderer = GetMurderer()
+        if Murderer and Murderer.Character then
+            LocalPlayer.Character.HumanoidRootPart.CFrame = Murderer.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
         end
     end)
 
-    TeleportTab:CreateButton("Teleport Sheriff", function()
-        for _, plr in ipairs(Players:GetPlayers()) do
-            if plr ~= LocalPlayer and plr.Backpack:FindFirstChild("Gun") or (plr.Character and plr.Character:FindFirstChild("Gun")) then
-                teleportTo(plr.Character.HumanoidRootPart.Position)
-                return
-            end
+    TeleportTab:CreateButton("Teleport to Sheriff", function()
+        local Sheriff = GetSheriff()
+        if Sheriff and Sheriff.Character then
+            LocalPlayer.Character.HumanoidRootPart.CFrame = Sheriff.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
         end
     end)
 
-    -- ========== AUTO GET GUN ==========
-    local AutoGetGunEnabled = false
-    local gunTeleportBackPos = nil
+    -- ==========================================
+    -- 6. VISUALS & ESP (KATİL / ŞERİF GÖRME)
+    -- ==========================================
+    local ESPFolder = Instance.new("Folder", game:GetService("CoreGui"))
+    ESPFolder.Name = "EmloxaMM2ESP"
 
-    TeleportTab:CreateToggle("Auto Get Gun", function(val)
-        AutoGetGunEnabled = val
-        if val then
-            -- Gitmeden önce pozisyonu kaydet
-            local char = LocalPlayer.Character
-            if char and char:FindFirstChild("HumanoidRootPart") then
-                gunTeleportBackPos = char.HumanoidRootPart.Position
+    local function CreateHighlight(player, color)
+        if player == LocalPlayer then return end
+        local hl = Instance.new("Highlight")
+        hl.Name = player.Name .. "_ESP"
+        hl.FillColor = color
+        hl.OutlineColor = Color3.new(1, 1, 1)
+        hl.FillTransparency = 0.5
+        hl.Parent = ESPFolder
+        
+        task.spawn(function()
+            while player.Parent and ESPFolder:FindFirstChild(hl.Name) do
+                if player.Character then hl.Adornee = player.Character end
+                task.wait(1)
             end
-        end
-    end)
-
-    RunService.Heartbeat:Connect(function()
-        if not AutoGetGunEnabled then return end
-        local gunDrop = getGunDrop()
-        if not gunDrop then return end
-
-        local char = LocalPlayer.Character
-        if not char then return end
-        local root = char:FindFirstChild("HumanoidRootPart")
-        if not root then return end
-
-        -- Silahı alana kadar drop kısmına git
-        if gunDrop and gunDrop:IsA("BasePart") and gunDrop.Parent then
-            root.CFrame = CFrame.new(gunDrop.Position + Vector3.new(0, 3, 0))
-        else
-            -- Drop yok olduysa veya silah alındıysa geri dön
-            if gunTeleportBackPos then
-                root.CFrame = CFrame.new(gunTeleportBackPos)
-                gunTeleportBackPos = nil
-                AutoGetGunEnabled = false
-            end
-        end
-    end)
-
-    -- ========== FLING TAB ==========
-    local FlingTab = Window:CreateTab("Fling")
-
-    local function flingTarget(targetChar)
-        local rootPart = targetChar:FindFirstChild("HumanoidRootPart")
-        if not rootPart then return end
-
-        -- Temel fling: Yüksek hızda döndür ve fırlat
-        local bodyGyro = Instance.new("BodyAngularVelocity")
-        bodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-        bodyGyro.AngularVelocity = Vector3.new(0, 100, 0)
-        bodyGyro.Parent = rootPart
-
-        local bodyVel = Instance.new("BodyVelocity")
-        bodyVel.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-        bodyVel.Velocity = Vector3.new(0, 500, 0)
-        bodyVel.Parent = rootPart
-
-        task.delay(2, function()
-            bodyGyro:Destroy()
-            bodyVel:Destroy()
+            hl:Destroy()
         end)
     end
 
-    FlingTab:CreateButton("Fling Kill All", function()
-        local targets = getPlayersExceptSelf()
-        for _, plr in ipairs(targets) do
-            local char = plr.Character
-            if char and char:FindFirstChild("HumanoidRootPart") then
-                flingTarget(char)
-                -- Bir sonrakine geçmeden önce hedefin fırladığını algılamak için bekle
-                repeat
-                    task.wait(0.5)
-                until not char or not char:FindFirstChild("HumanoidRootPart") or (char.HumanoidRootPart.Velocity.Magnitude < 5)
+    ESPTab:CreateButton("🔄 Update ESP Roles", function()
+        ESPFolder:ClearAllChildren()
+        for _, p in pairs(Players:GetPlayers()) do
+            local color = Color3.fromRGB(0, 255, 0) -- Masum (Yeşil)
+            if p == GetMurderer() then
+                color = Color3.fromRGB(255, 0, 0) -- Katil (Kırmızı)
+            elseif p == GetSheriff() then
+                color = Color3.fromRGB(0, 0, 255) -- Şerif (Mavi)
             end
+            CreateHighlight(p, color)
         end
     end)
 
-    FlingTab:CreateButton("Kill Murder (Fling)", function()
-        for _, plr in ipairs(Players:GetPlayers()) do
-            if plr ~= LocalPlayer then
-                local char = plr.Character
-                if char and char:FindFirstChild("Knife") then
-                    flingTarget(char)
-                    break
+    ESPTab:CreateButton("❌ Clear ESP", function()
+        ESPFolder:ClearAllChildren()
+    end)
+
+    -- ==========================================
+    -- 7. LOCAL PLAYER (FAKE DEATH, NOCLIP, SPEED)
+    -- ==========================================
+    LocalTab:CreateToggle("Fake Death (Press H)", function(state)
+        FakeDeathEnabled = state
+        -- Ekranda bilgilendirme yazısı gösterilir
+        local ui = LocalPlayer.PlayerGui:FindFirstChild("FakeDeathNotif")
+        if state and not ui then
+            ui = Instance.new("ScreenGui", LocalPlayer.PlayerGui)
+            ui.Name = "FakeDeathNotif"
+            local txt = Instance.new("TextLabel", ui)
+            txt.Size = UDim2.new(0, 200, 0, 30)
+            txt.Position = UDim2.new(0.5, -100, 0, 10)
+            txt.BackgroundTransparency = 1
+            txt.Text = "[H] Fake Death: ON"
+            txt.Font = Enum.Font.GothamBold
+            txt.TextColor3 = Color3.fromRGB(255, 85, 85)
+            txt.TextSize = 14
+        elseif not state and ui then
+            ui:Destroy()
+        end
+    end)
+
+    UserInputService.InputBegan:Connect(function(input, gpe)
+        if gpe then return end
+        if input.KeyCode == Enum.KeyCode.H and FakeDeathEnabled then
+            local Char = LocalPlayer.Character
+            if Char and Char:FindFirstChild("Humanoid") and Char:FindFirstChild("HumanoidRootPart") then
+                if not Char.Humanoid.PlatformStand then
+                    -- Yere Yüz Üstü Yatma
+                    Char.Humanoid.PlatformStand = true
+                    Char.HumanoidRootPart.CFrame = Char.HumanoidRootPart.CFrame * CFrame.Angles(math.rad(90), 0, 0)
+                else
+                    -- Ayağa Kalkma
+                    Char.Humanoid.PlatformStand = false
+                    Char.Humanoid.Jump = true
                 end
             end
         end
     end)
 
-    -- ========== MISC TAB ==========
-    local MiscTab = Window:CreateTab("Misc")
-
-    -- Fly
-    local FlyEnabled = false
-    local flyBodyGyro, flyBodyVel
-    MiscTab:CreateToggle("Fly", function(val)
-        FlyEnabled = val
-        local char = LocalPlayer.Character
-        if char and char:FindFirstChild("HumanoidRootPart") then
-            if val then
-                flyBodyGyro = Instance.new("BodyGyro")
-                flyBodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-                flyBodyGyro.CFrame = char.HumanoidRootPart.CFrame
-                flyBodyGyro.Parent = char.HumanoidRootPart
-
-                flyBodyVel = Instance.new("BodyVelocity")
-                flyBodyVel.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                flyBodyVel.Velocity = Vector3.zero
-                flyBodyVel.Parent = char.HumanoidRootPart
-            else
-                if flyBodyGyro then flyBodyGyro:Destroy() end
-                if flyBodyVel then flyBodyVel:Destroy() end
-            end
-        end
+    LocalTab:CreateToggle("Noclip", function(state)
+        NoclipActive = state
     end)
 
-    -- Speed
-    local WalkSpeed = 16
-    MiscTab:CreateSlider("Walk Speed", 16, 200, 16, function(val)
-        WalkSpeed = val
-        local char = LocalPlayer.Character
-        if char and char:FindFirstChild("Humanoid") then
-            char.Humanoid.WalkSpeed = val
-        end
-    end)
-
-    -- JumpPower
-    local JumpPower = 50
-    MiscTab:CreateSlider("Jump Power", 50, 300, 50, function(val)
-        JumpPower = val
-        local char = LocalPlayer.Character
-        if char and char:FindFirstChild("Humanoid") then
-            char.Humanoid.JumpPower = val
-        end
-    end)
-
-    -- Noclip
-    local NoclipEnabled = false
-    MiscTab:CreateToggle("Noclip", function(val)
-        NoclipEnabled = val
-    end)
-
-    -- Noclip döngüsü
     RunService.Stepped:Connect(function()
-        if NoclipEnabled then
-            local char = LocalPlayer.Character
-            if char then
-                for _, part in ipairs(char:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        part.CanCollide = false
-                    end
+        -- Farm açıkken harita altında takılmamak için noclip zorunludur
+        if (NoclipActive or FarmEnabled) and LocalPlayer.Character then
+            for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
                 end
             end
         end
     end)
 
-    -- Fly kontrol döngüsü
-    RunService.Heartbeat:Connect(function()
-        if FlyEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            local root = LocalPlayer.Character.HumanoidRootPart
-            local camera = Workspace.CurrentCamera
-            local moveDir = Vector3.zero
-
-            if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir += camera.CFrame.LookVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir -= camera.CFrame.LookVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir -= camera.CFrame.RightVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir += camera.CFrame.RightVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir += Vector3.new(0, 1, 0) end
-            if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir -= Vector3.new(0, 1, 0) end
-
-            flyBodyGyro.CFrame = camera.CFrame
-            flyBodyVel.Velocity = moveDir * 50
+    LocalTab:CreateSlider("WalkSpeed", 16, 100, 16, function(val)
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            LocalPlayer.Character.Humanoid.WalkSpeed = val
         end
     end)
 
-    -- ========== UNLOAD ==========
-    MiscTab:CreateButton("Unload Script", function()
-        CoinFarmEnabled = false
-        AutoGetGunEnabled = false
-        NoclipEnabled = false
-        FlyEnabled = false
-        if flyBodyGyro then flyBodyGyro:Destroy() end
-        if flyBodyVel then flyBodyVel:Destroy() end
-
-        local ui = game:GetService("CoreGui"):FindFirstChild("EmloxaWareUI") or LocalPlayer.PlayerGui:FindFirstChild("EmloxaWareUI")
-        if ui then ui:Destroy() end
+    LocalTab:CreateSlider("JumpPower", 50, 200, 50, function(val)
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            LocalPlayer.Character.Humanoid.UseJumpPower = true
+            LocalPlayer.Character.Humanoid.JumpPower = val
+        end
     end)
 end
 
