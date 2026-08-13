@@ -586,12 +586,28 @@ local function ShowDancinIntro(HubGui, callback)
 end
 
 -- ══════════════════════════════════════
---  IDENTITY HIDER SYSTEM (NEW)
+--  IDENTITY HIDER SYSTEM (SYSTEM-LEVEL DISGUISE)
 -- ══════════════════════════════════════
 local identityHiderStateFile = BaseConfigFolder .. "/identity_hider_state.json"
 local identityHiderEnabled = false
-local identityHiderRunning = false
 
+-- Bilinen konumlar (hızlı tarama için)
+local knownLocations = {}  -- dictionary: instance -> true
+
+-- Heartbeat bağlantısı ve tam tarama bayrağı
+local heartbeatConn = nil
+local fullScanRunning = false
+
+-- Gizlenme bilgileri
+local disguisePlayer = nil   -- Seçilen rastgele oyuncu
+local disguiseName = "EMLOXAWARE USER"
+local disguiseDisplayName = "EMLOXAWARE USER"
+local disguiseAvatarURL = ""  -- Seçilen oyuncunun avatar thumbnail URL'si
+
+-- Hook için eski metamethod referansı
+local oldIndexMetamethod = nil
+
+-- Durum kaydetme/yükleme
 local function LoadIdentityHiderState()
     if isfile(identityHiderStateFile) then
         return pcall(function()
@@ -612,49 +628,169 @@ local function SaveIdentityHiderState(state)
     end)
 end
 
-local function ScanAndHideIdentity()
-    local player = LocalPlayer
-    local playerName = player.Name
-    local displayName = player.DisplayName
-    local userId = tostring(player.UserId)
-    local replacement = "EMLOXAWARE USER"
+-- Rastgele oyuncu seç ve avatarını yükle
+local function SelectRandomPlayer()
+    local players = Players:GetPlayers()
+    local others = {}
+    for _, p in ipairs(players) do
+        if p ~= LocalPlayer then
+            table.insert(others, p)
+        end
+    end
+    if #others > 0 then
+        disguisePlayer = others[math.random(#others)]
+        disguiseName = disguisePlayer.Name
+        disguiseDisplayName = disguisePlayer.DisplayName
+        -- Avatar thumbnail'ini asenkron al
+        task.spawn(function()
+            local success, content = pcall(function()
+                return Players:GetUserThumbnailAsync(disguisePlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
+            end)
+            if success and content then
+                disguiseAvatarURL = content
+            else
+                disguiseAvatarURL = ""
+            end
+        end)
+    else
+        disguisePlayer = nil
+        disguiseName = "EMLOXAWARE USER"
+        disguiseDisplayName = "EMLOXAWARE USER"
+        disguiseAvatarURL = ""
+    end
+end
 
+-- Metamethod hook (sistem seviyesinde isim değiştirme)
+local function HookIdentity()
+    if oldIndexMetamethod then return end  -- zaten hook'lu
+
+    local success = pcall(function()
+        local mt = getrawmetatable(LocalPlayer)
+        if not mt then return end
+        oldIndexMetamethod = mt.__index
+        local newIndex = function(t, k)
+            if t == LocalPlayer then
+                if k == "Name" then
+                    return disguiseName
+                elseif k == "DisplayName" then
+                    return disguiseDisplayName
+                end
+            end
+            return oldIndexMetamethod(t, k)
+        end
+        mt.__index = newIndex
+    end)
+
+    if not success or not oldIndexMetamethod then
+        -- getrawmetatable yoksa hookmetamethod dene
+        local hookSuccess = pcall(function()
+            oldIndexMetamethod = hookmetamethod(game, "__index", function(self, key)
+                if self == LocalPlayer then
+                    if key == "Name" then
+                        return disguiseName
+                    elseif key == "DisplayName" then
+                        return disguiseDisplayName
+                    end
+                end
+                return oldIndexMetamethod(self, key)
+            end)
+        end)
+        if not hookSuccess then
+            oldIndexMetamethod = nil
+        end
+    end
+end
+
+local function UnhookIdentity()
+    if not oldIndexMetamethod then return end
+    pcall(function()
+        local mt = getrawmetatable(LocalPlayer)
+        if mt then
+            mt.__index = oldIndexMetamethod
+        end
+    end)
+    -- hookmetamethod ile yapıldıysa geri almak zor; genelde otomatik düzelir
+    oldIndexMetamethod = nil
+end
+
+-- Tek bir instance'ı kontrol et ve gerekirse değiştir
+local function ProcessInstance(instance)
+    if not instance or not instance.Parent then return false end
+    if HubGui and instance:IsDescendantOf(HubGui) then return false end  -- kendi UI'mizi atla
+
+    local relevant = false
+
+    -- Metin nesneleri
+    if instance:IsA("TextLabel") or instance:IsA("TextButton") or instance:IsA("TextBox") then
+        local original = instance.Text
+        if original and original ~= "" then
+            local newText = original
+            local changed = false
+            -- Gerçek isim/display adı geçiyorsa sahte isimle değiştir
+            if original == LocalPlayer.Name or original == LocalPlayer.DisplayName then
+                newText = disguiseName
+                changed = true
+            else
+                local replaced1, count1 = string.gsub(newText, LocalPlayer.Name, disguiseName)
+                if count1 > 0 then newText = replaced1; changed = true end
+                local replaced2, count2 = string.gsub(newText, LocalPlayer.DisplayName, disguiseName)
+                if count2 > 0 then newText = replaced2; changed = true end
+            end
+            if changed then
+                instance.Text = newText
+                relevant = true
+            end
+        end
+    end
+
+    -- Görsel nesneleri (avatar)
+    if instance:IsA("ImageLabel") or instance:IsA("ImageButton") then
+        local img = instance.Image
+        if img and img ~= "" then
+            -- Yerel oyuncunun UserId'sini içeren görselleri sahte avatar ile değiştir
+            if string.find(img, tostring(LocalPlayer.UserId)) then
+                if disguiseAvatarURL ~= "" then
+                    instance.Image = disguiseAvatarURL
+                else
+                    instance.Image = ""  -- avatar yoksa boşalt
+                end
+                instance.ImageTransparency = 0  -- görünür yap
+                relevant = true
+            end
+        end
+    end
+
+    return relevant
+end
+
+-- Hızlı tarama: yalnızca bilinen konumlar
+local function FastScan()
+    for instance, _ in pairs(knownLocations) do
+        if not instance.Parent then
+            knownLocations[instance] = nil
+        else
+            local stillRelevant = ProcessInstance(instance)
+            if not stillRelevant then
+                knownLocations[instance] = nil
+            end
+        end
+    end
+end
+
+-- Tam tarama: tüm konteynerleri tara
+local function FullScan()
     local containers = {
         game:GetService("CoreGui"),
-        player:WaitForChild("PlayerGui"),
+        LocalPlayer:WaitForChild("PlayerGui"),
         workspace
     }
-
     for _, container in ipairs(containers) do
         if container then
             for _, obj in ipairs(container:GetDescendants()) do
-                -- Skip our own HubGui to avoid breaking the script UI
-                if not HubGui or not obj:IsDescendantOf(HubGui) then
-                    -- Replace text labels
-                    if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
-                        local original = obj.Text
-                        if original and original ~= "" then
-                            local newText = original
-                            if original == playerName or original == displayName then
-                                newText = replacement
-                            else
-                                newText = string.gsub(newText, playerName, replacement)
-                                newText = string.gsub(newText, displayName, replacement)
-                            end
-                            if newText ~= original then
-                                obj.Text = newText
-                            end
-                        end
-                    end
-                    -- Hide avatar images
-                    if obj:IsA("ImageLabel") or obj:IsA("ImageButton") then
-                        local img = obj.Image
-                        if img and img ~= "" then
-                            if string.find(img, userId) or string.find(img, "Avatar") or string.find(img, "HeadShot") then
-                                obj.Image = ""  -- or "rbxassetid://0"
-                                obj.ImageTransparency = 1
-                            end
-                        end
+                if obj and obj.Parent then
+                    local relevant = ProcessInstance(obj)
+                    if relevant then
+                        knownLocations[obj] = true
                     end
                 end
             end
@@ -662,21 +798,35 @@ local function ScanAndHideIdentity()
     end
 end
 
+-- Tam tarama döngüsü (saniyede bir)
+local function FullScanLoop()
+    while fullScanRunning do
+        FullScan()
+        task.wait(1)
+    end
+end
+
+-- Sistemi başlat
 local function StartIdentityHider()
-    if identityHiderRunning then return end
-    identityHiderRunning = true
-    task.spawn(function()
-        while identityHiderRunning do
-            ScanAndHideIdentity()
-            task.wait(0.5)
-        end
-    end)
+    if heartbeatConn then return end
+    SelectRandomPlayer()
+    HookIdentity()
+    heartbeatConn = RunService.Heartbeat:Connect(FastScan)
+    fullScanRunning = true
+    task.spawn(FullScanLoop)
 end
 
+-- Sistemi durdur
 local function StopIdentityHider()
-    identityHiderRunning = false
+    if heartbeatConn then
+        heartbeatConn:Disconnect()
+        heartbeatConn = nil
+    end
+    fullScanRunning = false
+    UnhookIdentity()
 end
 
+-- Aç/kapa setter
 local function SetIdentityHider(state)
     identityHiderEnabled = state
     if state then
@@ -1390,10 +1540,8 @@ function EmloxaLibrary:CreateWindow(hubName)
             -- Return API for programmatic control
             local ToggleAPI = {}
             function ToggleAPI:SetState(val)
-                -- Ensure val is boolean
                 val = val and true or false
                 if state ~= val then
-                    -- Directly call the set function to update visuals and callback
                     for _, entry in ipairs(ConfigCallbacks) do
                         if entry.id == id then
                             entry.set(val)
