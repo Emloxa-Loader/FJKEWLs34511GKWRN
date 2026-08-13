@@ -135,7 +135,10 @@ local readfile = readfile or function() return "{}" end
 local delfile = delfile or function() end
 local listfiles = listfiles or function() return {} end
 
-local ConfigFolder = "Sys_App_Data_01"
+-- Oyun bazlı config klasörü
+local BaseConfigFolder = "Sys_App_Data_01"
+if not isfolder(BaseConfigFolder) then makefolder(BaseConfigFolder) end
+local ConfigFolder = BaseConfigFolder .. "/" .. tostring(game.PlaceId)
 if not isfolder(ConfigFolder) then makefolder(ConfigFolder) end
 
 local function GetSavedConfigs()
@@ -170,7 +173,7 @@ local function GetHWID()
     return clientID
 end
 
-local TimeDataFile = ConfigFolder .. "/.sys_limit_daily.json"
+local TimeDataFile = BaseConfigFolder .. "/.sys_limit_daily.json"
 local CurrentHWIDData = {
     HWID = GetHWID(),
     RemainingSeconds = 7200, 
@@ -377,7 +380,7 @@ local function ShowPreloadNotification(HubGui)
     Notif.Position = UDim2.new(1, 10, 1, -80)
     Notif.BackgroundColor3 = CurrentTheme.Panel
     Notif.Active = true
-    Notif.ZIndex = 999
+    Notif.ZIndex = 999999
     Notif.Parent = HubGui
     createCorner(Notif,10)
     createStroke(Notif, CurrentTheme.Primary,2)
@@ -392,7 +395,7 @@ local function ShowPreloadNotification(HubGui)
     TitleLabel.Position = UDim2.new(0,10,0,8)
     TitleLabel.BackgroundTransparency = 1
     TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    TitleLabel.ZIndex = 1000  -- Düzeltme: yazı görünürlüğü için yüksek ZIndex
+    TitleLabel.ZIndex = 999999
     TitleLabel.Parent = Notif
 
     local MsgLabel = Instance.new("TextLabel")
@@ -405,7 +408,7 @@ local function ShowPreloadNotification(HubGui)
     MsgLabel.BackgroundTransparency = 1
     MsgLabel.TextXAlignment = Enum.TextXAlignment.Left
     MsgLabel.TextWrapped = true
-    MsgLabel.ZIndex = 1000  -- Düzeltme: yazı görünürlüğü için yüksek ZIndex
+    MsgLabel.ZIndex = 999999
     MsgLabel.Parent = Notif
     
     TweenService:Create(Notif, TweenInfo.new(0.5,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Position = UDim2.new(1,-330,1,-80)}):Play()
@@ -417,7 +420,7 @@ local function ShowDancinIntro(HubGui, callback)
     IntroGui.Size = UDim2.new(1,0,1,0)
     IntroGui.BackgroundColor3 = Color3.fromRGB(135, 206, 250)
     IntroGui.BorderSizePixel = 0
-    IntroGui.ZIndex = 500
+    IntroGui.ZIndex = 999998
     IntroGui.Active = true
     IntroGui.Parent = HubGui
 
@@ -427,7 +430,7 @@ local function ShowDancinIntro(HubGui, callback)
     OrangeGlow.AnchorPoint = Vector2.new(0, 1)
     OrangeGlow.BackgroundColor3 = Color3.fromRGB(255, 140, 0)
     OrangeGlow.BorderSizePixel = 0
-    OrangeGlow.ZIndex = 501
+    OrangeGlow.ZIndex = 999998
     OrangeGlow.Parent = IntroGui
 
     local GlowGradient = Instance.new("UIGradient")
@@ -442,7 +445,7 @@ local function ShowDancinIntro(HubGui, callback)
     local musicAssetId = getDownloadedAsset(INTRO_MUSIC_URL, "emloxa_loading_music.mp3", FALLBACK_MUSIC)
     local IntroMusic = Instance.new("Sound")
     IntroMusic.SoundId = musicAssetId
-    IntroMusic.Volume = 2 -- Müzik Sesi Arttırıldı
+    IntroMusic.Volume = 2
     IntroMusic.Looped = true
     IntroMusic.Parent = IntroGui
     IntroMusic:Play()
@@ -456,9 +459,9 @@ local function ShowDancinIntro(HubGui, callback)
     CenterText.TextSize = 50
     CenterText.TextColor3 = Color3.new(1,1,1)
     CenterText.BackgroundTransparency = 1
-    CenterText.ZIndex = 505
+    CenterText.ZIndex = 999998
     CenterText.Parent = IntroGui
-    createShadow(CenterText, UDim2.new(1,30,1,30), -15, 0.5).ZIndex = 504
+    createShadow(CenterText, UDim2.new(1,30,1,30), -15, 0.5).ZIndex = 999997
 
     local LeftGif = Instance.new("ImageLabel")
     LeftGif.Size = UDim2.new(0, 220, 0, 220)
@@ -466,7 +469,7 @@ local function ShowDancinIntro(HubGui, callback)
     LeftGif.Position = UDim2.new(0.2, 0, 0.5, 0)
     LeftGif.BackgroundTransparency = 1
     LeftGif.Image = frameCache[1]
-    LeftGif.ZIndex = 505
+    LeftGif.ZIndex = 999998
     LeftGif.Parent = IntroGui
 
     local RightGif = Instance.new("ImageLabel")
@@ -475,7 +478,7 @@ local function ShowDancinIntro(HubGui, callback)
     RightGif.Position = UDim2.new(0.8, 0, 0.5, 0)
     RightGif.BackgroundTransparency = 1
     RightGif.Image = frameCache[1]
-    RightGif.ZIndex = 505
+    RightGif.ZIndex = 999998
     RightGif.Parent = IntroGui
 
     local SkipText = Instance.new("TextLabel")
@@ -486,14 +489,16 @@ local function ShowDancinIntro(HubGui, callback)
     SkipText.TextSize = 20
     SkipText.TextColor3 = Color3.new(1, 1, 1)
     SkipText.BackgroundTransparency = 1
-    SkipText.ZIndex = 505
+    SkipText.ZIndex = 999998
+    SkipText.Visible = false  -- Başlangıçta gizli
     SkipText.Parent = IntroGui
 
     local SkipButton = Instance.new("TextButton")
     SkipButton.Size = UDim2.new(1, 0, 1, 0)
     SkipButton.BackgroundTransparency = 1
     SkipButton.Text = ""
-    SkipButton.ZIndex = 510
+    SkipButton.ZIndex = 999999
+    SkipButton.Active = false  -- Başlangıçta pasif (5 saniye sonra aktif olacak)
     SkipButton.Parent = IntroGui
 
     local isPlaying = true
@@ -516,12 +521,21 @@ local function ShowDancinIntro(HubGui, callback)
         end
     end)
 
+    -- 5 saniye sonra skip yazısını ve tıklamayı aktif et
     task.spawn(function()
-        while isPlaying do
-            TweenService:Create(SkipText, TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {TextTransparency = 0.8}):Play()
-            task.wait(0.7)
-            TweenService:Create(SkipText, TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {TextTransparency = 0}):Play()
-            task.wait(0.7)
+        task.wait(5)
+        if isPlaying then
+            SkipText.Visible = true
+            SkipButton.Active = true
+            -- Skip yazısı için yanıp sönme animasyonu
+            task.spawn(function()
+                while isPlaying do
+                    TweenService:Create(SkipText, TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {TextTransparency = 0.8}):Play()
+                    task.wait(0.7)
+                    TweenService:Create(SkipText, TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {TextTransparency = 0}):Play()
+                    task.wait(0.7)
+                end
+            end)
         end
     end)
 
@@ -590,6 +604,8 @@ function EmloxaLibrary:CreateWindow(hubName)
     HubGui.Name = "CoreUI_Telemetry_x64" 
     HubGui.ResetOnSpawn = false
     HubGui.IgnoreGuiInset = true
+    HubGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    HubGui.ZIndex = 999999  -- Aşırı yüksek ZIndex
     HubGui.Parent = SafeParent
     ProtectUI(HubGui)
 
@@ -796,7 +812,7 @@ function EmloxaLibrary:CreateWindow(hubName)
         Notif.Position = UDim2.new(1, 10, 1, -80)
         Notif.BackgroundColor3 = CurrentTheme.Panel
         Notif.Active = true
-        Notif.ZIndex = 200
+        Notif.ZIndex = 999999
         Notif.Parent = HubGui
         createCorner(Notif,10)
         createStroke(Notif, CurrentTheme.Primary, 2)
@@ -810,7 +826,7 @@ function EmloxaLibrary:CreateWindow(hubName)
         TitleLabel.Position = UDim2.new(0,10,0,8)
         TitleLabel.BackgroundTransparency = 1
         TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-        TitleLabel.ZIndex = 205
+        TitleLabel.ZIndex = 999999
         TitleLabel.Parent = Notif
         
         local MsgLabel = Instance.new("TextLabel")
@@ -823,7 +839,7 @@ function EmloxaLibrary:CreateWindow(hubName)
         MsgLabel.BackgroundTransparency = 1
         MsgLabel.TextXAlignment = Enum.TextXAlignment.Left
         MsgLabel.TextWrapped = true
-        MsgLabel.ZIndex = 205
+        MsgLabel.ZIndex = 999999
         MsgLabel.Parent = Notif
         
         TweenService:Create(Notif, TweenInfo.new(0.5,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Position = UDim2.new(1,-310,1,-80)}):Play()
@@ -840,14 +856,14 @@ function EmloxaLibrary:CreateWindow(hubName)
         Overlay.BackgroundColor3 = Color3.new(0,0,0)
         Overlay.BackgroundTransparency = 0.5
         Overlay.Active = true
-        Overlay.ZIndex = 100
+        Overlay.ZIndex = 999998
         Overlay.Parent = HubGui
 
         local Modal = Instance.new("Frame")
         Modal.Size = UDim2.new(0, 500, 0, 360)
         Modal.Position = UDim2.new(0.5, -250, 0.5, -180)
         Modal.BackgroundColor3 = CurrentTheme.Panel
-        Modal.ZIndex = 101
+        Modal.ZIndex = 999999
         Modal.Parent = Overlay
         createCorner(Modal, 12)
         createStroke(Modal, CurrentTheme.Primary, 2)
@@ -859,7 +875,7 @@ function EmloxaLibrary:CreateWindow(hubName)
         MTitle.TextColor3 = CurrentTheme.Primary
         MTitle.Size = UDim2.new(1,-40,0,30); MTitle.Position = UDim2.new(0,18,0,12)
         MTitle.BackgroundTransparency = 1; MTitle.TextXAlignment = Enum.TextXAlignment.Left
-        MTitle.ZIndex = 102; MTitle.Parent = Modal
+        MTitle.ZIndex = 999999; MTitle.Parent = Modal
         registerThemeable(MTitle, {TextColor3 = "Primary"})
 
         local MDesc = Instance.new("TextLabel")
@@ -868,13 +884,13 @@ function EmloxaLibrary:CreateWindow(hubName)
         MDesc.TextColor3 = CurrentTheme.SubTextColor
         MDesc.Size = UDim2.new(1,-40,0,20); MDesc.Position = UDim2.new(0,18,0,38)
         MDesc.BackgroundTransparency = 1; MDesc.TextXAlignment = Enum.TextXAlignment.Left
-        MDesc.ZIndex = 102; MDesc.Parent = Modal
+        MDesc.ZIndex = 999999; MDesc.Parent = Modal
 
         local MClose = Instance.new("TextButton")
         MClose.Size = UDim2.new(0,28,0,28); MClose.Position = UDim2.new(1,-36,0,12)
         MClose.Text = "X"; MClose.Font = Enum.Font.GothamBold; MClose.TextColor3 = CurrentTheme.Accent
         MClose.BackgroundColor3 = CurrentTheme.PanelLight
-        MClose.ZIndex = 102; MClose.Parent = Modal
+        MClose.ZIndex = 999999; MClose.Parent = Modal
         createCorner(MClose,6)
         registerThemeable(MClose, {BackgroundColor3 = "PanelLight"})
         MClose.MouseButton1Click:Connect(function() Overlay:Destroy() end)
@@ -882,7 +898,7 @@ function EmloxaLibrary:CreateWindow(hubName)
         local Grid = Instance.new("Frame")
         Grid.Size = UDim2.new(1,-36,1,-80); Grid.Position = UDim2.new(0,18,0,70)
         Grid.BackgroundTransparency = 1
-        Grid.ZIndex = 102; Grid.Parent = Modal
+        Grid.ZIndex = 999999; Grid.Parent = Modal
 
         local Layout = Instance.new("UIGridLayout", Grid)
         Layout.CellSize = UDim2.new(0, 222, 0, 120)
@@ -898,7 +914,7 @@ function EmloxaLibrary:CreateWindow(hubName)
         for _, opt in ipairs(Options) do
             local Card = Instance.new("Frame")
             Card.BackgroundColor3 = CurrentTheme.PanelLight
-            Card.ZIndex = 103; Card.Parent = Grid
+            Card.ZIndex = 999999; Card.Parent = Grid
             createCorner(Card, 8)
             createStroke(Card, CurrentTheme.Primary, 1)
 
@@ -907,21 +923,21 @@ function EmloxaLibrary:CreateWindow(hubName)
             CName.TextColor3 = CurrentTheme.TextColor; CName.Size = UDim2.new(1,-10,0,24)
             CName.Position = UDim2.new(0,8,0,6); CName.BackgroundTransparency = 1
             CName.TextXAlignment = Enum.TextXAlignment.Left
-            CName.ZIndex = 104; CName.Parent = Card
+            CName.ZIndex = 999999; CName.Parent = Card
 
             local CInfo = Instance.new("TextLabel")
             CInfo.Text = opt.Info; CInfo.Font = Enum.Font.GothamBlack; CInfo.TextSize = 10
             CInfo.TextColor3 = CurrentTheme.Accent; CInfo.Size = UDim2.new(1,-10,0,18)
             CInfo.Position = UDim2.new(0,8,0,30); CInfo.BackgroundTransparency = 1
             CInfo.TextXAlignment = Enum.TextXAlignment.Left
-            CInfo.ZIndex = 104; CInfo.Parent = Card
+            CInfo.ZIndex = 999999; CInfo.Parent = Card
 
             local BuyBtn = Instance.new("TextButton")
             BuyBtn.Size = UDim2.new(1,-16,0,34); BuyBtn.Position = UDim2.new(0,8,1,-42)
             BuyBtn.BackgroundColor3 = CurrentTheme.Primary; BuyBtn.Text = "Buy " .. opt.Price
             BuyBtn.Font = Enum.Font.GothamBold; BuyBtn.TextColor3 = Color3.new(1,1,1)
             BuyBtn.TextSize = 12
-            BuyBtn.ZIndex = 105; BuyBtn.Parent = Card
+            BuyBtn.ZIndex = 999999; BuyBtn.Parent = Card
             createCorner(BuyBtn, 6)
 
             BuyBtn.MouseButton1Click:Connect(function()
@@ -959,7 +975,7 @@ function EmloxaLibrary:CreateWindow(hubName)
             Notif.Position = UDim2.new(1, 10, 1, -80)
             Notif.BackgroundColor3 = CurrentTheme.Panel
             Notif.Active = true
-            Notif.ZIndex = 200
+            Notif.ZIndex = 999999
             Notif.Parent = HubGui
             createCorner(Notif,10)
             createStroke(Notif, CurrentTheme.Primary,2)
@@ -973,7 +989,7 @@ function EmloxaLibrary:CreateWindow(hubName)
             TitleLabel.Position = UDim2.new(0,10,0,8)
             TitleLabel.BackgroundTransparency = 1
             TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-            TitleLabel.ZIndex = 205
+            TitleLabel.ZIndex = 999999
             TitleLabel.Parent = Notif
             
             local MsgLabel = Instance.new("TextLabel")
@@ -989,7 +1005,7 @@ function EmloxaLibrary:CreateWindow(hubName)
             MsgLabel.Position = UDim2.new(0,10,0,32)
             MsgLabel.BackgroundTransparency = 1
             MsgLabel.TextXAlignment = Enum.TextXAlignment.Left
-            MsgLabel.ZIndex = 205
+            MsgLabel.ZIndex = 999999
             MsgLabel.Parent = Notif
             
             TweenService:Create(Notif, TweenInfo.new(0.5,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Position = UDim2.new(1,-250,1,-80)}):Play()
@@ -1641,7 +1657,7 @@ function EmloxaLibrary:CreateWindow(hubName)
             Notif.Position = UDim2.new(1, 10, 1, -80)
             Notif.BackgroundColor3 = CurrentTheme.Panel
             Notif.Active = true
-            Notif.ZIndex = 200
+            Notif.ZIndex = 999999
             Notif.Parent = HubGui
             createCorner(Notif,10)
             createStroke(Notif, CurrentTheme.Primary,2)
@@ -1657,7 +1673,7 @@ function EmloxaLibrary:CreateWindow(hubName)
             TitleLabel.Position = UDim2.new(0,10,0,8)
             TitleLabel.BackgroundTransparency = 1
             TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-            TitleLabel.ZIndex = 205
+            TitleLabel.ZIndex = 999999
             TitleLabel.Parent = Notif
             registerThemeable(TitleLabel, {TextColor3 = "Primary"})
 
@@ -1671,7 +1687,7 @@ function EmloxaLibrary:CreateWindow(hubName)
             MsgLabel.BackgroundTransparency = 1
             MsgLabel.TextXAlignment = Enum.TextXAlignment.Left
             MsgLabel.TextWrapped = true
-            MsgLabel.ZIndex = 205
+            MsgLabel.ZIndex = 999999
             MsgLabel.Parent = Notif
             registerThemeable(MsgLabel, {TextColor3 = "TextColor"})
 
@@ -1691,20 +1707,7 @@ function EmloxaLibrary:CreateWindow(hubName)
         EmloxaLibrary:SetTheme(val)
     end)
 
-    local bgMusic
-    MenuTab:CreateToggle("Background Music", function(state)
-        local bgMusicConfigFile = ConfigFolder .. "/.bgmusic.json"
-        if state then 
-            if not bgMusic then
-                bgMusic = createSound(FALLBACK_MUSIC, 0.25, true, HubGui)
-                bgMusic.Name = "Sys_Audio_Stream"
-            end
-            bgMusic:Play()
-        else 
-            if bgMusic then bgMusic:Stop() end
-        end
-        pcall(function() writefile(bgMusicConfigFile, HttpService:JSONEncode({Enabled = state})) end)
-    end)
+    -- Background Music kaldırıldı (eski toggle burada yok)
 
     MenuTab:CreateDivider()
 
@@ -1773,6 +1776,143 @@ function EmloxaLibrary:CreateWindow(hubName)
         else
             MenuTab:CreateNotification("Error", "File does not exist.", 2)
         end
+    end)
+
+    -- Export Config
+    MenuTab:CreateButton("📤 Export Config", function()
+        if SelectedConfig == "" or SelectedConfig == "No Configs Found" then
+            MenuTab:CreateNotification("Error", "No config selected!", 2)
+            return
+        end
+        local path = ConfigFolder .. "/" .. SelectedConfig .. ".json"
+        if isfile(path) then
+            local json = readfile(path)
+            if setclipboard then
+                setclipboard(json)
+                MenuTab:CreateNotification("Exported", "Config JSON copied to clipboard!", 2)
+            else
+                MenuTab:CreateNotification("Error", "Clipboard not supported!", 2)
+            end
+        else
+            MenuTab:CreateNotification("Error", "Config file not found!", 2)
+        end
+    end)
+
+    -- Import Config
+    MenuTab:CreateButton("📥 Import Config", function()
+        local Overlay = Instance.new("Frame")
+        Overlay.Size = UDim2.new(1,0,1,0)
+        Overlay.BackgroundColor3 = Color3.new(0,0,0)
+        Overlay.BackgroundTransparency = 0.5
+        Overlay.Active = true
+        Overlay.ZIndex = 999998
+        Overlay.Parent = HubGui
+
+        local Modal = Instance.new("Frame")
+        Modal.Size = UDim2.new(0, 400, 0, 300)
+        Modal.Position = UDim2.new(0.5, -200, 0.5, -150)
+        Modal.BackgroundColor3 = CurrentTheme.Panel
+        Modal.ZIndex = 999999
+        Modal.Parent = Overlay
+        createCorner(Modal, 12)
+        createStroke(Modal, CurrentTheme.Primary, 2)
+        registerThemeable(Modal, {BackgroundColor3 = "Panel"})
+
+        local MTitle = Instance.new("TextLabel")
+        MTitle.Text = "📥 Import Config"
+        MTitle.Font = Enum.Font.GothamBlack; MTitle.TextSize = 16
+        MTitle.TextColor3 = CurrentTheme.Primary
+        MTitle.Size = UDim2.new(1,-40,0,30); MTitle.Position = UDim2.new(0,18,0,12)
+        MTitle.BackgroundTransparency = 1; MTitle.TextXAlignment = Enum.TextXAlignment.Left
+        MTitle.ZIndex = 999999; MTitle.Parent = Modal
+        registerThemeable(MTitle, {TextColor3 = "Primary"})
+
+        local NameLabel = Instance.new("TextLabel")
+        NameLabel.Text = "Config Name:"
+        NameLabel.Font = Enum.Font.GothamSemibold; NameLabel.TextSize = 12
+        NameLabel.TextColor3 = CurrentTheme.TextColor
+        NameLabel.Size = UDim2.new(1,-36,0,20); NameLabel.Position = UDim2.new(0,18,0,50)
+        NameLabel.BackgroundTransparency = 1; NameLabel.TextXAlignment = Enum.TextXAlignment.Left
+        NameLabel.ZIndex = 999999; NameLabel.Parent = Modal
+
+        local NameBox = Instance.new("TextBox")
+        NameBox.Size = UDim2.new(1,-36,0,30); NameBox.Position = UDim2.new(0,18,0,72)
+        NameBox.BackgroundColor3 = CurrentTheme.PanelLight
+        NameBox.Text = ""
+        NameBox.PlaceholderText = "Enter config name..."
+        NameBox.Font = Enum.Font.Gotham; NameBox.TextSize = 12
+        NameBox.TextColor3 = CurrentTheme.TextColor
+        NameBox.ClearTextOnFocus = false
+        NameBox.ZIndex = 999999; NameBox.Parent = Modal
+        createCorner(NameBox, 6)
+        registerThemeable(NameBox, {BackgroundColor3 = "PanelLight", TextColor3 = "TextColor"})
+
+        local JSONLabel = Instance.new("TextLabel")
+        JSONLabel.Text = "Paste JSON:"
+        JSONLabel.Font = Enum.Font.GothamSemibold; JSONLabel.TextSize = 12
+        JSONLabel.TextColor3 = CurrentTheme.TextColor
+        JSONLabel.Size = UDim2.new(1,-36,0,20); JSONLabel.Position = UDim2.new(0,18,0,110)
+        JSONLabel.BackgroundTransparency = 1; JSONLabel.TextXAlignment = Enum.TextXAlignment.Left
+        JSONLabel.ZIndex = 999999; JSONLabel.Parent = Modal
+
+        local JSONBox = Instance.new("TextBox")
+        JSONBox.Size = UDim2.new(1,-36,0,100); JSONBox.Position = UDim2.new(0,18,0,132)
+        JSONBox.BackgroundColor3 = CurrentTheme.PanelLight
+        JSONBox.Text = ""
+        JSONBox.PlaceholderText = "Paste config JSON here..."
+        JSONBox.Font = Enum.Font.Gotham; JSONBox.TextSize = 10
+        JSONBox.TextColor3 = CurrentTheme.TextColor
+        JSONBox.ClearTextOnFocus = false
+        JSONBox.TextWrapped = true
+        JSONBox.ZIndex = 999999; JSONBox.Parent = Modal
+        createCorner(JSONBox, 6)
+        registerThemeable(JSONBox, {BackgroundColor3 = "PanelLight", TextColor3 = "TextColor"})
+
+        local ImportBtn = Instance.new("TextButton")
+        ImportBtn.Size = UDim2.new(0,120,0,34); ImportBtn.Position = UDim2.new(0,18,1,-44)
+        ImportBtn.BackgroundColor3 = CurrentTheme.Primary
+        ImportBtn.Text = "Import"
+        ImportBtn.Font = Enum.Font.GothamBold; ImportBtn.TextColor3 = Color3.new(1,1,1); ImportBtn.TextSize = 13
+        ImportBtn.ZIndex = 999999; ImportBtn.Parent = Modal
+        createCorner(ImportBtn, 8)
+        registerThemeable(ImportBtn, {BackgroundColor3 = "Primary"})
+
+        local CancelBtn = Instance.new("TextButton")
+        CancelBtn.Size = UDim2.new(0,120,0,34); CancelBtn.Position = UDim2.new(1,-138,1,-44)
+        CancelBtn.BackgroundColor3 = CurrentTheme.PanelLight
+        CancelBtn.Text = "Cancel"
+        CancelBtn.Font = Enum.Font.Gotham; CancelBtn.TextColor3 = CurrentTheme.SubTextColor; CancelBtn.TextSize = 13
+        CancelBtn.ZIndex = 999999; CancelBtn.Parent = Modal
+        createCorner(CancelBtn, 8)
+        registerThemeable(CancelBtn, {BackgroundColor3 = "PanelLight", TextColor3 = "SubTextColor"})
+
+        local function CloseImport()
+            TweenService:Create(Modal, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 0)}):Play()
+            task.wait(0.3)
+            Overlay:Destroy()
+        end
+
+        CancelBtn.MouseButton1Click:Connect(CloseImport)
+        ImportBtn.MouseButton1Click:Connect(function()
+            local cfgName = NameBox.Text
+            local jsonData = JSONBox.Text
+            if cfgName == "" or jsonData == "" then
+                MenuTab:CreateNotification("Error", "Name or JSON cannot be empty!", 2)
+                return
+            end
+            local success, err = pcall(function()
+                -- Validate JSON
+                HttpService:JSONDecode(jsonData)
+                writefile(ConfigFolder .. "/" .. cfgName .. ".json", jsonData)
+            end)
+            if success then
+                CloseImport()
+                MenuTab:CreateNotification("Success", "Imported Config: " .. cfgName, 2)
+                if ConfigDropdown then ConfigDropdown:Refresh(GetSavedConfigs()) end
+            else
+                MenuTab:CreateNotification("Error", "Invalid JSON format!", 2)
+            end
+        end)
     end)
 
     function WindowSetup:CreateTab(tabName)
