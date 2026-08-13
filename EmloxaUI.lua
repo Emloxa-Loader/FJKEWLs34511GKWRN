@@ -1,5 +1,5 @@
 -- =========================================================================
--- EMLOXA WARE PREMIUM UI v18.7.1 (PRELOAD ENGINE, IDENTITY FIX, MANUAL TARGET)
+-- EMLOXA WARE PREMIUM UI v18.8 (ULTIMATE IDENTITY SYSTEM, NO INVISIBILITY BUG)
 -- FULLY UNCUT AND OPTIMIZED FOR MAXIMUM STEALTH & AESTHETICS
 -- =========================================================================
 local EmloxaLibrary = {}
@@ -581,7 +581,7 @@ local function ShowDancinIntro(HubGui, callback)
 end
 
 -- ══════════════════════════════════════
---  IDENTITY HIDER SYSTEM (SYSTEM-LEVEL DISGUISE)
+--  IDENTITY HIDER SYSTEM (NO ENGINE HOOK = NO INVISIBLE BUGS)
 -- ══════════════════════════════════════
 local identityHiderStateFile = BaseConfigFolder .. "/identity_hider_state.json"
 local identityHiderEnabled = false
@@ -590,14 +590,10 @@ local knownLocations = {}
 local heartbeatConn = nil
 local fullScanRunning = false
 
--- Hafızada tutulacak sahte kimlik verileri (Player objesi tutmuyoruz, çıkarsa bozulmaz)
 local disguiseName = "EMLOXAWARE USER"
 local disguiseDisplayName = "EMLOXAWARE USER"
 local disguiseAvatarURL = ""
 local disguiseUserId = 1
-
-local oldIndexMetamethod = nil
-local isHookInjected = false -- Sadece 1 kez hook atılması için
 
 local function LoadIdentityHiderState()
     if isfile(identityHiderStateFile) then
@@ -618,7 +614,6 @@ end
 local function SelectTargetPlayer(targetString)
     local target = nil
     
-    -- Eğer özel bir isim belirtilmişse
     if targetString and targetString ~= "" then
         local searchStr = string.lower(targetString)
         for _, p in ipairs(Players:GetPlayers()) do
@@ -629,7 +624,6 @@ local function SelectTargetPlayer(targetString)
         end
     end
 
-    -- Belirtilmemişse veya bulunamamışsa rastgele seç
     if not target then
         local others = {}
         for _, p in ipairs(Players:GetPlayers()) do
@@ -640,7 +634,6 @@ local function SelectTargetPlayer(targetString)
         end
     end
 
-    -- Verileri hafızaya al (Obje değil, sadece yazı ve ID)
     if target then
         disguiseName = target.Name
         disguiseDisplayName = target.DisplayName
@@ -656,7 +649,6 @@ local function SelectTargetPlayer(targetString)
             end
         end)
     else
-        -- Odada kimse yoksa
         disguiseName = "EMLOXAWARE USER"
         disguiseDisplayName = "EMLOXAWARE USER"
         disguiseUserId = 1
@@ -664,76 +656,82 @@ local function SelectTargetPlayer(targetString)
     end
 end
 
--- Güvenli ve kalıcı hook (Sadece 1 kez eklenir, boolean ile kontrol edilir)
-local function InjectIdentityHook()
-    if isHookInjected then return end
-    isHookInjected = true
-    
-    local success = pcall(function()
-        oldIndexMetamethod = hookmetamethod(game, "__index", function(self, key)
-            if identityHiderEnabled and self == LocalPlayer then
-                if key == "Name" then
-                    return disguiseName
-                elseif key == "DisplayName" then
-                    return disguiseDisplayName
-                elseif key == "UserId" then
-                    return disguiseUserId
-                end
-            end
-            return oldIndexMetamethod(self, key)
-        end)
-    end)
+-- Özel karakterlerin hata vermesini engelleyen fonksiyon
+local function SafeReplace(str, findStr, replaceStr)
+    local escapedFind = findStr:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%1")
+    local res, count = string.gsub(str, escapedFind, replaceStr)
+    return res, count > 0
 end
 
 local function ProcessInstance(instance)
     if not instance or not instance.Parent then return false end
     if HubGui and instance:IsDescendantOf(HubGui) then return false end 
 
-    local relevant = false
+    local isRelevant = false
 
-    if instance:IsA("TextLabel") or instance:IsA("TextButton") or instance:IsA("TextBox") then
-        local original = instance.Text
-        if original and original ~= "" then
-            local newText = original
-            local changed = false
+    pcall(function()
+        if instance:IsA("TextLabel") or instance:IsA("TextButton") or instance:IsA("TextBox") then
+            local currentText = instance.Text
+            if not currentText or currentText == "" then return end
             
-            if original == LocalPlayer.Name then
+            -- Eğer zaten spooflanmışsa veya spooflanmış kelimeyi barındırıyorsa izlemeye devam et. (Böylece ESC ve Leaderboard'dan silinmez)
+            if currentText == disguiseName or currentText == disguiseDisplayName then
+                isRelevant = true
+                return
+            end
+
+            local changed = false
+            local newText = currentText
+            
+            if currentText == LocalPlayer.Name then
                 newText = disguiseName
                 changed = true
-            elseif original == LocalPlayer.DisplayName then
+            elseif currentText == LocalPlayer.DisplayName then
                 newText = disguiseDisplayName
                 changed = true
             else
-                local replaced1, count1 = string.gsub(newText, LocalPlayer.Name, disguiseName)
-                if count1 > 0 then newText = replaced1; changed = true end
-                -- DisplayName düzeltmesi (disguiseName yerine disguiseDisplayName kullanıldı)
-                local replaced2, count2 = string.gsub(newText, LocalPlayer.DisplayName, disguiseDisplayName)
-                if count2 > 0 then newText = replaced2; changed = true end
+                local res1, c1 = SafeReplace(newText, LocalPlayer.Name, disguiseName)
+                if c1 then newText = res1; changed = true end
+                
+                local res2, c2 = SafeReplace(newText, LocalPlayer.DisplayName, disguiseDisplayName)
+                if c2 then newText = res2; changed = true end
             end
             
             if changed then
                 instance.Text = newText
-                relevant = true
+                isRelevant = true
+            else
+                -- Eğer cümle içinde zaten sahte adımız geçiyorsa (mesela sohbette), script bunu takip etmeye devam eder.
+                if string.find(currentText, disguiseName, 1, true) or string.find(currentText, disguiseDisplayName, 1, true) then
+                    isRelevant = true
+                end
             end
         end
-    end
-
-    if instance:IsA("ImageLabel") or instance:IsA("ImageButton") then
-        local img = instance.Image
-        if img and img ~= "" then
-            if string.find(img, tostring(LocalPlayer.UserId)) then
+    end)
+    
+    pcall(function()
+        if instance:IsA("ImageLabel") or instance:IsA("ImageButton") then
+            local currentImg = instance.Image
+            if not currentImg or currentImg == "" then return end
+            
+            -- Avatar zaten değiştirilmişse izlemeye devam et.
+            if disguiseAvatarURL ~= "" and currentImg == disguiseAvatarURL then
+                isRelevant = true
+                return
+            end
+            
+            if string.find(currentImg, tostring(LocalPlayer.UserId), 1, true) then
                 if disguiseAvatarURL ~= "" then
                     instance.Image = disguiseAvatarURL
                 else
-                    instance.Image = "" 
+                    instance.Image = ""
                 end
-                instance.ImageTransparency = 0 
-                relevant = true
+                isRelevant = true
             end
         end
-    end
+    end)
 
-    return relevant
+    return isRelevant
 end
 
 local function FastScan()
@@ -751,10 +749,11 @@ end
 
 local function FullScan()
     local containers = {
-        game:GetService("CoreGui"),
         LocalPlayer:WaitForChild("PlayerGui"),
         workspace
     }
+    pcall(function() table.insert(containers, game:GetService("CoreGui")) end)
+
     for _, container in ipairs(containers) do
         if container then
             for _, obj in ipairs(container:GetDescendants()) do
@@ -778,7 +777,6 @@ end
 
 local function StartIdentityHider()
     if heartbeatConn then return end
-    InjectIdentityHook()
     heartbeatConn = RunService.Heartbeat:Connect(function()
         if identityHiderEnabled then FastScan() end
     end)
@@ -787,8 +785,6 @@ local function StartIdentityHider()
 end
 
 local function StopIdentityHider()
-    -- Artık Unhook yapmıyoruz, identityHiderEnabled = false olduğu için hook bypass oluyor.
-    -- Bu sayede 'attempt to call nil value' hatası çözüldü.
     if heartbeatConn then
         heartbeatConn:Disconnect()
         heartbeatConn = nil
