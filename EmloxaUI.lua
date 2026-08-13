@@ -392,6 +392,7 @@ local function ShowPreloadNotification(HubGui)
     TitleLabel.Position = UDim2.new(0,10,0,8)
     TitleLabel.BackgroundTransparency = 1
     TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    TitleLabel.ZIndex = 1000  -- Düzeltme: yazı görünürlüğü için yüksek ZIndex
     TitleLabel.Parent = Notif
 
     local MsgLabel = Instance.new("TextLabel")
@@ -404,6 +405,7 @@ local function ShowPreloadNotification(HubGui)
     MsgLabel.BackgroundTransparency = 1
     MsgLabel.TextXAlignment = Enum.TextXAlignment.Left
     MsgLabel.TextWrapped = true
+    MsgLabel.ZIndex = 1000  -- Düzeltme: yazı görünürlüğü için yüksek ZIndex
     MsgLabel.Parent = Notif
     
     TweenService:Create(Notif, TweenInfo.new(0.5,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Position = UDim2.new(1,-330,1,-80)}):Play()
@@ -659,6 +661,9 @@ function EmloxaLibrary:CreateWindow(hubName)
             MainFrame.Visible = true
             playSound(128170212983132, 0.5)
             TweenService:Create(MainFrame, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 710, 0, 480)}):Play()
+            -- Discord bildirimini intro sonrası göster
+            task.wait(0.6)
+            WindowSetup:ShowDiscordPrompt()
         end)
     end)
 
