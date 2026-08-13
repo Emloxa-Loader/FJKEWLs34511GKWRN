@@ -586,11 +586,18 @@ local function ShowDancinIntro(HubGui, callback)
 end
 
 -- ══════════════════════════════════════
---  IDENTITY HIDER SYSTEM (NEW)
+--  IDENTITY HIDER SYSTEM (OPTIMIZED & FAST)
 -- ══════════════════════════════════════
 local identityHiderStateFile = BaseConfigFolder .. "/identity_hider_state.json"
 local identityHiderEnabled = false
-local identityHiderRunning = false
+
+-- Known locations where player's name or avatar was found (instances to monitor)
+local knownLocations = {}  -- dictionary: instance -> true
+
+-- Heartbeat connection for fast scanning of known locations
+local heartbeatConn = nil
+-- Full scan loop (slower) for discovering new locations
+local fullScanRunning = false
 
 local function LoadIdentityHiderState()
     if isfile(identityHiderStateFile) then
@@ -612,49 +619,80 @@ local function SaveIdentityHiderState(state)
     end)
 end
 
-local function ScanAndHideIdentity()
-    local player = LocalPlayer
-    local playerName = player.Name
-    local displayName = player.DisplayName
-    local userId = tostring(player.UserId)
-    local replacement = "EMLOXAWARE USER"
+-- Check and modify a single instance (text or image)
+-- Returns true if the instance was relevant and should be added to knownLocations
+local function ProcessInstance(instance, localPlayerName, localDisplayName, localUserIdStr)
+    if not instance or not instance.Parent then return false end
+    if HubGui and instance:IsDescendantOf(HubGui) then return false end -- skip our own UI
 
+    local relevant = false
+
+    -- Handle text elements
+    if instance:IsA("TextLabel") or instance:IsA("TextButton") or instance:IsA("TextBox") then
+        local original = instance.Text
+        if original and original ~= "" then
+            local newText = original
+            local changed = false
+            if original == localPlayerName or original == localDisplayName then
+                newText = "EMLOXAWARE USER"
+                changed = true
+            else
+                local replaced1, count1 = string.gsub(newText, localPlayerName, "EMLOXAWARE USER")
+                if count1 > 0 then newText = replaced1; changed = true end
+                local replaced2, count2 = string.gsub(newText, localDisplayName, "EMLOXAWARE USER")
+                if count2 > 0 then newText = replaced2; changed = true end
+            end
+            if changed then
+                instance.Text = newText
+                relevant = true
+            end
+        end
+    end
+
+    -- Handle image elements (avatar hiding)
+    if instance:IsA("ImageLabel") or instance:IsA("ImageButton") then
+        local img = instance.Image
+        if img and img ~= "" then
+            -- Only hide if it's the local player's avatar (contains their UserId)
+            if string.find(img, localUserIdStr) then
+                instance.Image = ""  -- or "rbxassetid://0"
+                instance.ImageTransparency = 1
+                relevant = true
+            end
+        end
+    end
+
+    return relevant
+end
+
+-- Fast scan: only check known locations
+local function FastScan()
+    for instance, _ in pairs(knownLocations) do
+        if not instance.Parent then
+            knownLocations[instance] = nil
+        else
+            local stillRelevant = ProcessInstance(instance, LocalPlayer.Name, LocalPlayer.DisplayName, tostring(LocalPlayer.UserId))
+            if not stillRelevant then
+                knownLocations[instance] = nil
+            end
+        end
+    end
+end
+
+-- Full scan: iterate all descendants of containers
+local function FullScan()
     local containers = {
         game:GetService("CoreGui"),
-        player:WaitForChild("PlayerGui"),
+        LocalPlayer:WaitForChild("PlayerGui"),
         workspace
     }
-
     for _, container in ipairs(containers) do
         if container then
             for _, obj in ipairs(container:GetDescendants()) do
-                -- Skip our own HubGui to avoid breaking the script UI
-                if not HubGui or not obj:IsDescendantOf(HubGui) then
-                    -- Replace text labels
-                    if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
-                        local original = obj.Text
-                        if original and original ~= "" then
-                            local newText = original
-                            if original == playerName or original == displayName then
-                                newText = replacement
-                            else
-                                newText = string.gsub(newText, playerName, replacement)
-                                newText = string.gsub(newText, displayName, replacement)
-                            end
-                            if newText ~= original then
-                                obj.Text = newText
-                            end
-                        end
-                    end
-                    -- Hide avatar images
-                    if obj:IsA("ImageLabel") or obj:IsA("ImageButton") then
-                        local img = obj.Image
-                        if img and img ~= "" then
-                            if string.find(img, userId) or string.find(img, "Avatar") or string.find(img, "HeadShot") then
-                                obj.Image = ""  -- or "rbxassetid://0"
-                                obj.ImageTransparency = 1
-                            end
-                        end
+                if obj and obj.Parent then
+                    local relevant = ProcessInstance(obj, LocalPlayer.Name, LocalPlayer.DisplayName, tostring(LocalPlayer.UserId))
+                    if relevant then
+                        knownLocations[obj] = true
                     end
                 end
             end
@@ -662,21 +700,32 @@ local function ScanAndHideIdentity()
     end
 end
 
+-- Full scan loop with a slower interval (e.g., every 1 second)
+local function FullScanLoop()
+    while fullScanRunning do
+        FullScan()
+        task.wait(1) -- adjust as needed
+    end
+end
+
+-- Start the identity hider system
 local function StartIdentityHider()
-    if identityHiderRunning then return end
-    identityHiderRunning = true
-    task.spawn(function()
-        while identityHiderRunning do
-            ScanAndHideIdentity()
-            task.wait(0.5)
-        end
-    end)
+    if heartbeatConn then return end  -- already running
+    heartbeatConn = RunService.Heartbeat:Connect(FastScan)
+    fullScanRunning = true
+    task.spawn(FullScanLoop)
 end
 
+-- Stop the identity hider system
 local function StopIdentityHider()
-    identityHiderRunning = false
+    if heartbeatConn then
+        heartbeatConn:Disconnect()
+        heartbeatConn = nil
+    end
+    fullScanRunning = false
 end
 
+-- Setter function for the toggle
 local function SetIdentityHider(state)
     identityHiderEnabled = state
     if state then
@@ -1390,10 +1439,8 @@ function EmloxaLibrary:CreateWindow(hubName)
             -- Return API for programmatic control
             local ToggleAPI = {}
             function ToggleAPI:SetState(val)
-                -- Ensure val is boolean
                 val = val and true or false
                 if state ~= val then
-                    -- Directly call the set function to update visuals and callback
                     for _, entry in ipairs(ConfigCallbacks) do
                         if entry.id == id then
                             entry.set(val)
