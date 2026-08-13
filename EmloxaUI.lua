@@ -605,7 +605,7 @@ function EmloxaLibrary:CreateWindow(hubName)
     HubGui.ResetOnSpawn = false
     HubGui.IgnoreGuiInset = true
     HubGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    HubGui.ZIndex = 999999  -- Aşırı yüksek ZIndex
+    HubGui.DisplayOrder = 999999  -- ScreenGui için yüksek DisplayOrder (ZIndex yerine)
     HubGui.Parent = SafeParent
     ProtectUI(HubGui)
 
@@ -1707,7 +1707,7 @@ function EmloxaLibrary:CreateWindow(hubName)
         EmloxaLibrary:SetTheme(val)
     end)
 
-    -- Background Music kaldırıldı (eski toggle burada yok)
+    -- Background Music tamamen kaldırıldı
 
     MenuTab:CreateDivider()
 
