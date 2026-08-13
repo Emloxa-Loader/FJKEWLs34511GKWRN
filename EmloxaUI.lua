@@ -141,25 +141,85 @@ if not isfolder(BaseConfigFolder) then makefolder(BaseConfigFolder) end
 local ConfigFolder = BaseConfigFolder .. "/" .. tostring(game.PlaceId)
 if not isfolder(ConfigFolder) then makefolder(ConfigFolder) end
 
-local function GetSavedConfigs()
-    local list = {}
-    if listfiles then
+-- Identity Hide ayar dosyası (oyun bazlı değil, global)
+local IdentityHideFile = BaseConfigFolder .. "/identity_hide.json"
+local IdentityHideEnabled = false
+
+local function LoadIdentityHide()
+    if isfile(IdentityHideFile) then
         pcall(function()
-            for _, file in ipairs(listfiles(ConfigFolder)) do
-                local fileName = file:match("([^/\\]+)%.json$")
-                if fileName and not fileName:find("^%.") then table.insert(list, fileName) end
+            local json = readfile(IdentityHideFile)
+            local data = HttpService:JSONDecode(json)
+            if data and data.Enabled ~= nil then
+                IdentityHideEnabled = data.Enabled
             end
         end)
     end
-    if #list == 0 then table.insert(list, "No Configs Found") end
-    return list
+end
+LoadIdentityHide()
+
+local function SaveIdentityHide()
+    pcall(function()
+        writefile(IdentityHideFile, HttpService:JSONEncode({Enabled = IdentityHideEnabled}))
+    end)
 end
 
-local ConfigValues = {}
-local ConfigCallbacks = {}
-local function registerConfig(id, setValue)
-    table.insert(ConfigCallbacks, {id = id, set = setValue})
+-- ── Kimlik Gizleme Fonksiyonu ──
+local function HideIdentity()
+    local playerName = LocalPlayer.Name
+    local displayName = LocalPlayer.DisplayName
+    local userId = tostring(LocalPlayer.UserId)
+    
+    local function processInstance(instance)
+        if instance:IsA("TextLabel") or instance:IsA("TextButton") then
+            local txt = instance.Text
+            if txt and (txt:find(playerName) or txt:find(displayName)) then
+                instance.Text = "EMLOXAWARE USER"
+            end
+        elseif instance:IsA("ImageLabel") or instance:IsA("ImageButton") then
+            local img = instance.Image
+            if img and (img:find("rbxthumb") or img:find("headshot") or img:find("avatar")) and img:find(userId) then
+                instance.Image = ""
+                instance.ImageTransparency = 1
+            end
+        end
+        for _, child in ipairs(instance:GetChildren()) do
+            pcall(processInstance, child)
+        end
+    end
+    
+    -- Tarama alanları: PlayerGui, CoreGui, HUI
+    local containers = {
+        LocalPlayer:FindFirstChild("PlayerGui"),
+        game:GetService("CoreGui")
+    }
+    pcall(function()
+        local hui = gethui()
+        if hui then table.insert(containers, hui) end
+    end)
+    
+    for _, container in ipairs(containers) do
+        if container then
+            pcall(processInstance, container)
+        end
+    end
+    
+    -- Karakter üzerindeki BillboardGui'leri de tara
+    local character = LocalPlayer.Character
+    if character then
+        pcall(processInstance, character)
+    end
 end
+
+-- Identity Hide için sürekli kontrol döngüsü
+task.spawn(function()
+    while true do
+        if IdentityHideEnabled then
+            HideIdentity()
+        end
+        task.wait(0.5)
+    end
+end)
 
 -- ══════════════════════════════════════
 --  GITHUB VIP & HWID LOGIC
@@ -498,7 +558,7 @@ local function ShowDancinIntro(HubGui, callback)
     SkipButton.BackgroundTransparency = 1
     SkipButton.Text = ""
     SkipButton.ZIndex = 999999
-    SkipButton.Active = false  -- Başlangıçta pasif (5 saniye sonra aktif olacak)
+    SkipButton.Active = false  -- Başlangıçta pasif
     SkipButton.Parent = IntroGui
 
     local isPlaying = true
@@ -605,7 +665,7 @@ function EmloxaLibrary:CreateWindow(hubName)
     HubGui.ResetOnSpawn = false
     HubGui.IgnoreGuiInset = true
     HubGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    HubGui.DisplayOrder = 999999  -- ScreenGui için yüksek DisplayOrder (ZIndex yerine)
+    HubGui.DisplayOrder = 999999  -- ScreenGui için yüksek DisplayOrder
     HubGui.Parent = SafeParent
     ProtectUI(HubGui)
 
@@ -1222,7 +1282,7 @@ function EmloxaLibrary:CreateWindow(hubName)
             return baseName .. "_" .. elementCounter
         end
 
-        function TabSetup:CreateToggle(name, callback)
+        function TabSetup:CreateToggle(name, callback, default)
             local id = generateId("toggle_" .. name)
             local ToggleFrame = Instance.new("Frame")
             ToggleFrame.Size = UDim2.new(1,0,0,42) 
@@ -1261,7 +1321,7 @@ function EmloxaLibrary:CreateWindow(hubName)
             Circle.Parent = Btn
             createCorner(Circle,8)
 
-            local state = false
+            local state = default or false
             ConfigValues[id] = state
             registerConfig(id, function(val)
                 state = val
@@ -1270,6 +1330,14 @@ function EmloxaLibrary:CreateWindow(hubName)
                 TweenService:Create(Circle, TweenInfo.new(0.3,Enum.EasingStyle.Quart,Enum.EasingDirection.Out), {Position = gPos}):Play()
                 TweenService:Create(Btn, TweenInfo.new(0.3), {BackgroundColor3 = gCol}):Play()
                 callback(state)
+            end)
+
+            -- Başlangıç durumunu uygula
+            task.spawn(function()
+                local gPos = state and UDim2.new(1,-19,0.5,-8) or UDim2.new(0,3,0.5,-8)
+                local gCol = state and CurrentTheme.Primary or CurrentTheme.Panel
+                Circle.Position = gPos
+                Btn.BackgroundColor3 = gCol
             end)
 
             Btn.MouseEnter:Connect(playHoverSound)
@@ -1703,11 +1771,15 @@ function EmloxaLibrary:CreateWindow(hubName)
 
     local MenuTab = CreateTabInternal("Menu", 9999)
     
+    -- Identity Hide (en üstte)
+    MenuTab:CreateToggle("Identity Hide", function(state)
+        IdentityHideEnabled = state
+        SaveIdentityHide()
+    end, IdentityHideEnabled)
+
     MenuTab:CreateDropdown("Theme", EmloxaLibrary:GetThemeNames(), "Default", function(val)
         EmloxaLibrary:SetTheme(val)
     end)
-
-    -- Background Music tamamen kaldırıldı
 
     MenuTab:CreateDivider()
 
