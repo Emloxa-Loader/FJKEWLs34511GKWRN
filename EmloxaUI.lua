@@ -141,7 +141,7 @@ if not isfolder(BaseConfigFolder) then makefolder(BaseConfigFolder) end
 local ConfigFolder = BaseConfigFolder .. "/" .. tostring(game.PlaceId)
 if not isfolder(ConfigFolder) then makefolder(ConfigFolder) end
 
--- Identity Hide ayar dosyası (oyun bazlı değil, global)
+-- Identity Hide ayar dosyası (global)
 local IdentityHideFile = BaseConfigFolder .. "/identity_hide.json"
 local IdentityHideEnabled = false
 
@@ -164,7 +164,7 @@ local function SaveIdentityHide()
     end)
 end
 
--- ── Kimlik Gizleme Fonksiyonu ──
+-- Kimlik Gizleme Fonksiyonu
 local function HideIdentity()
     local playerName = LocalPlayer.Name
     local displayName = LocalPlayer.DisplayName
@@ -188,7 +188,6 @@ local function HideIdentity()
         end
     end
     
-    -- Tarama alanları: PlayerGui, CoreGui, HUI
     local containers = {
         LocalPlayer:FindFirstChild("PlayerGui"),
         game:GetService("CoreGui")
@@ -204,14 +203,13 @@ local function HideIdentity()
         end
     end
     
-    -- Karakter üzerindeki BillboardGui'leri de tara
     local character = LocalPlayer.Character
     if character then
         pcall(processInstance, character)
     end
 end
 
--- Identity Hide için sürekli kontrol döngüsü
+-- Identity Hide sürekli kontrol döngüsü
 task.spawn(function()
     while true do
         if IdentityHideEnabled then
@@ -669,6 +667,73 @@ function EmloxaLibrary:CreateWindow(hubName)
     HubGui.Parent = SafeParent
     ProtectUI(HubGui)
 
+    -- Discord Prompt fonksiyonunu erken tanımla (callback'in erken çağrılma ihtimaline karşı)
+    function WindowSetup:ShowDiscordPrompt()
+        local PromptFrame = Instance.new("Frame")
+        PromptFrame.Size = UDim2.new(0, 350, 0, 140)
+        PromptFrame.Position = UDim2.new(1, 20, 1, -160)
+        PromptFrame.BackgroundColor3 = CurrentTheme.Panel
+        PromptFrame.Active = true
+        PromptFrame.Parent = HubGui
+        createCorner(PromptFrame, 12)
+        createStroke(PromptFrame, CurrentTheme.Primary, 2)
+        createShadow(PromptFrame, UDim2.new(1,18,1,18), -9, 0.7)
+        registerThemeable(PromptFrame, {BackgroundColor3 = "Panel"})
+
+        local PTitle = Instance.new("TextLabel")
+        PTitle.Text = "🔥 Emloxa Discord"
+        PTitle.Font = Enum.Font.GothamBlack; PTitle.TextSize = 18
+        PTitle.TextColor3 = CurrentTheme.Primary
+        PTitle.Size = UDim2.new(1,-20,0,30); PTitle.Position = UDim2.new(0,10,0,10)
+        PTitle.BackgroundTransparency = 1; PTitle.TextXAlignment = Enum.TextXAlignment.Left
+        PTitle.Parent = PromptFrame
+        registerThemeable(PTitle, {TextColor3 = "Primary"})
+
+        local PDesc = Instance.new("TextLabel")
+        PDesc.Text = "Join our Discord for the latest scripts and support!"
+        PDesc.Font = Enum.Font.Gotham; PDesc.TextSize = 13
+        PDesc.TextColor3 = CurrentTheme.TextColor
+        PDesc.Size = UDim2.new(1,-20,0,50); PDesc.Position = UDim2.new(0,10,0,45)
+        PDesc.BackgroundTransparency = 1; PDesc.TextXAlignment = Enum.TextXAlignment.Left
+        PDesc.TextWrapped = true; PDesc.Parent = PromptFrame
+        registerThemeable(PDesc, {TextColor3 = "TextColor"})
+
+        local BtnYes = Instance.new("TextButton")
+        BtnYes.Size = UDim2.new(0,150,0,34); BtnYes.Position = UDim2.new(0,15,1,-44)
+        BtnYes.BackgroundColor3 = CurrentTheme.Primary; BtnYes.Text = "Copy Link"
+        BtnYes.Font = Enum.Font.GothamBold; BtnYes.TextColor3 = Color3.new(1,1,1); BtnYes.TextSize = 13
+        BtnYes.Parent = PromptFrame; createCorner(BtnYes,8)
+        registerThemeable(BtnYes, {BackgroundColor3 = "Primary"})
+
+        local BtnNo = Instance.new("TextButton")
+        BtnNo.Size = UDim2.new(0,150,0,34); BtnNo.Position = UDim2.new(1,-165,1,-44)
+        BtnNo.BackgroundColor3 = CurrentTheme.PanelLight; BtnNo.Text = "No Thanks"
+        BtnNo.Font = Enum.Font.Gotham; BtnNo.TextColor3 = CurrentTheme.SubTextColor; BtnNo.TextSize = 13
+        BtnNo.Parent = PromptFrame; createCorner(BtnNo,8)
+        registerThemeable(BtnNo, {BackgroundColor3 = "PanelLight", TextColor3 = "SubTextColor"})
+
+        TweenService:Create(PromptFrame, TweenInfo.new(0.6, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2.new(1,-370,1,-160)}):Play()
+
+        local function ClosePrompt()
+            TweenService:Create(PromptFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {Position = UDim2.new(1,20,1,-160)}):Play()
+            task.wait(0.5); PromptFrame:Destroy()
+        end
+
+        BtnYes.MouseEnter:Connect(playHoverSound)
+        BtnNo.MouseEnter:Connect(playHoverSound)
+        BtnYes.MouseButton1Click:Connect(function()
+            playClickSound()
+            if setclipboard then setclipboard("https://discord.gg/XjfW7N84jT") end
+            BtnYes.Text = "Copied!"; BtnYes.BackgroundColor3 = Color3.fromRGB(40,200,100)
+            TweenService:Create(BtnYes, TweenInfo.new(0.15), {Size = UDim2.new(0,155,0,36)}):Play()
+            task.wait(1); ClosePrompt()
+        end)
+        BtnNo.MouseButton1Click:Connect(function()
+            playClickSound()
+            ClosePrompt()
+        end)
+    end
+
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "Sys_Data_Container"
     MainFrame.Size = UDim2.new(0, 0, 0, 0)
@@ -737,7 +802,7 @@ function EmloxaLibrary:CreateWindow(hubName)
             MainFrame.Visible = true
             playSound(128170212983132, 0.5)
             TweenService:Create(MainFrame, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 710, 0, 480)}):Play()
-            -- Discord bildirimini intro sonrası göster
+            -- Discord bildirimini intro sonrası göster (artık WindowSetup üzerinde mevcut)
             task.wait(0.6)
             WindowSetup:ShowDiscordPrompt()
         end)
@@ -1989,72 +2054,6 @@ function EmloxaLibrary:CreateWindow(hubName)
 
     function WindowSetup:CreateTab(tabName)
         return CreateTabInternal(tabName, #Tabs + 1)
-    end
-
-    function WindowSetup:ShowDiscordPrompt()
-        local PromptFrame = Instance.new("Frame")
-        PromptFrame.Size = UDim2.new(0, 350, 0, 140)
-        PromptFrame.Position = UDim2.new(1, 20, 1, -160)
-        PromptFrame.BackgroundColor3 = CurrentTheme.Panel
-        PromptFrame.Active = true
-        PromptFrame.Parent = HubGui
-        createCorner(PromptFrame, 12)
-        createStroke(PromptFrame, CurrentTheme.Primary, 2)
-        createShadow(PromptFrame, UDim2.new(1,18,1,18), -9, 0.7)
-        registerThemeable(PromptFrame, {BackgroundColor3 = "Panel"})
-
-        local PTitle = Instance.new("TextLabel")
-        PTitle.Text = "🔥 Emloxa Discord"
-        PTitle.Font = Enum.Font.GothamBlack; PTitle.TextSize = 18
-        PTitle.TextColor3 = CurrentTheme.Primary
-        PTitle.Size = UDim2.new(1,-20,0,30); PTitle.Position = UDim2.new(0,10,0,10)
-        PTitle.BackgroundTransparency = 1; PTitle.TextXAlignment = Enum.TextXAlignment.Left
-        PTitle.Parent = PromptFrame
-        registerThemeable(PTitle, {TextColor3 = "Primary"})
-
-        local PDesc = Instance.new("TextLabel")
-        PDesc.Text = "Join our Discord for the latest scripts and support!"
-        PDesc.Font = Enum.Font.Gotham; PDesc.TextSize = 13
-        PDesc.TextColor3 = CurrentTheme.TextColor
-        PDesc.Size = UDim2.new(1,-20,0,50); PDesc.Position = UDim2.new(0,10,0,45)
-        PDesc.BackgroundTransparency = 1; PDesc.TextXAlignment = Enum.TextXAlignment.Left
-        PDesc.TextWrapped = true; PDesc.Parent = PromptFrame
-        registerThemeable(PDesc, {TextColor3 = "TextColor"})
-
-        local BtnYes = Instance.new("TextButton")
-        BtnYes.Size = UDim2.new(0,150,0,34); BtnYes.Position = UDim2.new(0,15,1,-44)
-        BtnYes.BackgroundColor3 = CurrentTheme.Primary; BtnYes.Text = "Copy Link"
-        BtnYes.Font = Enum.Font.GothamBold; BtnYes.TextColor3 = Color3.new(1,1,1); BtnYes.TextSize = 13
-        BtnYes.Parent = PromptFrame; createCorner(BtnYes,8)
-        registerThemeable(BtnYes, {BackgroundColor3 = "Primary"})
-
-        local BtnNo = Instance.new("TextButton")
-        BtnNo.Size = UDim2.new(0,150,0,34); BtnNo.Position = UDim2.new(1,-165,1,-44)
-        BtnNo.BackgroundColor3 = CurrentTheme.PanelLight; BtnNo.Text = "No Thanks"
-        BtnNo.Font = Enum.Font.Gotham; BtnNo.TextColor3 = CurrentTheme.SubTextColor; BtnNo.TextSize = 13
-        BtnNo.Parent = PromptFrame; createCorner(BtnNo,8)
-        registerThemeable(BtnNo, {BackgroundColor3 = "PanelLight", TextColor3 = "SubTextColor"})
-
-        TweenService:Create(PromptFrame, TweenInfo.new(0.6, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2.new(1,-370,1,-160)}):Play()
-
-        local function ClosePrompt()
-            TweenService:Create(PromptFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {Position = UDim2.new(1,20,1,-160)}):Play()
-            task.wait(0.5); PromptFrame:Destroy()
-        end
-
-        BtnYes.MouseEnter:Connect(playHoverSound)
-        BtnNo.MouseEnter:Connect(playHoverSound)
-        BtnYes.MouseButton1Click:Connect(function()
-            playClickSound()
-            if setclipboard then setclipboard("https://discord.gg/XjfW7N84jT") end
-            BtnYes.Text = "Copied!"; BtnYes.BackgroundColor3 = Color3.fromRGB(40,200,100)
-            TweenService:Create(BtnYes, TweenInfo.new(0.15), {Size = UDim2.new(0,155,0,36)}):Play()
-            task.wait(1); ClosePrompt()
-        end)
-        BtnNo.MouseButton1Click:Connect(function()
-            playClickSound()
-            ClosePrompt()
-        end)
     end
 
     return WindowSetup
