@@ -7,15 +7,13 @@ local EmloxaLibrary = {}
 -- ══════════════════════════════════════
 --  COMPATIBILITY LAYER (task fix)
 -- ══════════════════════════════════════
-local task = task or {}
-if not task.spawn then task.spawn = function(f) coroutine.wrap(f)() end end
-if not task.wait then
-    task.wait = function(t)
-        if t and type(t) == "number" then
-            wait(t)
-        else
-            wait()
-        end
+local task = {}
+function task.spawn(f) return coroutine.wrap(f)() end
+function task.wait(t)
+    if t and type(t) == "number" then
+        wait(t)
+    else
+        wait()
     end
 end
 
@@ -513,12 +511,12 @@ local function ShowDancinIntro(HubGui, callback)
     SkipButton.BackgroundTransparency = 1
     SkipButton.Text = ""
     SkipButton.ZIndex = 999999
-    SkipButton.Active = false
+    SkipButton.Active = true -- Başlangıçta aktif et
     SkipButton.Parent = IntroGui
 
     local isPlaying = true
 
-    -- Animasyon döngüsü
+    -- Animasyon döngüsü (task.spawn yerine doğrudan spawn kullanıyoruz)
     task.spawn(function()
         local frameIndex = 1
         while isPlaying do
@@ -536,12 +534,11 @@ local function ShowDancinIntro(HubGui, callback)
         end
     end)
 
-    -- 5 saniye sonra skip aktif
+    -- 5 saniye sonra skip yazısını göster (artık buton zaten aktif)
     task.spawn(function()
         task.wait(5)
         if isPlaying then
             SkipText.Visible = true
-            SkipButton.Active = true
             task.spawn(function()
                 while isPlaying do
                     TweenService:Create(SkipText, TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {TextTransparency = 0.8}):Play()
@@ -553,28 +550,42 @@ local function ShowDancinIntro(HubGui, callback)
         end
     end)
 
-    -- Audio-reactive
+    -- Audio-reactive (hata korumalı)
     local currentGlowHeight = 0.5
     local currentScale = 1
     local renderConn
     renderConn = RunService.RenderStepped:Connect(function(deltaTime)
-        if not isPlaying then return end
-        
-        local loudness = IntroMusic.PlaybackLoudness
-        local targetGlowHeight = 0.4 + (loudness / 1000) * 0.8 
-        local targetScale = 1 + (loudness / 600) * 0.35 
-        
-        currentGlowHeight = currentGlowHeight + (targetGlowHeight - currentGlowHeight) * 12 * deltaTime
-        currentScale = currentScale + (targetScale - currentScale) * 18 * deltaTime
-        
-        OrangeGlow.Size = UDim2.new(1, 0, currentGlowHeight, 0)
-        CenterText.Size = UDim2.new(0, 500 * currentScale, 0, 100 * currentScale)
-        CenterText.TextSize = 50 * currentScale
-        
-        LeftGif.Size = UDim2.new(0, 220 * currentScale, 0, 220 * currentScale)
-        RightGif.Size = UDim2.new(0, 220 * currentScale, 0, 220 * currentScale)
-        
-        CenterText.TextColor3 = Color3.fromHSV(tick() * 0.2 % 1, 0.4, 1)
+        pcall(function()
+            if not isPlaying then return end
+            
+            local loudness = IntroMusic.PlaybackLoudness or 0
+            local targetGlowHeight = 0.4 + (loudness / 1000) * 0.8 
+            local targetScale = 1 + (loudness / 600) * 0.35 
+            
+            currentGlowHeight = currentGlowHeight + (targetGlowHeight - currentGlowHeight) * 12 * deltaTime
+            currentScale = currentScale + (targetScale - currentScale) * 18 * deltaTime
+            
+            OrangeGlow.Size = UDim2.new(1, 0, currentGlowHeight, 0)
+            CenterText.Size = UDim2.new(0, 500 * currentScale, 0, 100 * currentScale)
+            CenterText.TextSize = 50 * currentScale
+            
+            LeftGif.Size = UDim2.new(0, 220 * currentScale, 0, 220 * currentScale)
+            RightGif.Size = UDim2.new(0, 220 * currentScale, 0, 220 * currentScale)
+            
+            -- Güvenli renk değişimi (Color3.fromHSV yoksa alternatif)
+            local hue = (tick() * 0.2) % 1
+            local r, g, b
+            if Color3.fromHSV then
+                local c = Color3.fromHSV(hue, 0.4, 1)
+                CenterText.TextColor3 = c
+            else
+                -- Basit sine dalgası ile renk değişimi
+                r = math.abs(math.sin(tick()))
+                g = math.abs(math.cos(tick() * 0.7))
+                b = math.abs(math.sin(tick() * 1.3))
+                CenterText.TextColor3 = Color3.new(r, g, b)
+            end
+        end)
     end)
 
     local hasClicked = false
