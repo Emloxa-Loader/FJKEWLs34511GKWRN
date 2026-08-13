@@ -4,6 +4,19 @@
 -- =========================================================================
 local EmloxaLibrary = {}
 
+-- ══════════════════════════════════════
+--  COMPATIBILITY LAYER (task fix)
+-- ══════════════════════════════════════
+local task = {}
+function task.spawn(f) return coroutine.wrap(f)() end
+function task.wait(t)
+    if t and type(t) == "number" then
+        wait(t)
+    else
+        wait()
+    end
+end
+
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -490,7 +503,7 @@ local function ShowDancinIntro(HubGui, callback)
     SkipText.TextColor3 = Color3.new(1, 1, 1)
     SkipText.BackgroundTransparency = 1
     SkipText.ZIndex = 999998
-    SkipText.Visible = false  -- Başlangıçta gizli
+    SkipText.Visible = false
     SkipText.Parent = IntroGui
 
     local SkipButton = Instance.new("TextButton")
@@ -498,12 +511,12 @@ local function ShowDancinIntro(HubGui, callback)
     SkipButton.BackgroundTransparency = 1
     SkipButton.Text = ""
     SkipButton.ZIndex = 999999
-    SkipButton.Active = false  -- Başlangıçta pasif (5 saniye sonra aktif olacak)
+    SkipButton.Active = true -- Başlangıçta aktif
     SkipButton.Parent = IntroGui
 
     local isPlaying = true
 
-    -- Preloaded Animasyon Döngüsü
+    -- Animasyon döngüsü
     task.spawn(function()
         local frameIndex = 1
         while isPlaying do
@@ -521,13 +534,11 @@ local function ShowDancinIntro(HubGui, callback)
         end
     end)
 
-    -- 5 saniye sonra skip yazısını ve tıklamayı aktif et
+    -- 5 saniye sonra skip yazısını göster
     task.spawn(function()
         task.wait(5)
         if isPlaying then
             SkipText.Visible = true
-            SkipButton.Active = true
-            -- Skip yazısı için yanıp sönme animasyonu
             task.spawn(function()
                 while isPlaying do
                     TweenService:Create(SkipText, TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {TextTransparency = 0.8}):Play()
@@ -539,28 +550,41 @@ local function ShowDancinIntro(HubGui, callback)
         end
     end)
 
-    -- AUDIO-REACTIVE (Daha Hassas ve Şiddetli)
+    -- Audio-reactive (hata korumalı)
     local currentGlowHeight = 0.5
     local currentScale = 1
     local renderConn
     renderConn = RunService.RenderStepped:Connect(function(deltaTime)
-        if not isPlaying then return end
-        
-        local loudness = IntroMusic.PlaybackLoudness
-        local targetGlowHeight = 0.4 + (loudness / 1000) * 0.8 
-        local targetScale = 1 + (loudness / 600) * 0.35 
-        
-        currentGlowHeight = currentGlowHeight + (targetGlowHeight - currentGlowHeight) * 12 * deltaTime
-        currentScale = currentScale + (targetScale - currentScale) * 18 * deltaTime
-        
-        OrangeGlow.Size = UDim2.new(1, 0, currentGlowHeight, 0)
-        CenterText.Size = UDim2.new(0, 500 * currentScale, 0, 100 * currentScale)
-        CenterText.TextSize = 50 * currentScale
-        
-        LeftGif.Size = UDim2.new(0, 220 * currentScale, 0, 220 * currentScale)
-        RightGif.Size = UDim2.new(0, 220 * currentScale, 0, 220 * currentScale)
-        
-        CenterText.TextColor3 = Color3.fromHSV(tick() * 0.2 % 1, 0.4, 1)
+        pcall(function()
+            if not isPlaying then return end
+            
+            local loudness = 0
+            local success, value = pcall(function() return IntroMusic.PlaybackLoudness end)
+            if success and value then loudness = value end
+            
+            local targetGlowHeight = 0.4 + (loudness / 1000) * 0.8 
+            local targetScale = 1 + (loudness / 600) * 0.35 
+            
+            currentGlowHeight = currentGlowHeight + (targetGlowHeight - currentGlowHeight) * 12 * deltaTime
+            currentScale = currentScale + (targetScale - currentScale) * 18 * deltaTime
+            
+            OrangeGlow.Size = UDim2.new(1, 0, currentGlowHeight, 0)
+            CenterText.Size = UDim2.new(0, 500 * currentScale, 0, 100 * currentScale)
+            CenterText.TextSize = 50 * currentScale
+            
+            LeftGif.Size = UDim2.new(0, 220 * currentScale, 0, 220 * currentScale)
+            RightGif.Size = UDim2.new(0, 220 * currentScale, 0, 220 * currentScale)
+            
+            -- Güvenli renk değişimi
+            if Color3.fromHSV then
+                CenterText.TextColor3 = Color3.fromHSV(tick() * 0.2 % 1, 0.4, 1)
+            else
+                local r = math.abs(math.sin(tick()))
+                local g = math.abs(math.cos(tick() * 0.7))
+                local b = math.abs(math.sin(tick() * 1.3))
+                CenterText.TextColor3 = Color3.new(r, g, b)
+            end
+        end)
     end)
 
     local hasClicked = false
@@ -591,23 +615,23 @@ end
 local identityHiderStateFile = BaseConfigFolder .. "/identity_hider_state.json"
 local identityHiderEnabled = false
 
--- Bilinen konumlar (hızlı tarama için)
-local knownLocations = {}  -- dictionary: instance -> true
-
--- Heartbeat bağlantısı ve tam tarama bayrağı
+local knownLocations = {}
 local heartbeatConn = nil
 local fullScanRunning = false
 
--- Gizlenme bilgileri
-local disguisePlayer = nil   -- Seçilen rastgele oyuncu
+local disguisePlayer = nil
+local manualDisguisePlayer = nil
 local disguiseName = "EMLOXAWARE USER"
 local disguiseDisplayName = "EMLOXAWARE USER"
-local disguiseAvatarURL = ""  -- Seçilen oyuncunun avatar thumbnail URL'si
+local disguiseAvatarURL = ""
 
--- Hook için eski metamethod referansı
 local oldIndexMetamethod = nil
+local disguiseDropdown = nil
 
--- Durum kaydetme/yükleme
+local function SetDisguiseDropdown(dropdown)
+    disguiseDropdown = dropdown
+end
+
 local function LoadIdentityHiderState()
     if isfile(identityHiderStateFile) then
         return pcall(function()
@@ -628,8 +652,41 @@ local function SaveIdentityHiderState(state)
     end)
 end
 
--- Rastgele oyuncu seç ve avatarını yükle
-local function SelectRandomPlayer()
+local function UpdateDisguiseFromPlayer(player)
+    if player and player.Parent == Players then
+        disguisePlayer = player
+        disguiseName = player.Name
+        disguiseDisplayName = player.DisplayName
+        task.spawn(function()
+            local success, content = pcall(function()
+                return Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
+            end)
+            if success and content then
+                disguiseAvatarURL = content
+            else
+                disguiseAvatarURL = ""
+            end
+        end)
+        return true
+    else
+        disguisePlayer = nil
+        disguiseName = "EMLOXAWARE USER"
+        disguiseDisplayName = "EMLOXAWARE USER"
+        disguiseAvatarURL = ""
+        return false
+    end
+end
+
+local function SetManualDisguisePlayer(player)
+    manualDisguisePlayer = player
+    if player then
+        UpdateDisguiseFromPlayer(player)
+    else
+        SelectRandomPlayer()
+    end
+end
+
+function SelectRandomPlayer()
     local players = Players:GetPlayers()
     local others = {}
     for _, p in ipairs(players) do
@@ -638,20 +695,8 @@ local function SelectRandomPlayer()
         end
     end
     if #others > 0 then
-        disguisePlayer = others[math.random(#others)]
-        disguiseName = disguisePlayer.Name
-        disguiseDisplayName = disguisePlayer.DisplayName
-        -- Avatar thumbnail'ini asenkron al
-        task.spawn(function()
-            local success, content = pcall(function()
-                return Players:GetUserThumbnailAsync(disguisePlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
-            end)
-            if success and content then
-                disguiseAvatarURL = content
-            else
-                disguiseAvatarURL = ""
-            end
-        end)
+        local chosen = others[math.random(#others)]
+        UpdateDisguiseFromPlayer(chosen)
     else
         disguisePlayer = nil
         disguiseName = "EMLOXAWARE USER"
@@ -660,13 +705,55 @@ local function SelectRandomPlayer()
     end
 end
 
--- Metamethod hook (sistem seviyesinde isim değiştirme)
-local function HookIdentity()
-    if oldIndexMetamethod then return end  -- zaten hook'lu
+local function OnPlayerListChanged()
+    if disguiseDropdown then
+        local options = {"Random"}
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer then
+                table.insert(options, p.Name)
+            end
+        end
+        disguiseDropdown:Refresh(options)
+    end
 
-    local success = pcall(function()
+    if identityHiderEnabled then
+        if manualDisguisePlayer then
+            if not manualDisguisePlayer.Parent or manualDisguisePlayer.Parent ~= Players then
+                SetManualDisguisePlayer(nil)
+            else
+                UpdateDisguiseFromPlayer(manualDisguisePlayer)
+            end
+        else
+            if disguisePlayer and (not disguisePlayer.Parent or disguisePlayer.Parent ~= Players) then
+                SelectRandomPlayer()
+            else
+                if disguisePlayer then
+                    UpdateDisguiseFromPlayer(disguisePlayer)
+                else
+                    SelectRandomPlayer()
+                end
+            end
+        end
+    end
+end
+
+Players.PlayerAdded:Connect(function(player)
+    if player ~= LocalPlayer then
+        OnPlayerListChanged()
+    end
+end)
+Players.PlayerRemoving:Connect(function(player)
+    if player ~= LocalPlayer then
+        OnPlayerListChanged()
+    end
+end)
+
+local function HookIdentity()
+    if oldIndexMetamethod then return end
+
+    local success, err = pcall(function()
         local mt = getrawmetatable(LocalPlayer)
-        if not mt then return end
+        if not mt then error("no metatable") end
         oldIndexMetamethod = mt.__index
         local newIndex = function(t, k)
             if t == LocalPlayer then
@@ -676,15 +763,19 @@ local function HookIdentity()
                     return disguiseDisplayName
                 end
             end
-            return oldIndexMetamethod(t, k)
+            if oldIndexMetamethod then
+                return oldIndexMetamethod(t, k)
+            else
+                return rawget(t, k)
+            end
         end
         mt.__index = newIndex
     end)
 
     if not success or not oldIndexMetamethod then
-        -- getrawmetatable yoksa hookmetamethod dene
+        oldIndexMetamethod = nil
         local hookSuccess = pcall(function()
-            oldIndexMetamethod = hookmetamethod(game, "__index", function(self, key)
+            local orig = hookmetamethod(game, "__index", function(self, key)
                 if self == LocalPlayer then
                     if key == "Name" then
                         return disguiseName
@@ -692,8 +783,9 @@ local function HookIdentity()
                         return disguiseDisplayName
                     end
                 end
-                return oldIndexMetamethod(self, key)
+                return orig(self, key)
             end)
+            oldIndexMetamethod = orig
         end)
         if not hookSuccess then
             oldIndexMetamethod = nil
@@ -709,32 +801,36 @@ local function UnhookIdentity()
             mt.__index = oldIndexMetamethod
         end
     end)
-    -- hookmetamethod ile yapıldıysa geri almak zor; genelde otomatik düzelir
     oldIndexMetamethod = nil
 end
 
--- Tek bir instance'ı kontrol et ve gerekirse değiştir
 local function ProcessInstance(instance)
     if not instance or not instance.Parent then return false end
-    if HubGui and instance:IsDescendantOf(HubGui) then return false end  -- kendi UI'mizi atla
+    if HubGui and instance:IsDescendantOf(HubGui) then return false end
 
     local relevant = false
 
-    -- Metin nesneleri
     if instance:IsA("TextLabel") or instance:IsA("TextButton") or instance:IsA("TextBox") then
         local original = instance.Text
         if original and original ~= "" then
             local newText = original
             local changed = false
-            -- Gerçek isim/display adı geçiyorsa sahte isimle değiştir
-            if original == LocalPlayer.Name or original == LocalPlayer.DisplayName then
+            local replacedName, countName = string.gsub(newText, LocalPlayer.Name, disguiseName)
+            if countName > 0 then
+                newText = replacedName
+                changed = true
+            end
+            local replacedDisplay, countDisplay = string.gsub(newText, LocalPlayer.DisplayName, disguiseDisplayName)
+            if countDisplay > 0 then
+                newText = replacedDisplay
+                changed = true
+            end
+            if original == LocalPlayer.Name then
                 newText = disguiseName
                 changed = true
-            else
-                local replaced1, count1 = string.gsub(newText, LocalPlayer.Name, disguiseName)
-                if count1 > 0 then newText = replaced1; changed = true end
-                local replaced2, count2 = string.gsub(newText, LocalPlayer.DisplayName, disguiseName)
-                if count2 > 0 then newText = replaced2; changed = true end
+            elseif original == LocalPlayer.DisplayName then
+                newText = disguiseDisplayName
+                changed = true
             end
             if changed then
                 instance.Text = newText
@@ -743,18 +839,16 @@ local function ProcessInstance(instance)
         end
     end
 
-    -- Görsel nesneleri (avatar)
     if instance:IsA("ImageLabel") or instance:IsA("ImageButton") then
         local img = instance.Image
         if img and img ~= "" then
-            -- Yerel oyuncunun UserId'sini içeren görselleri sahte avatar ile değiştir
             if string.find(img, tostring(LocalPlayer.UserId)) then
                 if disguiseAvatarURL ~= "" then
                     instance.Image = disguiseAvatarURL
                 else
-                    instance.Image = ""  -- avatar yoksa boşalt
+                    instance.Image = ""
                 end
-                instance.ImageTransparency = 0  -- görünür yap
+                instance.ImageTransparency = 0
                 relevant = true
             end
         end
@@ -763,7 +857,6 @@ local function ProcessInstance(instance)
     return relevant
 end
 
--- Hızlı tarama: yalnızca bilinen konumlar
 local function FastScan()
     for instance, _ in pairs(knownLocations) do
         if not instance.Parent then
@@ -777,7 +870,6 @@ local function FastScan()
     end
 end
 
--- Tam tarama: tüm konteynerleri tara
 local function FullScan()
     local containers = {
         game:GetService("CoreGui"),
@@ -798,7 +890,6 @@ local function FullScan()
     end
 end
 
--- Tam tarama döngüsü (saniyede bir)
 local function FullScanLoop()
     while fullScanRunning do
         FullScan()
@@ -806,17 +897,19 @@ local function FullScanLoop()
     end
 end
 
--- Sistemi başlat
 local function StartIdentityHider()
     if heartbeatConn then return end
-    SelectRandomPlayer()
+    if not manualDisguisePlayer then
+        SelectRandomPlayer()
+    else
+        UpdateDisguiseFromPlayer(manualDisguisePlayer)
+    end
     HookIdentity()
     heartbeatConn = RunService.Heartbeat:Connect(FastScan)
     fullScanRunning = true
     task.spawn(FullScanLoop)
 end
 
--- Sistemi durdur
 local function StopIdentityHider()
     if heartbeatConn then
         heartbeatConn:Disconnect()
@@ -826,7 +919,6 @@ local function StopIdentityHider()
     UnhookIdentity()
 end
 
--- Aç/kapa setter
 local function SetIdentityHider(state)
     identityHiderEnabled = state
     if state then
@@ -907,29 +999,26 @@ function EmloxaLibrary:CreateWindow(hubName)
     createCorner(OpenIcon, 12)
 
     RunService.RenderStepped:Connect(function()
-        iconStroke.Color = Color3.fromHSV(tick()*0.3 % 1, 0.9, 1)
+        if Color3.fromHSV then
+            iconStroke.Color = Color3.fromHSV(tick()*0.3 % 1, 0.9, 1)
+        end
     end)
 
-    -- PRELOAD SİSTEMİ (Assetleri İndirme ve Bildirim)
     task.spawn(function()
         local loadingNotif = ShowPreloadNotification(HubGui)
         
-        -- Bütün frameleri indir ve önbelleğe al
         for i, frameData in ipairs(CAT_FRAMES) do
             frameCache[i] = getDownloadedAsset(BASE_FRAME_URL .. frameData.file, "emloxa_cat_"..(i-1)..".png", FALLBACK_LOGO)
         end
         
-        -- İndirme bitince bildirimi kaldır
         TweenService:Create(loadingNotif, TweenInfo.new(0.5,Enum.EasingStyle.Quad,Enum.EasingDirection.In), {Position = UDim2.new(1,10,1,-80)}):Play()
         task.wait(0.5)
         loadingNotif:Destroy()
 
-        -- İNTROYU BAŞLAT
         ShowDancinIntro(HubGui, function()
             MainFrame.Visible = true
             playSound(128170212983132, 0.5)
             TweenService:Create(MainFrame, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 710, 0, 480)}):Play()
-            -- Discord bildirimini intro sonrası göster
             task.wait(0.6)
             WindowSetup:ShowDiscordPrompt()
         end)
@@ -970,7 +1059,9 @@ function EmloxaLibrary:CreateWindow(hubName)
     Title.BackgroundTransparency = 1
     Title.Parent = TopBar
     RunService.RenderStepped:Connect(function()
-        Title.TextColor3 = Color3.fromHSV(tick()%5/5,0.9,1)
+        if Color3.fromHSV then
+            Title.TextColor3 = Color3.fromHSV(tick()%5/5,0.9,1)
+        end
     end)
 
     local CreditsText = Instance.new("TextLabel")
@@ -1537,7 +1628,6 @@ function EmloxaLibrary:CreateWindow(hubName)
                 end
             end)
 
-            -- Return API for programmatic control
             local ToggleAPI = {}
             function ToggleAPI:SetState(val)
                 val = val and true or false
@@ -1973,12 +2063,35 @@ function EmloxaLibrary:CreateWindow(hubName)
 
     local MenuTab = CreateTabInternal("Menu", 9999)
     
-    -- IDENTITY HIDER TOGGLE (placed at top)
     local identityHiderToggle = MenuTab:CreateToggle("Identity Hider", function(state)
         SetIdentityHider(state)
     end)
 
-    -- Load saved state after toggle created
+    local function GetPlayerOptions()
+        local opts = {"Random"}
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer then
+                table.insert(opts, p.Name)
+            end
+        end
+        return opts
+    end
+
+    local disguiseDropdown = MenuTab:CreateDropdown("Disguise Player", GetPlayerOptions(), "Random", function(val)
+        if val == "Random" then
+            SetManualDisguisePlayer(nil)
+        else
+            local targetPlayer = Players:FindFirstChild(val)
+            if targetPlayer then
+                SetManualDisguisePlayer(targetPlayer)
+            else
+                SetManualDisguisePlayer(nil)
+            end
+        end
+    end)
+
+    SetDisguiseDropdown(disguiseDropdown)
+
     local savedHiderState = LoadIdentityHiderState()
     if savedHiderState then
         identityHiderToggle:SetState(true)
@@ -1987,8 +2100,6 @@ function EmloxaLibrary:CreateWindow(hubName)
     MenuTab:CreateDropdown("Theme", EmloxaLibrary:GetThemeNames(), "Default", function(val)
         EmloxaLibrary:SetTheme(val)
     end)
-
-    -- Background Music tamamen kaldırıldı
 
     MenuTab:CreateDivider()
 
@@ -2059,7 +2170,6 @@ function EmloxaLibrary:CreateWindow(hubName)
         end
     end)
 
-    -- Export Config
     MenuTab:CreateButton("📤 Export Config", function()
         if SelectedConfig == "" or SelectedConfig == "No Configs Found" then
             MenuTab:CreateNotification("Error", "No config selected!", 2)
@@ -2079,7 +2189,6 @@ function EmloxaLibrary:CreateWindow(hubName)
         end
     end)
 
-    -- Import Config
     MenuTab:CreateButton("📥 Import Config", function()
         local Overlay = Instance.new("Frame")
         Overlay.Size = UDim2.new(1,0,1,0)
@@ -2182,7 +2291,6 @@ function EmloxaLibrary:CreateWindow(hubName)
                 return
             end
             local success, err = pcall(function()
-                -- Validate JSON
                 HttpService:JSONDecode(jsonData)
                 writefile(ConfigFolder .. "/" .. cfgName .. ".json", jsonData)
             end)
