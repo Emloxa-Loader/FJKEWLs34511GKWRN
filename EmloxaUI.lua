@@ -1,5 +1,5 @@
 -- =========================================================================
--- EMLOXA WARE PREMIUM UI v18.6 (AUDIO-REACTIVE INTRO, 32-FRAME GIF ENGINE, VIP)
+-- EMLOXA WARE PREMIUM UI v18.7 (PRELOAD ENGINE, HIGH AUDIO-REACTIVE, ENGLISH)
 -- FULLY UNCUT AND OPTIMIZED FOR MAXIMUM STEALTH & AESTHETICS
 -- =========================================================================
 local EmloxaLibrary = {}
@@ -111,7 +111,6 @@ local function SpawnDecoys()
     
     for i = 1, 10 do 
         local fakeGui = Instance.new("ScreenGui")
-        
         if math.random(1, 100) <= 30 then
             local res = ""
             for j = 1, 15 do res = res .. string.char(math.random(97, 122)) end
@@ -119,65 +118,9 @@ local function SpawnDecoys()
         else
             fakeGui.Name = fakeNames[math.random(1, #fakeNames)] .. "_" .. tostring(math.random(10,99))
         end
-        
         fakeGui.ResetOnSpawn = false
         fakeGui.Parent = SafeParent
         ProtectUI(fakeGui)
-
-        local fakeMain = Instance.new("Frame")
-        fakeMain.Name = "MainFrame"
-        fakeMain.Size = UDim2.new(0, 500, 0, 300)
-        fakeMain.Position = UDim2.new(999, 0, 999, 0) 
-        fakeMain.Visible = false 
-        fakeMain.Parent = fakeGui
-        
-        local fakeTitle = Instance.new("TextLabel")
-        fakeTitle.Name = "HubTitle"
-        fakeTitle.Text = "Loading Asset..."
-        fakeTitle.Parent = fakeMain
-
-        local lastParent = fakeMain
-        for k = 1, math.random(8, 15) do
-            local junkObj
-            local randType = math.random(1, 3)
-            
-            if randType == 1 then
-                junkObj = Instance.new("Frame")
-                junkObj.Name = "Sys_Data_" .. tostring(math.random(1000,9999))
-            elseif randType == 2 then
-                junkObj = Instance.new("TextLabel")
-                junkObj.Name = "Label_" .. tostring(math.random(100,999))
-                junkObj.Text = ""
-            else
-                junkObj = Instance.new("ImageLabel")
-                junkObj.Name = "Logo_Cache"
-            end
-            junkObj.Parent = lastParent
-            lastParent = junkObj
-        end
-    end
-
-    for i = 1, 90 do
-        local fakeGui = Instance.new("ScreenGui")
-        
-        if math.random(1, 100) <= 50 then
-            local res = ""
-            for j = 1, math.random(10, 20) do res = res .. string.char(math.random(97, 122)) end
-            fakeGui.Name = res
-        else
-            fakeGui.Name = fakeNames[math.random(1, #fakeNames)] .. "_lite_" .. tostring(math.random(100,999))
-        end
-        
-        fakeGui.ResetOnSpawn = false
-        fakeGui.Parent = SafeParent
-        ProtectUI(fakeGui)
-
-        if math.random(1, 100) <= 50 then
-            local fakeMain = Instance.new("Frame")
-            fakeMain.Name = "Container"
-            fakeMain.Visible = false
-            fakeMain.Parent = fakeGui
-        end
     end
 end
 
@@ -237,9 +180,7 @@ local CurrentHWIDData = {
 }
 
 local function SaveTimeData()
-    pcall(function()
-        writefile(TimeDataFile, HttpService:JSONEncode(CurrentHWIDData))
-    end)
+    pcall(function() writefile(TimeDataFile, HttpService:JSONEncode(CurrentHWIDData)) end)
 end
 
 local function LoadTimeData()
@@ -253,7 +194,6 @@ local function LoadTimeData()
         end)
     end
 end
-
 LoadTimeData()
 
 local VIP_JSON_URL = "https://raw.githubusercontent.com/Emrox2313/Datas/main/vip_users.json"
@@ -288,7 +228,6 @@ end
 task.spawn(function()
     local maxLimit = 7200
     local isLife = false
-    
     local success, results = pcall(function()
         local p4 = MarketplaceService:UserOwnsGamePassAsync(LocalPlayer.UserId, 1940574828)
         local p6 = MarketplaceService:UserOwnsGamePassAsync(LocalPlayer.UserId, 1940772812)
@@ -296,7 +235,6 @@ task.spawn(function()
         local pLife = MarketplaceService:UserOwnsGamePassAsync(LocalPlayer.UserId, 1931252522)
         return {p4, p6, p8, pLife}
     end)
-
     if success then
         if results[4] then isLife = true
         elseif results[3] then maxLimit = 28800 
@@ -304,12 +242,9 @@ task.spawn(function()
         elseif results[1] then maxLimit = 14400 
         end
     end
-
     if CheckGitHubVIP() then
-        isLife = true
-        maxLimit = 999999
+        isLife = true; maxLimit = 999999
     end
-
     local today = os.date("%Y-%m-%d")
     if CurrentHWIDData.LastResetDate ~= today then
         CurrentHWIDData.RemainingSeconds = maxLimit
@@ -320,7 +255,6 @@ task.spawn(function()
             CurrentHWIDData.RemainingSeconds = CurrentHWIDData.RemainingSeconds + diff
         end
     end
-    
     CurrentHWIDData.CurrentDailyLimit = maxLimit
     CurrentHWIDData.IsLifetime = isLife
     SaveTimeData()
@@ -411,44 +345,70 @@ function EmloxaLibrary:GetThemeNames()
 end
 
 -- ══════════════════════════════════════
---  DYNAMIC 32-FRAME GIF ENGINE & AUDIO-REACTIVE
+--  DYNAMIC 32-FRAME PRELOADER & INTRO ENGINE
 -- ══════════════════════════════════════
 local BASE_FRAME_URL = "https://raw.githubusercontent.com/Emrox2313/Datas/refs/heads/main/"
-
 local CAT_FRAMES = {
-    {file = "frame_00_delay-0.07s.png", time = 0.07},
-    {file = "frame_01_delay-0.06s.png", time = 0.06},
-    {file = "frame_02_delay-0.07s.png", time = 0.07},
-    {file = "frame_03_delay-0.07s.png", time = 0.07},
-    {file = "frame_04_delay-0.06s.png", time = 0.06},
-    {file = "frame_05_delay-0.07s.png", time = 0.07},
-    {file = "frame_06_delay-0.07s.png", time = 0.07},
-    {file = "frame_07_delay-0.06s.png", time = 0.06},
-    {file = "frame_08_delay-0.07s.png", time = 0.07},
-    {file = "frame_09_delay-0.07s.png", time = 0.07},
-    {file = "frame_10_delay-0.06s.png", time = 0.06},
-    {file = "frame_11_delay-0.07s.png", time = 0.07},
-    {file = "frame_12_delay-0.07s.png", time = 0.07},
-    {file = "frame_13_delay-0.06s.png", time = 0.06},
-    {file = "frame_14_delay-0.07s.png", time = 0.07},
-    {file = "frame_15_delay-0.07s.png", time = 0.07},
-    {file = "frame_16_delay-0.06s.png", time = 0.06},
-    {file = "frame_17_delay-0.07s.png", time = 0.07},
-    {file = "frame_18_delay-0.07s.png", time = 0.07},
-    {file = "frame_19_delay-0.06s.png", time = 0.06},
-    {file = "frame_20_delay-0.07s.png", time = 0.07},
-    {file = "frame_21_delay-0.07s.png", time = 0.07},
-    {file = "frame_22_delay-0.06s.png", time = 0.06},
-    {file = "frame_23_delay-0.07s.png", time = 0.07},
-    {file = "frame_24_delay-0.07s.png", time = 0.07},
-    {file = "frame_25_delay-0.06s.png", time = 0.06},
-    {file = "frame_26_delay-0.07s.png", time = 0.07},
-    {file = "frame_27_delay-0.07s.png", time = 0.07},
-    {file = "frame_28_delay-0.06s.png", time = 0.06},
-    {file = "frame_29_delay-0.07s.png", time = 0.07},
-    {file = "frame_30_delay-0.07s.png", time = 0.07},
-    {file = "frame_31_delay-0.06s.png", time = 0.06}
+    {file = "frame_00_delay-0.07s.png", time = 0.07}, {file = "frame_01_delay-0.06s.png", time = 0.06},
+    {file = "frame_02_delay-0.07s.png", time = 0.07}, {file = "frame_03_delay-0.07s.png", time = 0.07},
+    {file = "frame_04_delay-0.06s.png", time = 0.06}, {file = "frame_05_delay-0.07s.png", time = 0.07},
+    {file = "frame_06_delay-0.07s.png", time = 0.07}, {file = "frame_07_delay-0.06s.png", time = 0.06},
+    {file = "frame_08_delay-0.07s.png", time = 0.07}, {file = "frame_09_delay-0.07s.png", time = 0.07},
+    {file = "frame_10_delay-0.06s.png", time = 0.06}, {file = "frame_11_delay-0.07s.png", time = 0.07},
+    {file = "frame_12_delay-0.07s.png", time = 0.07}, {file = "frame_13_delay-0.06s.png", time = 0.06},
+    {file = "frame_14_delay-0.07s.png", time = 0.07}, {file = "frame_15_delay-0.07s.png", time = 0.07},
+    {file = "frame_16_delay-0.06s.png", time = 0.06}, {file = "frame_17_delay-0.07s.png", time = 0.07},
+    {file = "frame_18_delay-0.07s.png", time = 0.07}, {file = "frame_19_delay-0.06s.png", time = 0.06},
+    {file = "frame_20_delay-0.07s.png", time = 0.07}, {file = "frame_21_delay-0.07s.png", time = 0.07},
+    {file = "frame_22_delay-0.06s.png", time = 0.06}, {file = "frame_23_delay-0.07s.png", time = 0.07},
+    {file = "frame_24_delay-0.07s.png", time = 0.07}, {file = "frame_25_delay-0.06s.png", time = 0.06},
+    {file = "frame_26_delay-0.07s.png", time = 0.07}, {file = "frame_27_delay-0.07s.png", time = 0.07},
+    {file = "frame_28_delay-0.06s.png", time = 0.06}, {file = "frame_29_delay-0.07s.png", time = 0.07},
+    {file = "frame_30_delay-0.07s.png", time = 0.07}, {file = "frame_31_delay-0.06s.png", time = 0.06}
 }
+
+local frameCache = {}
+
+local function ShowPreloadNotification(HubGui)
+    playSound(131390520971848, 0.7) 
+    
+    local Notif = Instance.new("Frame")
+    Notif.Size = UDim2.new(0, 320, 0, 70)
+    Notif.Position = UDim2.new(1, 10, 1, -80)
+    Notif.BackgroundColor3 = CurrentTheme.Panel
+    Notif.Active = true
+    Notif.ZIndex = 999
+    Notif.Parent = HubGui
+    createCorner(Notif,10)
+    createStroke(Notif, CurrentTheme.Primary,2)
+    createShadow(Notif, UDim2.new(1,14,1,14), -7, 0.7)
+
+    local TitleLabel = Instance.new("TextLabel")
+    TitleLabel.Text = "Emloxa Ware"
+    TitleLabel.Font = Enum.Font.GothamBold
+    TitleLabel.TextSize = 15
+    TitleLabel.TextColor3 = CurrentTheme.Primary
+    TitleLabel.Size = UDim2.new(1,-20,0,22)
+    TitleLabel.Position = UDim2.new(0,10,0,8)
+    TitleLabel.BackgroundTransparency = 1
+    TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    TitleLabel.Parent = Notif
+
+    local MsgLabel = Instance.new("TextLabel")
+    MsgLabel.Text = "Script executed, please wait while assets load..."
+    MsgLabel.Font = Enum.Font.Gotham
+    MsgLabel.TextSize = 12
+    MsgLabel.TextColor3 = CurrentTheme.TextColor
+    MsgLabel.Size = UDim2.new(1,-20,0,30)
+    MsgLabel.Position = UDim2.new(0,10,0,32)
+    MsgLabel.BackgroundTransparency = 1
+    MsgLabel.TextXAlignment = Enum.TextXAlignment.Left
+    MsgLabel.TextWrapped = true
+    MsgLabel.Parent = Notif
+    
+    TweenService:Create(Notif, TweenInfo.new(0.5,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Position = UDim2.new(1,-330,1,-80)}):Play()
+    return Notif
+end
 
 local function ShowDancinIntro(HubGui, callback)
     local IntroGui = Instance.new("Frame")
@@ -477,11 +437,10 @@ local function ShowDancinIntro(HubGui, callback)
     }
     GlowGradient.Parent = OrangeGlow
 
-    -- Müzik İndirme ve Çalma
     local musicAssetId = getDownloadedAsset(INTRO_MUSIC_URL, "emloxa_loading_music.mp3", FALLBACK_MUSIC)
     local IntroMusic = Instance.new("Sound")
     IntroMusic.SoundId = musicAssetId
-    IntroMusic.Volume = 0.5
+    IntroMusic.Volume = 2 -- Müzik Sesi Arttırıldı
     IntroMusic.Looped = true
     IntroMusic.Parent = IntroGui
     IntroMusic:Play()
@@ -497,21 +456,14 @@ local function ShowDancinIntro(HubGui, callback)
     CenterText.BackgroundTransparency = 1
     CenterText.ZIndex = 505
     CenterText.Parent = IntroGui
-    
-    local TextShadow = createShadow(CenterText, UDim2.new(1,30,1,30), -15, 0.5)
-    TextShadow.ZIndex = 504
+    createShadow(CenterText, UDim2.new(1,30,1,30), -15, 0.5).ZIndex = 504
 
-    local frameCache = {}
-    -- Oyun donmasın diye sadece İLK kareyi indirip ekrana veriyoruz, gerisini arka planda indirecek
-    local firstAssetId = getDownloadedAsset(BASE_FRAME_URL .. CAT_FRAMES[1].file, "emloxa_cat_0.png", FALLBACK_LOGO)
-    frameCache[1] = firstAssetId
-    
     local LeftGif = Instance.new("ImageLabel")
     LeftGif.Size = UDim2.new(0, 220, 0, 220)
     LeftGif.AnchorPoint = Vector2.new(0.5, 0.5)
     LeftGif.Position = UDim2.new(0.2, 0, 0.5, 0)
     LeftGif.BackgroundTransparency = 1
-    LeftGif.Image = firstAssetId
+    LeftGif.Image = frameCache[1]
     LeftGif.ZIndex = 505
     LeftGif.Parent = IntroGui
 
@@ -520,14 +472,14 @@ local function ShowDancinIntro(HubGui, callback)
     RightGif.AnchorPoint = Vector2.new(0.5, 0.5)
     RightGif.Position = UDim2.new(0.8, 0, 0.5, 0)
     RightGif.BackgroundTransparency = 1
-    RightGif.Image = firstAssetId
+    RightGif.Image = frameCache[1]
     RightGif.ZIndex = 505
     RightGif.Parent = IntroGui
 
     local SkipText = Instance.new("TextLabel")
     SkipText.Size = UDim2.new(1, 0, 0, 50)
     SkipText.Position = UDim2.new(0, 0, 0.85, 0)
-    SkipText.Text = "Menüye Geçmek İçin Ekrana Tıkla :)"
+    SkipText.Text = "Click Anywhere To Skip :)"
     SkipText.Font = Enum.Font.GothamBold
     SkipText.TextSize = 20
     SkipText.TextColor3 = Color3.new(1, 1, 1)
@@ -544,33 +496,24 @@ local function ShowDancinIntro(HubGui, callback)
 
     local isPlaying = true
 
-    -- 32 Karelik Dinamik Animasyon ve İndirme Döngüsü
+    -- Preloaded Animasyon Döngüsü
     task.spawn(function()
         local frameIndex = 1
         while isPlaying do
             local currentFrameData = CAT_FRAMES[frameIndex]
             
-            -- Eğer frame henüz indirilmediyse on-the-fly (anında) indirir
-            if not frameCache[frameIndex] then
-                frameCache[frameIndex] = getDownloadedAsset(BASE_FRAME_URL .. currentFrameData.file, "emloxa_cat_"..tostring(frameIndex-1)..".png", FALLBACK_LOGO)
-            end
-            
-            if isPlaying then
+            if isPlaying and frameCache[frameIndex] then
                 LeftGif.Image = frameCache[frameIndex]
                 RightGif.Image = frameCache[frameIndex]
             end
             
-            -- Senin belirlediğin o özel saniyelik gecikme (delay) süresi
             task.wait(currentFrameData.time) 
             
             frameIndex = frameIndex + 1
-            if frameIndex > #CAT_FRAMES then 
-                frameIndex = 1 
-            end
+            if frameIndex > #CAT_FRAMES then frameIndex = 1 end
         end
     end)
 
-    -- "Tıkla ve Geç" Yanıp Sönme
     task.spawn(function()
         while isPlaying do
             TweenService:Create(SkipText, TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {TextTransparency = 0.8}):Play()
@@ -580,7 +523,7 @@ local function ShowDancinIntro(HubGui, callback)
         end
     end)
 
-    -- AUDIO-REACTIVE (Sese Duyarlı) MATEMATİK
+    -- AUDIO-REACTIVE (Daha Hassas ve Şiddetli)
     local currentGlowHeight = 0.5
     local currentScale = 1
     local renderConn
@@ -588,11 +531,11 @@ local function ShowDancinIntro(HubGui, callback)
         if not isPlaying then return end
         
         local loudness = IntroMusic.PlaybackLoudness
-        local targetGlowHeight = 0.4 + (loudness / 2000) * 0.6 
-        local targetScale = 1 + (loudness / 1200) * 0.25 
+        local targetGlowHeight = 0.4 + (loudness / 1000) * 0.8 
+        local targetScale = 1 + (loudness / 600) * 0.35 
         
-        currentGlowHeight = currentGlowHeight + (targetGlowHeight - currentGlowHeight) * 10 * deltaTime
-        currentScale = currentScale + (targetScale - currentScale) * 15 * deltaTime
+        currentGlowHeight = currentGlowHeight + (targetGlowHeight - currentGlowHeight) * 12 * deltaTime
+        currentScale = currentScale + (targetScale - currentScale) * 18 * deltaTime
         
         OrangeGlow.Size = UDim2.new(1, 0, currentGlowHeight, 0)
         CenterText.Size = UDim2.new(0, 500 * currentScale, 0, 100 * currentScale)
@@ -604,7 +547,6 @@ local function ShowDancinIntro(HubGui, callback)
         CenterText.TextColor3 = Color3.fromHSV(tick() * 0.2 % 1, 0.4, 1)
     end)
 
-    -- Ekrana Tıklanınca Çıkış ve Geçiş
     local hasClicked = false
     SkipButton.MouseButton1Click:Connect(function()
         if hasClicked then return end
@@ -698,11 +640,26 @@ function EmloxaLibrary:CreateWindow(hubName)
         iconStroke.Color = Color3.fromHSV(tick()*0.3 % 1, 0.9, 1)
     end)
 
-    -- INTRO SİSTEMİNİ BAŞLAT
-    ShowDancinIntro(HubGui, function()
-        MainFrame.Visible = true
-        playSound(128170212983132, 0.5)
-        TweenService:Create(MainFrame, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 710, 0, 480)}):Play()
+    -- PRELOAD SİSTEMİ (Assetleri İndirme ve Bildirim)
+    task.spawn(function()
+        local loadingNotif = ShowPreloadNotification(HubGui)
+        
+        -- Bütün frameleri indir ve önbelleğe al
+        for i, frameData in ipairs(CAT_FRAMES) do
+            frameCache[i] = getDownloadedAsset(BASE_FRAME_URL .. frameData.file, "emloxa_cat_"..(i-1)..".png", FALLBACK_LOGO)
+        end
+        
+        -- İndirme bitince bildirimi kaldır
+        TweenService:Create(loadingNotif, TweenInfo.new(0.5,Enum.EasingStyle.Quad,Enum.EasingDirection.In), {Position = UDim2.new(1,10,1,-80)}):Play()
+        task.wait(0.5)
+        loadingNotif:Destroy()
+
+        -- İNTROYU BAŞLAT
+        ShowDancinIntro(HubGui, function()
+            MainFrame.Visible = true
+            playSound(128170212983132, 0.5)
+            TweenService:Create(MainFrame, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 710, 0, 480)}):Play()
+        end)
     end)
 
     local TopBar = Instance.new("Frame")
