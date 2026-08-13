@@ -599,13 +599,22 @@ local heartbeatConn = nil
 local fullScanRunning = false
 
 -- Gizlenme bilgileri
-local disguisePlayer = nil   -- Seçilen rastgele oyuncu
+local disguisePlayer = nil   -- Seçilen oyuncu (manuel veya rastgele)
+local manualDisguisePlayer = nil -- Manuel seçilen oyuncu (varsa)
 local disguiseName = "EMLOXAWARE USER"
 local disguiseDisplayName = "EMLOXAWARE USER"
 local disguiseAvatarURL = ""  -- Seçilen oyuncunun avatar thumbnail URL'si
 
 -- Hook için eski metamethod referansı
 local oldIndexMetamethod = nil
+
+-- Oyuncu listesi dropdown referansı (UI tarafından set edilecek)
+local disguiseDropdown = nil
+
+-- Dropdown setter (UI tarafından çağrılacak)
+local function SetDisguiseDropdown(dropdown)
+    disguiseDropdown = dropdown
+end
 
 -- Durum kaydetme/yükleme
 local function LoadIdentityHiderState()
@@ -628,7 +637,45 @@ local function SaveIdentityHiderState(state)
     end)
 end
 
--- Rastgele oyuncu seç ve avatarını yükle
+-- Seçilen oyuncuyu güncelle
+local function UpdateDisguiseFromPlayer(player)
+    if player and player.Parent == Players then
+        disguisePlayer = player
+        disguiseName = player.Name
+        disguiseDisplayName = player.DisplayName
+        -- Avatar thumbnail'ini asenkron al
+        task.spawn(function()
+            local success, content = pcall(function()
+                return Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
+            end)
+            if success and content then
+                disguiseAvatarURL = content
+            else
+                disguiseAvatarURL = ""
+            end
+        end)
+        return true
+    else
+        -- Oyuncu artık yok
+        disguisePlayer = nil
+        disguiseName = "EMLOXAWARE USER"
+        disguiseDisplayName = "EMLOXAWARE USER"
+        disguiseAvatarURL = ""
+        return false
+    end
+end
+
+-- Manuel seçim fonksiyonu (nil verilirse rastgele seçim yapılır)
+local function SetManualDisguisePlayer(player)
+    manualDisguisePlayer = player
+    if player then
+        UpdateDisguiseFromPlayer(player)
+    else
+        SelectRandomPlayer()
+    end
+end
+
+-- Rastgele oyuncu seç
 local function SelectRandomPlayer()
     local players = Players:GetPlayers()
     local others = {}
@@ -638,20 +685,8 @@ local function SelectRandomPlayer()
         end
     end
     if #others > 0 then
-        disguisePlayer = others[math.random(#others)]
-        disguiseName = disguisePlayer.Name
-        disguiseDisplayName = disguisePlayer.DisplayName
-        -- Avatar thumbnail'ini asenkron al
-        task.spawn(function()
-            local success, content = pcall(function()
-                return Players:GetUserThumbnailAsync(disguisePlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
-            end)
-            if success and content then
-                disguiseAvatarURL = content
-            else
-                disguiseAvatarURL = ""
-            end
-        end)
+        local chosen = others[math.random(#others)]
+        UpdateDisguiseFromPlayer(chosen)
     else
         disguisePlayer = nil
         disguiseName = "EMLOXAWARE USER"
@@ -660,13 +695,64 @@ local function SelectRandomPlayer()
     end
 end
 
+-- Oyuncu listesi değiştiğinde dropdown'ı güncelle ve seçim kontrolü
+local function OnPlayerListChanged()
+    -- Dropdown'ı güncelle
+    if disguiseDropdown then
+        local options = {"Random"}
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer then
+                table.insert(options, p.Name)
+            end
+        end
+        disguiseDropdown:Refresh(options)
+    end
+
+    -- Eğer identity hider aktifse, seçim güncellenmeli
+    if identityHiderEnabled then
+        if manualDisguisePlayer then
+            -- Manuel seçim varsa, oyuncu hala var mı?
+            if not manualDisguisePlayer.Parent or manualDisguisePlayer.Parent ~= Players then
+                -- Manuel seçilen oyuncu çıktı, rastgele moda geç
+                SetManualDisguisePlayer(nil)
+            else
+                UpdateDisguiseFromPlayer(manualDisguisePlayer)
+            end
+        else
+            -- Rastgele modda, mevcut seçili oyuncu çıktıysa yeniden seç
+            if disguisePlayer and (not disguisePlayer.Parent or disguisePlayer.Parent ~= Players) then
+                SelectRandomPlayer()
+            else
+                -- Hala varsa bilgileri güncelle (adı değişmiş olabilir)
+                if disguisePlayer then
+                    UpdateDisguiseFromPlayer(disguisePlayer)
+                else
+                    SelectRandomPlayer()
+                end
+            end
+        end
+    end
+end
+
+-- Players eventlerini bağla
+Players.PlayerAdded:Connect(function(player)
+    if player ~= LocalPlayer then
+        OnPlayerListChanged()
+    end
+end)
+Players.PlayerRemoving:Connect(function(player)
+    if player ~= LocalPlayer then
+        OnPlayerListChanged()
+    end
+end)
+
 -- Metamethod hook (sistem seviyesinde isim değiştirme)
 local function HookIdentity()
     if oldIndexMetamethod then return end  -- zaten hook'lu
 
-    local success = pcall(function()
+    local success, err = pcall(function()
         local mt = getrawmetatable(LocalPlayer)
-        if not mt then return end
+        if not mt then error("no metatable") end
         oldIndexMetamethod = mt.__index
         local newIndex = function(t, k)
             if t == LocalPlayer then
@@ -676,15 +762,20 @@ local function HookIdentity()
                     return disguiseDisplayName
                 end
             end
-            return oldIndexMetamethod(t, k)
+            if oldIndexMetamethod then
+                return oldIndexMetamethod(t, k)
+            else
+                return rawget(t, k)
+            end
         end
         mt.__index = newIndex
     end)
 
     if not success or not oldIndexMetamethod then
         -- getrawmetatable yoksa hookmetamethod dene
+        oldIndexMetamethod = nil
         local hookSuccess = pcall(function()
-            oldIndexMetamethod = hookmetamethod(game, "__index", function(self, key)
+            local orig = hookmetamethod(game, "__index", function(self, key)
                 if self == LocalPlayer then
                     if key == "Name" then
                         return disguiseName
@@ -692,8 +783,9 @@ local function HookIdentity()
                         return disguiseDisplayName
                     end
                 end
-                return oldIndexMetamethod(self, key)
+                return orig(self, key)
             end)
+            oldIndexMetamethod = orig
         end)
         if not hookSuccess then
             oldIndexMetamethod = nil
@@ -727,14 +819,25 @@ local function ProcessInstance(instance)
             local newText = original
             local changed = false
             -- Gerçek isim/display adı geçiyorsa sahte isimle değiştir
-            if original == LocalPlayer.Name or original == LocalPlayer.DisplayName then
+            -- Name değişimi
+            local replacedName, countName = string.gsub(newText, LocalPlayer.Name, disguiseName)
+            if countName > 0 then
+                newText = replacedName
+                changed = true
+            end
+            -- DisplayName değişimi (ayrı)
+            local replacedDisplay, countDisplay = string.gsub(newText, LocalPlayer.DisplayName, disguiseDisplayName)
+            if countDisplay > 0 then
+                newText = replacedDisplay
+                changed = true
+            end
+            -- Tam eşleşme durumları (string.gsub zaten yapar ama yine de)
+            if original == LocalPlayer.Name then
                 newText = disguiseName
                 changed = true
-            else
-                local replaced1, count1 = string.gsub(newText, LocalPlayer.Name, disguiseName)
-                if count1 > 0 then newText = replaced1; changed = true end
-                local replaced2, count2 = string.gsub(newText, LocalPlayer.DisplayName, disguiseName)
-                if count2 > 0 then newText = replaced2; changed = true end
+            elseif original == LocalPlayer.DisplayName then
+                newText = disguiseDisplayName
+                changed = true
             end
             if changed then
                 instance.Text = newText
@@ -809,7 +912,12 @@ end
 -- Sistemi başlat
 local function StartIdentityHider()
     if heartbeatConn then return end
-    SelectRandomPlayer()
+    -- İlk seçim: manuel seçim yoksa rastgele seç
+    if not manualDisguisePlayer then
+        SelectRandomPlayer()
+    else
+        UpdateDisguiseFromPlayer(manualDisguisePlayer)
+    end
     HookIdentity()
     heartbeatConn = RunService.Heartbeat:Connect(FastScan)
     fullScanRunning = true
@@ -1977,6 +2085,34 @@ function EmloxaLibrary:CreateWindow(hubName)
     local identityHiderToggle = MenuTab:CreateToggle("Identity Hider", function(state)
         SetIdentityHider(state)
     end)
+
+    -- Manuel oyuncu seçimi dropdown'ı
+    local function GetPlayerOptions()
+        local opts = {"Random"}
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer then
+                table.insert(opts, p.Name)
+            end
+        end
+        return opts
+    end
+
+    local disguiseDropdown = MenuTab:CreateDropdown("Disguise Player", GetPlayerOptions(), "Random", function(val)
+        if val == "Random" then
+            SetManualDisguisePlayer(nil)
+        else
+            local targetPlayer = Players:FindFirstChild(val)
+            if targetPlayer then
+                SetManualDisguisePlayer(targetPlayer)
+            else
+                -- Oyuncu bulunamadı, rastgele seç
+                SetManualDisguisePlayer(nil)
+            end
+        end
+    end)
+
+    -- Dropdown'ı global sisteme bağla
+    SetDisguiseDropdown(disguiseDropdown)
 
     -- Load saved state after toggle created
     local savedHiderState = LoadIdentityHiderState()
