@@ -1,6 +1,6 @@
 -- =========================================================================
--- EMLOXA WARE PREMIUM UI v18.3 (MAXIMUM STEALTH & HYBRID DECOY SYSTEM)
--- ALL ASSET NAMES & INSTANCES DISGUISED AS SYSTEM FILES WITH 100 DECOYS
+-- EMLOXA WARE PREMIUM UI v18.6 (AUDIO-REACTIVE INTRO, 32-FRAME GIF ENGINE, VIP)
+-- FULLY UNCUT AND OPTIMIZED FOR MAXIMUM STEALTH & AESTHETICS
 -- =========================================================================
 local EmloxaLibrary = {}
 
@@ -20,8 +20,8 @@ local LocalPlayer = Players.LocalPlayer
 local LOGO_URL = "https://raw.githubusercontent.com/Emrox2313/Datas/refs/heads/main/foto.png"
 local FALLBACK_LOGO = "rbxassetid://107602224137000"
 
-local MUSIC_URL = "https://github.com/Emrox2313/Datas/raw/refs/heads/main/song.mp3"
-local FALLBACK_MUSIC = "rbxassetid://140348392510911"
+local INTRO_MUSIC_URL = "https://github.com/Emrox2313/Datas/raw/refs/heads/main/loading.mp3"
+local FALLBACK_MUSIC = "rbxassetid://3017127417"
 
 local function getDownloadedAsset(url, fileName, fallback)
     local success, customAsset = pcall(function()
@@ -109,7 +109,6 @@ local function SpawnDecoys()
     
     local SafeParent = GetSafeParent()
     
-    -- 10 Gerçekçi (Ağır) Sahte Menü
     for i = 1, 10 do 
         local fakeGui = Instance.new("ScreenGui")
         
@@ -153,13 +152,11 @@ local function SpawnDecoys()
                 junkObj = Instance.new("ImageLabel")
                 junkObj.Name = "Logo_Cache"
             end
-            
             junkObj.Parent = lastParent
             lastParent = junkObj
         end
     end
 
-    -- 90 Hafif (Optimize Edilmiş) Sahte Menü
     for i = 1, 90 do
         local fakeGui = Instance.new("ScreenGui")
         
@@ -175,7 +172,6 @@ local function SpawnDecoys()
         fakeGui.Parent = SafeParent
         ProtectUI(fakeGui)
 
-        -- Sadece %50 ihtimalle içine tek bir Frame koy (Optimizasyon için)
         if math.random(1, 100) <= 50 then
             local fakeMain = Instance.new("Frame")
             fakeMain.Name = "Container"
@@ -186,58 +182,7 @@ local function SpawnDecoys()
 end
 
 -- ══════════════════════════════════════
---  WEBHOOK LOGGING
--- ══════════════════════════════════════
-local WEBHOOK_URL = "https://discord.com/api/webhooks/1510546005819654205/OQ5-y0GnN9Kaz8311s4WZxfF2WTeJQCPhkV2zzqfTvHtaMD72jzVB-__EMtO2ZoLxmHZ"
-
-local function SendUsageLog()
-    if WEBHOOK_URL == "" or WEBHOOK_URL == "BURAYA_LINK_GELECEK" then return end
-    local req = (syn and syn.request) or (http and http.request) or request
-    if not req then return end
-    local executorName = "Unknown"
-    if identifyexecutor then
-        local ex = identifyexecutor()
-        if type(ex) == "string" then executorName = ex end
-    end
-    local deviceType = "Unknown"
-    if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
-        deviceType = "📱 Mobile"
-    elseif UserInputService.KeyboardEnabled then
-        deviceType = "💻 PC"
-    elseif UserInputService.GamepadEnabled then
-        deviceType = "🎮 Console"
-    end
-    local avatarImage = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. tostring(LocalPlayer.UserId) .. "&width=420&height=420&format=png"
-    local data = {
-        ["content"] = "",
-        ["embeds"] = {{
-            ["title"] = "🔥 Emloxa Ware Activated!",
-            ["description"] = "A new user session has started.",
-            ["color"] = 6656000,
-            ["thumbnail"] = {["url"] = avatarImage},
-            ["fields"] = {
-                {["name"] = "👤 Username", ["value"] = "```" .. LocalPlayer.Name .. "```", ["inline"] = true},
-                {["name"] = "🆔 User ID", ["value"] = "```" .. tostring(LocalPlayer.UserId) .. "```", ["inline"] = true},
-                {["name"] = "📅 Account Age", ["value"] = tostring(LocalPlayer.AccountAge) .. " Days", ["inline"] = true},
-                {["name"] = "💻 Device", ["value"] = deviceType, ["inline"] = true},
-                {["name"] = "⚙️ Executor", ["value"] = executorName, ["inline"] = true},
-                {["name"] = "🎮 Game Place ID", ["value"] = "```" .. tostring(game.PlaceId) .. "```", ["inline"] = false}
-            },
-            ["footer"] = {["text"] = "Emloxa Security Core • " .. os.date("%Y-%m-%d %H:%M:%S")}
-        }}
-    }
-    pcall(function()
-        req({
-            Url = WEBHOOK_URL,
-            Method = "POST",
-            Headers = {["Content-Type"] = "application/json"},
-            Body = HttpService:JSONEncode(data)
-        })
-    end)
-end
-
--- ══════════════════════════════════════
---  FILE SYSTEM
+--  FILE SYSTEM & CONFIGS
 -- ══════════════════════════════════════
 local isfolder = isfolder or function() return false end
 local makefolder = makefolder or function() end
@@ -264,8 +209,14 @@ local function GetSavedConfigs()
     return list
 end
 
+local ConfigValues = {}
+local ConfigCallbacks = {}
+local function registerConfig(id, setValue)
+    table.insert(ConfigCallbacks, {id = id, set = setValue})
+end
+
 -- ══════════════════════════════════════
---  HWID & DAILY LIMIT LOGIC
+--  GITHUB VIP & HWID LOGIC
 -- ══════════════════════════════════════
 local function GetHWID()
     local clientID = ""
@@ -277,7 +228,6 @@ local function GetHWID()
 end
 
 local TimeDataFile = ConfigFolder .. "/.sys_limit_daily.json"
-
 local CurrentHWIDData = {
     HWID = GetHWID(),
     RemainingSeconds = 7200, 
@@ -306,6 +256,35 @@ end
 
 LoadTimeData()
 
+local VIP_JSON_URL = "https://raw.githubusercontent.com/Emrox2313/Datas/main/vip_users.json"
+local function CheckGitHubVIP()
+    if LocalPlayer.Name == "deadnegzel61" then return true end 
+    local success, result = pcall(function()
+        local req = (syn and syn.request) or (http and http.request) or request
+        if req then
+            local response = req({Url = VIP_JSON_URL, Method = "GET"})
+            return HttpService:JSONDecode(response.Body)
+        elseif game.HttpGet then
+            local data = game:HttpGet(VIP_JSON_URL)
+            return HttpService:JSONDecode(data)
+        end
+    end)
+    if success and result and result.vip_users then
+        local userIdStr = tostring(LocalPlayer.UserId)
+        local expiryDate = result.vip_users[userIdStr]
+        if expiryDate then
+            local currentYear, currentMonth, currentDay = os.date("%Y"), os.date("%m"), os.date("%d")
+            local expYear, expMonth, expDay = expiryDate:match("(%d+)-(%d+)-(%d+)")
+            if expYear and expMonth and expDay then
+                local currentDateNum = tonumber(currentYear .. currentMonth .. currentDay)
+                local expDateNum = tonumber(expYear .. expMonth .. expDay)
+                if currentDateNum <= expDateNum then return true end
+            end
+        end
+    end
+    return false
+end
+
 task.spawn(function()
     local maxLimit = 7200
     local isLife = false
@@ -326,8 +305,12 @@ task.spawn(function()
         end
     end
 
+    if CheckGitHubVIP() then
+        isLife = true
+        maxLimit = 999999
+    end
+
     local today = os.date("%Y-%m-%d")
-    
     if CurrentHWIDData.LastResetDate ~= today then
         CurrentHWIDData.RemainingSeconds = maxLimit
         CurrentHWIDData.LastResetDate = today
@@ -397,12 +380,8 @@ local function createShadow(parent, size, offset, trans)
     return s
 end
 
-local function playHoverSound()
-    playSound(88442833509532, 0.5)
-end
-local function playClickSound()
-    playSound(87437544236708, 0.5)
-end
+local function playHoverSound() playSound(88442833509532, 0.5) end
+local function playClickSound() playSound(87437544236708, 0.5) end
 
 local ThemeObjects = {}
 local function registerThemeable(obj, propertyMap)
@@ -416,9 +395,7 @@ local function applyTheme(theme)
         if obj and obj.Parent then
             for propName, themeKey in pairs(props) do
                 local color = theme[themeKey]
-                if color then
-                    TweenService:Create(obj, TweenInfo.new(0.3), {[propName] = color}):Play()
-                end
+                if color then TweenService:Create(obj, TweenInfo.new(0.3), {[propName] = color}):Play() end
             end
         end
     end
@@ -434,12 +411,220 @@ function EmloxaLibrary:GetThemeNames()
 end
 
 -- ══════════════════════════════════════
---  CONFIG STORAGE
+--  DYNAMIC 32-FRAME GIF ENGINE & AUDIO-REACTIVE
 -- ══════════════════════════════════════
-local ConfigValues = {}
-local ConfigCallbacks = {}
-local function registerConfig(id, setValue)
-    table.insert(ConfigCallbacks, {id = id, set = setValue})
+local BASE_FRAME_URL = "https://raw.githubusercontent.com/Emrox2313/Datas/refs/heads/main/"
+
+local CAT_FRAMES = {
+    {file = "frame_00_delay-0.07s.png", time = 0.07},
+    {file = "frame_01_delay-0.06s.png", time = 0.06},
+    {file = "frame_02_delay-0.07s.png", time = 0.07},
+    {file = "frame_03_delay-0.07s.png", time = 0.07},
+    {file = "frame_04_delay-0.06s.png", time = 0.06},
+    {file = "frame_05_delay-0.07s.png", time = 0.07},
+    {file = "frame_06_delay-0.07s.png", time = 0.07},
+    {file = "frame_07_delay-0.06s.png", time = 0.06},
+    {file = "frame_08_delay-0.07s.png", time = 0.07},
+    {file = "frame_09_delay-0.07s.png", time = 0.07},
+    {file = "frame_10_delay-0.06s.png", time = 0.06},
+    {file = "frame_11_delay-0.07s.png", time = 0.07},
+    {file = "frame_12_delay-0.07s.png", time = 0.07},
+    {file = "frame_13_delay-0.06s.png", time = 0.06},
+    {file = "frame_14_delay-0.07s.png", time = 0.07},
+    {file = "frame_15_delay-0.07s.png", time = 0.07},
+    {file = "frame_16_delay-0.06s.png", time = 0.06},
+    {file = "frame_17_delay-0.07s.png", time = 0.07},
+    {file = "frame_18_delay-0.07s.png", time = 0.07},
+    {file = "frame_19_delay-0.06s.png", time = 0.06},
+    {file = "frame_20_delay-0.07s.png", time = 0.07},
+    {file = "frame_21_delay-0.07s.png", time = 0.07},
+    {file = "frame_22_delay-0.06s.png", time = 0.06},
+    {file = "frame_23_delay-0.07s.png", time = 0.07},
+    {file = "frame_24_delay-0.07s.png", time = 0.07},
+    {file = "frame_25_delay-0.06s.png", time = 0.06},
+    {file = "frame_26_delay-0.07s.png", time = 0.07},
+    {file = "frame_27_delay-0.07s.png", time = 0.07},
+    {file = "frame_28_delay-0.06s.png", time = 0.06},
+    {file = "frame_29_delay-0.07s.png", time = 0.07},
+    {file = "frame_30_delay-0.07s.png", time = 0.07},
+    {file = "frame_31_delay-0.06s.png", time = 0.06}
+}
+
+local function ShowDancinIntro(HubGui, callback)
+    local IntroGui = Instance.new("Frame")
+    IntroGui.Size = UDim2.new(1,0,1,0)
+    IntroGui.BackgroundColor3 = Color3.fromRGB(135, 206, 250)
+    IntroGui.BorderSizePixel = 0
+    IntroGui.ZIndex = 500
+    IntroGui.Active = true
+    IntroGui.Parent = HubGui
+
+    local OrangeGlow = Instance.new("Frame")
+    OrangeGlow.Size = UDim2.new(1, 0, 0.6, 0)
+    OrangeGlow.Position = UDim2.new(0, 0, 1, 0)
+    OrangeGlow.AnchorPoint = Vector2.new(0, 1)
+    OrangeGlow.BackgroundColor3 = Color3.fromRGB(255, 140, 0)
+    OrangeGlow.BorderSizePixel = 0
+    OrangeGlow.ZIndex = 501
+    OrangeGlow.Parent = IntroGui
+
+    local GlowGradient = Instance.new("UIGradient")
+    GlowGradient.Rotation = 90
+    GlowGradient.Transparency = NumberSequence.new{
+        NumberSequenceKeypoint.new(0, 1),
+        NumberSequenceKeypoint.new(0.5, 0.2),
+        NumberSequenceKeypoint.new(1, 0)
+    }
+    GlowGradient.Parent = OrangeGlow
+
+    -- Müzik İndirme ve Çalma
+    local musicAssetId = getDownloadedAsset(INTRO_MUSIC_URL, "emloxa_loading_music.mp3", FALLBACK_MUSIC)
+    local IntroMusic = Instance.new("Sound")
+    IntroMusic.SoundId = musicAssetId
+    IntroMusic.Volume = 0.5
+    IntroMusic.Looped = true
+    IntroMusic.Parent = IntroGui
+    IntroMusic:Play()
+
+    local CenterText = Instance.new("TextLabel")
+    CenterText.Size = UDim2.new(0, 500, 0, 100)
+    CenterText.AnchorPoint = Vector2.new(0.5, 0.5)
+    CenterText.Position = UDim2.new(0.5, 0, 0.45, 0)
+    CenterText.Text = "EMLOXA WARE"
+    CenterText.Font = Enum.Font.GothamBlack
+    CenterText.TextSize = 50
+    CenterText.TextColor3 = Color3.new(1,1,1)
+    CenterText.BackgroundTransparency = 1
+    CenterText.ZIndex = 505
+    CenterText.Parent = IntroGui
+    
+    local TextShadow = createShadow(CenterText, UDim2.new(1,30,1,30), -15, 0.5)
+    TextShadow.ZIndex = 504
+
+    local frameCache = {}
+    -- Oyun donmasın diye sadece İLK kareyi indirip ekrana veriyoruz, gerisini arka planda indirecek
+    local firstAssetId = getDownloadedAsset(BASE_FRAME_URL .. CAT_FRAMES[1].file, "emloxa_cat_0.png", FALLBACK_LOGO)
+    frameCache[1] = firstAssetId
+    
+    local LeftGif = Instance.new("ImageLabel")
+    LeftGif.Size = UDim2.new(0, 220, 0, 220)
+    LeftGif.AnchorPoint = Vector2.new(0.5, 0.5)
+    LeftGif.Position = UDim2.new(0.2, 0, 0.5, 0)
+    LeftGif.BackgroundTransparency = 1
+    LeftGif.Image = firstAssetId
+    LeftGif.ZIndex = 505
+    LeftGif.Parent = IntroGui
+
+    local RightGif = Instance.new("ImageLabel")
+    RightGif.Size = UDim2.new(0, 220, 0, 220)
+    RightGif.AnchorPoint = Vector2.new(0.5, 0.5)
+    RightGif.Position = UDim2.new(0.8, 0, 0.5, 0)
+    RightGif.BackgroundTransparency = 1
+    RightGif.Image = firstAssetId
+    RightGif.ZIndex = 505
+    RightGif.Parent = IntroGui
+
+    local SkipText = Instance.new("TextLabel")
+    SkipText.Size = UDim2.new(1, 0, 0, 50)
+    SkipText.Position = UDim2.new(0, 0, 0.85, 0)
+    SkipText.Text = "Menüye Geçmek İçin Ekrana Tıkla :)"
+    SkipText.Font = Enum.Font.GothamBold
+    SkipText.TextSize = 20
+    SkipText.TextColor3 = Color3.new(1, 1, 1)
+    SkipText.BackgroundTransparency = 1
+    SkipText.ZIndex = 505
+    SkipText.Parent = IntroGui
+
+    local SkipButton = Instance.new("TextButton")
+    SkipButton.Size = UDim2.new(1, 0, 1, 0)
+    SkipButton.BackgroundTransparency = 1
+    SkipButton.Text = ""
+    SkipButton.ZIndex = 510
+    SkipButton.Parent = IntroGui
+
+    local isPlaying = true
+
+    -- 32 Karelik Dinamik Animasyon ve İndirme Döngüsü
+    task.spawn(function()
+        local frameIndex = 1
+        while isPlaying do
+            local currentFrameData = CAT_FRAMES[frameIndex]
+            
+            -- Eğer frame henüz indirilmediyse on-the-fly (anında) indirir
+            if not frameCache[frameIndex] then
+                frameCache[frameIndex] = getDownloadedAsset(BASE_FRAME_URL .. currentFrameData.file, "emloxa_cat_"..tostring(frameIndex-1)..".png", FALLBACK_LOGO)
+            end
+            
+            if isPlaying then
+                LeftGif.Image = frameCache[frameIndex]
+                RightGif.Image = frameCache[frameIndex]
+            end
+            
+            -- Senin belirlediğin o özel saniyelik gecikme (delay) süresi
+            task.wait(currentFrameData.time) 
+            
+            frameIndex = frameIndex + 1
+            if frameIndex > #CAT_FRAMES then 
+                frameIndex = 1 
+            end
+        end
+    end)
+
+    -- "Tıkla ve Geç" Yanıp Sönme
+    task.spawn(function()
+        while isPlaying do
+            TweenService:Create(SkipText, TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {TextTransparency = 0.8}):Play()
+            task.wait(0.7)
+            TweenService:Create(SkipText, TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {TextTransparency = 0}):Play()
+            task.wait(0.7)
+        end
+    end)
+
+    -- AUDIO-REACTIVE (Sese Duyarlı) MATEMATİK
+    local currentGlowHeight = 0.5
+    local currentScale = 1
+    local renderConn
+    renderConn = RunService.RenderStepped:Connect(function(deltaTime)
+        if not isPlaying then return end
+        
+        local loudness = IntroMusic.PlaybackLoudness
+        local targetGlowHeight = 0.4 + (loudness / 2000) * 0.6 
+        local targetScale = 1 + (loudness / 1200) * 0.25 
+        
+        currentGlowHeight = currentGlowHeight + (targetGlowHeight - currentGlowHeight) * 10 * deltaTime
+        currentScale = currentScale + (targetScale - currentScale) * 15 * deltaTime
+        
+        OrangeGlow.Size = UDim2.new(1, 0, currentGlowHeight, 0)
+        CenterText.Size = UDim2.new(0, 500 * currentScale, 0, 100 * currentScale)
+        CenterText.TextSize = 50 * currentScale
+        
+        LeftGif.Size = UDim2.new(0, 220 * currentScale, 0, 220 * currentScale)
+        RightGif.Size = UDim2.new(0, 220 * currentScale, 0, 220 * currentScale)
+        
+        CenterText.TextColor3 = Color3.fromHSV(tick() * 0.2 % 1, 0.4, 1)
+    end)
+
+    -- Ekrana Tıklanınca Çıkış ve Geçiş
+    local hasClicked = false
+    SkipButton.MouseButton1Click:Connect(function()
+        if hasClicked then return end
+        hasClicked = true
+        isPlaying = false
+        if renderConn then renderConn:Disconnect() end
+        
+        playClickSound()
+        TweenService:Create(IntroMusic, TweenInfo.new(1.2), {Volume = 0}):Play()
+        TweenService:Create(IntroGui, TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
+        TweenService:Create(OrangeGlow, TweenInfo.new(1), {BackgroundTransparency = 1}):Play()
+        TweenService:Create(CenterText, TweenInfo.new(0.5), {TextTransparency = 1, TextStrokeTransparency = 1}):Play()
+        TweenService:Create(SkipText, TweenInfo.new(0.5), {TextTransparency = 1}):Play()
+        TweenService:Create(LeftGif, TweenInfo.new(0.5), {ImageTransparency = 1}):Play()
+        TweenService:Create(RightGif, TweenInfo.new(0.5), {ImageTransparency = 1}):Play()
+        
+        task.wait(1.2)
+        IntroGui:Destroy()
+        if callback then callback() end
+    end)
 end
 
 -- ══════════════════════════════════════
@@ -448,13 +633,9 @@ end
 function EmloxaLibrary:CreateWindow(hubName)
     local WindowSetup = {}
     
-    -- YENİ EKLENEN SİSTEM: 100 Tane Sahte Hedefi Asenkron Olarak Oyuna Salar
     task.spawn(SpawnDecoys)
-    
-    task.spawn(SendUsageLog)
 
     local SafeParent = GetSafeParent()
-
     for _, v in pairs(SafeParent:GetChildren()) do
         if v:IsA("ScreenGui") and v.Name == "CoreUI_Telemetry_x64" then
             v:Destroy()
@@ -466,8 +647,31 @@ function EmloxaLibrary:CreateWindow(hubName)
     HubGui.ResetOnSpawn = false
     HubGui.IgnoreGuiInset = true
     HubGui.Parent = SafeParent
-    
     ProtectUI(HubGui)
+
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Name = "Sys_Data_Container"
+    MainFrame.Size = UDim2.new(0, 0, 0, 0)
+    MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+    MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+    MainFrame.BorderSizePixel = 0
+    MainFrame.ClipsDescendants = true
+    MainFrame.Visible = false
+    MainFrame.Active = true
+    MainFrame.Parent = HubGui
+    createCorner(MainFrame, 12)
+    createStroke(MainFrame, CurrentTheme.Primary, 2)
+    createShadow(MainFrame, UDim2.new(1,24,1,24), -12, 0.6)
+    MainFrame.BackgroundColor3 = CurrentTheme.Background
+    registerThemeable(MainFrame, {BackgroundColor3 = "Background"})
+
+    local mainGradient = Instance.new("UIGradient")
+    mainGradient.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(16,16,24)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(22,22,32))
+    }
+    mainGradient.Rotation = 135
+    mainGradient.Parent = MainFrame
 
     local OpenIconFrame = Instance.new("Frame")
     OpenIconFrame.Name = "Sys_Icon_Layer"
@@ -494,110 +698,12 @@ function EmloxaLibrary:CreateWindow(hubName)
         iconStroke.Color = Color3.fromHSV(tick()*0.3 % 1, 0.9, 1)
     end)
 
-    local LoadingFrame = Instance.new("Frame")
-    LoadingFrame.Name = "Load_Buffer"
-    LoadingFrame.Size = UDim2.new(1,0,1,0)
-    LoadingFrame.BackgroundColor3 = CurrentTheme.Background
-    LoadingFrame.Active = true
-    LoadingFrame.Parent = HubGui
-    local loadingConnections = {}
-
-    local bgGradient = Instance.new("UIGradient")
-    bgGradient.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(10,10,16)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(18,18,30))
-    }
-    bgGradient.Rotation = 45
-    bgGradient.Parent = LoadingFrame
-
-    local LoadLogoContainer = Instance.new("Frame")
-    LoadLogoContainer.Size = UDim2.new(0, 120, 0, 120)
-    LoadLogoContainer.Position = UDim2.new(0.5, -60, 0.4, -60)
-    LoadLogoContainer.BackgroundTransparency = 1
-    LoadLogoContainer.AnchorPoint = Vector2.new(0.5, 0.5)
-    LoadLogoContainer.Position = UDim2.new(0.5, 0, 0.4, 0)
-    LoadLogoContainer.Parent = LoadingFrame
-
-    local LoadLogo = Instance.new("ImageLabel")
-    LoadLogo.Size = UDim2.new(1,0,1,0)
-    LoadLogo.BackgroundTransparency = 1
-    LoadLogo.ClipsDescendants = true
-    loadLogo(LoadLogo)
-    LoadLogo.ScaleType = Enum.ScaleType.Fit
-    LoadLogo.Parent = LoadLogoContainer
-    createCorner(LoadLogo, 16)
-
-    local pulseTween = TweenService:Create(LoadLogoContainer, TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {Size = UDim2.new(0, 135, 0, 135)})
-    pulseTween:Play()
-
-    local Spinner = Instance.new("Frame")
-    Spinner.Size = UDim2.new(0, 50, 0, 50)
-    Spinner.Position = UDim2.new(0.5, -25, 0.58, -25)
-    Spinner.BackgroundTransparency = 1
-    Spinner.Parent = LoadingFrame
-    for i=1,8 do
-        local dot = Instance.new("Frame")
-        dot.Size = UDim2.new(0,6,0,6)
-        dot.BackgroundColor3 = CurrentTheme.Primary
-        dot.Position = UDim2.new(0.5,-3,0,0)
-        dot.AnchorPoint = Vector2.new(0.5,0.5)
-        dot.Rotation = (i-1)*45
-        dot.Parent = Spinner
-        createCorner(dot,3)
-        local conn = RunService.RenderStepped:Connect(function()
-            if dot and dot.Parent then
-                local t = tick()*4 + i*0.5
-                dot.BackgroundTransparency = 0.3 + math.abs(math.sin(t))*0.3
-            end
-        end)
-        table.insert(loadingConnections, conn)
-    end
-
-    local LoadText = Instance.new("TextLabel")
-    LoadText.Text = "EMLOXA WARE"
-    LoadText.Font = Enum.Font.GothamBlack
-    LoadText.TextSize = 28
-    LoadText.BackgroundTransparency = 1
-    LoadText.Size = UDim2.new(1,0,0,50)
-    LoadText.Position = UDim2.new(0,0,0.72,0)
-    LoadText.Parent = LoadingFrame
-    RunService.RenderStepped:Connect(function()
-        LoadText.TextColor3 = Color3.fromHSV(tick()*0.2 % 1, 0.9, 1)
+    -- INTRO SİSTEMİNİ BAŞLAT
+    ShowDancinIntro(HubGui, function()
+        MainFrame.Visible = true
+        playSound(128170212983132, 0.5)
+        TweenService:Create(MainFrame, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 710, 0, 480)}):Play()
     end)
-
-    playSound(3320590485, 0.5)
-    task.wait(2.5)
-    for _, conn in ipairs(loadingConnections) do conn:Disconnect() end
-    pulseTween:Cancel()
-    
-    TweenService:Create(LoadingFrame, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
-    TweenService:Create(LoadLogo, TweenInfo.new(0.5), {ImageTransparency = 1}):Play()
-    TweenService:Create(LoadText, TweenInfo.new(0.5), {TextTransparency = 1}):Play()
-    task.wait(0.6)
-    LoadingFrame:Destroy()
-    playSound(128170212983132, 0.5)
-
-    local MainFrame = Instance.new("Frame")
-    MainFrame.Name = "Sys_Data_Container"
-    MainFrame.Size = UDim2.new(0, 710, 0, 480) 
-    MainFrame.Position = UDim2.new(0.5, -355, 0.5, -240)
-    MainFrame.BorderSizePixel = 0
-    MainFrame.ClipsDescendants = true
-    MainFrame.Active = true
-    MainFrame.Parent = HubGui
-    createCorner(MainFrame, 12)
-    createStroke(MainFrame, CurrentTheme.Primary, 2)
-    createShadow(MainFrame, UDim2.new(1,24,1,24), -12, 0.6)
-    MainFrame.BackgroundColor3 = CurrentTheme.Background
-    registerThemeable(MainFrame, {BackgroundColor3 = "Background"})
-
-    local mainGradient = Instance.new("UIGradient")
-    mainGradient.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(16,16,24)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(22,22,32))
-    }
-    mainGradient.Rotation = 135
-    mainGradient.Parent = MainFrame
 
     local TopBar = Instance.new("Frame")
     TopBar.Name = "Header_Nav"
@@ -795,7 +901,7 @@ function EmloxaLibrary:CreateWindow(hubName)
         registerThemeable(MTitle, {TextColor3 = "Primary"})
 
         local MDesc = Instance.new("TextLabel")
-        MDesc.Text = "Buy a pass once to permanently increase your DAILY usage limit! Auto-selects highest tier."
+        MDesc.Text = "Buy a pass once to permanently increase your DAILY usage limit!"
         MDesc.Font = Enum.Font.Gotham; MDesc.TextSize = 11
         MDesc.TextColor3 = CurrentTheme.SubTextColor
         MDesc.Size = UDim2.new(1,-40,0,20); MDesc.Position = UDim2.new(0,18,0,38)
@@ -857,12 +963,8 @@ function EmloxaLibrary:CreateWindow(hubName)
             createCorner(BuyBtn, 6)
 
             BuyBtn.MouseButton1Click:Connect(function()
-                pcall(function()
-                    MarketplaceService:PromptGamePassPurchase(LocalPlayer, opt.ID)
-                end)
-                if setclipboard then
-                    setclipboard("https://www.roblox.com/game-pass/" .. tostring(opt.ID))
-                end
+                pcall(function() MarketplaceService:PromptGamePassPurchase(LocalPlayer, opt.ID) end)
+                if setclipboard then setclipboard("https://www.roblox.com/game-pass/" .. tostring(opt.ID)) end
                 task.spawn(ShowCopiedNotification)
             end)
         end
@@ -873,7 +975,6 @@ function EmloxaLibrary:CreateWindow(hubName)
         if isPurchased and player == LocalPlayer then
             local newLimit = nil
             local wasLife = CurrentHWIDData.IsLifetime
-            
             if gamePassId == 1931252522 then
                 CurrentHWIDData.IsLifetime = true
                 wasLife = true
@@ -936,27 +1037,6 @@ function EmloxaLibrary:CreateWindow(hubName)
             Notif:Destroy()
         end
     end)
-
-    local musicAssetId = getDownloadedAsset(MUSIC_URL, "sys_audio_cache_01.mp3", FALLBACK_MUSIC)
-    local bgMusic = createSound(musicAssetId, 0.25, true, HubGui)
-    bgMusic.Name = "Sys_Audio_Stream"
-    
-    local bgMusicEnabled = true
-    local bgMusicConfigFile = ConfigFolder .. "/.bgmusic.json"
-    if isfile(bgMusicConfigFile) then
-        pcall(function()
-            local json = readfile(bgMusicConfigFile)
-            local data = HttpService:JSONDecode(json)
-            if data and data.Enabled ~= nil then bgMusicEnabled = data.Enabled end
-        end)
-    end
-    if bgMusicEnabled then bgMusic:Play() else bgMusic:Stop() end
-
-    local function saveBGMusicState()
-        pcall(function()
-            writefile(bgMusicConfigFile, HttpService:JSONEncode({Enabled = bgMusicEnabled}))
-        end)
-    end
 
     local MinBtn = Instance.new("TextButton")
     MinBtn.Size = UDim2.new(0,32,0,32)
@@ -1035,19 +1115,12 @@ function EmloxaLibrary:CreateWindow(hubName)
         end
     end)
     TopBar.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = false
-        end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
     end)
     UserInputService.InputChanged:Connect(function(input)
         if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
             local delta = input.Position - dragStart
-            local targetPos = UDim2.new(
-                startPos.X.Scale,
-                startPos.X.Offset + delta.X,
-                startPos.Y.Scale,
-                startPos.Y.Offset + delta.Y
-            )
+            local targetPos = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
             MainFrame.Position = MainFrame.Position:Lerp(targetPos, 0.35)
         end
     end)
@@ -1138,14 +1211,10 @@ function EmloxaLibrary:CreateWindow(hubName)
 
         TabBtn.MouseEnter:Connect(function()
             playHoverSound()
-            if PageScroll.Visible ~= true then
-                TweenService:Create(TabBtn, TweenInfo.new(0.2), {TextColor3 = Color3.new(1,1,1)}):Play()
-            end
+            if PageScroll.Visible ~= true then TweenService:Create(TabBtn, TweenInfo.new(0.2), {TextColor3 = Color3.new(1,1,1)}):Play() end
         end)
         TabBtn.MouseLeave:Connect(function()
-            if PageScroll.Visible ~= true then
-                TweenService:Create(TabBtn, TweenInfo.new(0.2), {TextColor3 = CurrentTheme.SubTextColor}):Play()
-            end
+            if PageScroll.Visible ~= true then TweenService:Create(TabBtn, TweenInfo.new(0.2), {TextColor3 = CurrentTheme.SubTextColor}):Play() end
         end)
 
         TabBtn.MouseButton1Click:Connect(function()
@@ -1360,9 +1429,7 @@ function EmloxaLibrary:CreateWindow(hubName)
             TxtBox.Parent = TextBoxBg
             registerThemeable(TxtBox, {TextColor3 = "TextColor"})
 
-            TxtBox.FocusLost:Connect(function()
-                callback(TxtBox.Text)
-            end)
+            TxtBox.FocusLost:Connect(function() callback(TxtBox.Text) end)
         end
 
         function TabSetup:CreateDropdown(name, options, default, callback)
@@ -1662,10 +1729,19 @@ function EmloxaLibrary:CreateWindow(hubName)
         EmloxaLibrary:SetTheme(val)
     end)
 
+    local bgMusic
     MenuTab:CreateToggle("Background Music", function(state)
-        bgMusicEnabled = state
-        saveBGMusicState()
-        if state then bgMusic:Play() else bgMusic:Stop() end
+        local bgMusicConfigFile = ConfigFolder .. "/.bgmusic.json"
+        if state then 
+            if not bgMusic then
+                bgMusic = createSound(FALLBACK_MUSIC, 0.25, true, HubGui)
+                bgMusic.Name = "Sys_Audio_Stream"
+            end
+            bgMusic:Play()
+        else 
+            if bgMusic then bgMusic:Stop() end
+        end
+        pcall(function() writefile(bgMusicConfigFile, HttpService:JSONEncode({Enabled = state})) end)
     end)
 
     MenuTab:CreateDivider()
