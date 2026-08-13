@@ -164,7 +164,7 @@ local function SaveIdentityHide()
     end)
 end
 
--- Kimlik Gizleme Fonksiyonu
+-- ── Kimlik Gizleme Fonksiyonu ──
 local function HideIdentity()
     local playerName = LocalPlayer.Name
     local displayName = LocalPlayer.DisplayName
@@ -548,7 +548,7 @@ local function ShowDancinIntro(HubGui, callback)
     SkipText.TextColor3 = Color3.new(1, 1, 1)
     SkipText.BackgroundTransparency = 1
     SkipText.ZIndex = 999998
-    SkipText.Visible = false  -- Başlangıçta gizli
+    SkipText.Visible = false
     SkipText.Parent = IntroGui
 
     local SkipButton = Instance.new("TextButton")
@@ -556,7 +556,7 @@ local function ShowDancinIntro(HubGui, callback)
     SkipButton.BackgroundTransparency = 1
     SkipButton.Text = ""
     SkipButton.ZIndex = 999999
-    SkipButton.Active = false  -- Başlangıçta pasif
+    SkipButton.Active = false
     SkipButton.Parent = IntroGui
 
     local isPlaying = true
@@ -663,11 +663,11 @@ function EmloxaLibrary:CreateWindow(hubName)
     HubGui.ResetOnSpawn = false
     HubGui.IgnoreGuiInset = true
     HubGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    HubGui.DisplayOrder = 999999  -- ScreenGui için yüksek DisplayOrder
+    HubGui.DisplayOrder = 999999
     HubGui.Parent = SafeParent
     ProtectUI(HubGui)
 
-    -- Discord Prompt fonksiyonunu erken tanımla (callback'in erken çağrılma ihtimaline karşı)
+    -- Discord Prompt fonksiyonunu erken tanımla
     function WindowSetup:ShowDiscordPrompt()
         local PromptFrame = Instance.new("Frame")
         PromptFrame.Size = UDim2.new(0, 350, 0, 140)
@@ -802,7 +802,7 @@ function EmloxaLibrary:CreateWindow(hubName)
             MainFrame.Visible = true
             playSound(128170212983132, 0.5)
             TweenService:Create(MainFrame, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 710, 0, 480)}):Play()
-            -- Discord bildirimini intro sonrası göster (artık WindowSetup üzerinde mevcut)
+            -- Discord bildirimini intro sonrası göster
             task.wait(0.6)
             WindowSetup:ShowDiscordPrompt()
         end)
@@ -1344,7 +1344,8 @@ function EmloxaLibrary:CreateWindow(hubName)
         local elementCounter = 0
         local function generateId(baseName)
             elementCounter = elementCounter + 1
-            return baseName .. "_" .. elementCounter
+            local safeName = baseName:gsub("%s+", "_")  -- Boşlukları _ ile değiştir
+            return safeName .. "_" .. elementCounter
         end
 
         function TabSetup:CreateToggle(name, callback, default)
