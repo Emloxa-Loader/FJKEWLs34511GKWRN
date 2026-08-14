@@ -1,7 +1,6 @@
 -- =========================================================================
 -- EMLOXA WARE: FUNKY FRIDAY V29 (V27 FULL PERFECT CORE + AUTO-KEY SYSTEM - PREMIUM)
--- İSİMLERE BAKMAYAN ULTRA SİSTEM – HER NOTA KONUMA GÖRE TAKİP EDİLİR
--- TARAF ALGILAMA: HUD.Scores.Left.Emloxa / Right.Emloxa
+-- ULTRA GELİŞMİŞ NOTA ALGILAMA – İSİM BAĞIMSIZ, OTOMATİK VURUŞ ÇİZGİSİ
 -- =========================================================================
 local GameModule = {}
 
@@ -188,6 +187,28 @@ function GameModule:Init(Window)
         return nil
     end
 
+    -- Otomatik vuruş çizgisi bulma
+    local function FindHitY(laneFrame)
+        -- Önce açık isimler ara
+        local explicit = laneFrame:FindFirstChild("Receptor") or laneFrame:FindFirstChild("Arrow") or laneFrame:FindFirstChild("HitLine") or laneFrame:FindFirstChild("Target")
+        if explicit and explicit:IsA("GuiObject") then
+            return explicit.AbsolutePosition.Y + explicit.AbsoluteSize.Y / 2
+        end
+
+        -- Başka bir çocuk (Notes ve bizim eklediklerimiz hariç)
+        for _, child in pairs(laneFrame:GetChildren()) do
+            if child:IsA("GuiObject") and child.Name ~= "Notes" and child.Name ~= "EmloxaStats" and child.Name ~= "EmloxaDynamicDot" then
+                -- Küçük boyutlu bir hedef muhtemelen receptördür
+                if child.AbsoluteSize.Y < laneFrame.AbsoluteSize.Y * 0.5 then
+                    return child.AbsolutePosition.Y + child.AbsoluteSize.Y / 2
+                end
+            end
+        end
+
+        -- Varsayılan: lane'in alt kısmından biraz yukarısı
+        return laneFrame.AbsolutePosition.Y + laneFrame.AbsoluteSize.Y - 20
+    end
+
     RunService.RenderStepped:Connect(function(deltaTime)
         if not AutoPlayerEnabled then return end
         
@@ -200,7 +221,7 @@ function GameModule:Init(Window)
         local fields = ui.Game.Fields[mySide].Inner
         local anyNoteSeenThisFrame = false
 
-        -- Lane'leri topla ve sırala (isim "Lane1", "Lane2" vb. olduğu için sıralama güvenli)
+        -- Lane'leri topla ve sırala
         local laneFrames = {}
         for _, obj in pairs(fields:GetChildren()) do
             if obj:IsA("GuiObject") and obj.Name:find("Lane") and obj:FindFirstChild("Notes") then
@@ -221,7 +242,7 @@ function GameModule:Init(Window)
             
             UpdateLaneStats(laneFrame, laneName)
             
-            local laneCenterY = laneFrame.AbsolutePosition.Y + (laneFrame.AbsoluteSize.Y / 2)
+            local hitY = FindHitY(laneFrame)
             local notesFolder = laneFrame:FindFirstChild("Notes")
             
             if notesFolder then
@@ -245,7 +266,7 @@ function GameModule:Init(Window)
                         -- Nota nesnesi yeniden kullanılıyorsa (respawn tespiti)
                         if prevY and NoteStates[note] == "passed" then
                             -- Nota yukarıdan aşağı hareket eder: respawn = Y koordinatı büyükten küçüğe sıçrar
-                            if prevY > laneCenterY + 50 and noteCenterY < laneCenterY - 50 then
+                            if prevY > hitY + 50 and noteCenterY < hitY - 50 then
                                 CountedNotes[note] = nil
                                 HitNotes[note] = nil
                                 ActiveHolds[note] = nil
@@ -263,7 +284,7 @@ function GameModule:Init(Window)
                         local isHoldNote = (childCount > 1) or (note.AbsoluteSize.Y > note.AbsoluteSize.X * 1.5)
 
                         -- Dinamik nokta
-                        local dist = math.abs(noteCenterY - laneCenterY)
+                        local dist = math.abs(noteCenterY - hitY)
                         ManageDynamicDot(note, dist)
 
                         -- Vuruş kontrolü
@@ -271,32 +292,34 @@ function GameModule:Init(Window)
                             local shouldHit = false
                             
                             if isHoldNote then
-                                -- Hold başlangıcı: notanın üst kenarı merkeze ulaştığında
+                                -- Hold başlangıcı: notanın üst kenarı vuruş çizgisine ulaştığında
                                 if prevY then
-                                    if prevY <= laneCenterY and noteTop >= laneCenterY then
+                                    if prevY <= hitY and noteTop >= hitY then
                                         shouldHit = true
                                     end
                                 else
-                                    if math.abs(noteTop - laneCenterY) < 5 then
+                                    -- İlk görülme: zaten çok yakınsa vur
+                                    if math.abs(noteTop - hitY) < 25 then
                                         shouldHit = true
                                     end
                                 end
                             else
-                                -- Normal nota: merkez geçişi
+                                -- Normal nota: merkez vuruş çizgisine ulaştığında
                                 if prevY then
-                                    if (prevY <= laneCenterY and noteCenterY >= laneCenterY) or
-                                       (prevY >= laneCenterY and noteCenterY <= laneCenterY) then
+                                    if (prevY <= hitY and noteCenterY >= hitY) or
+                                       (prevY >= hitY and noteCenterY <= hitY) then
                                         shouldHit = true
                                     end
                                 else
-                                    if math.abs(noteCenterY - laneCenterY) < 5 then
+                                    -- İlk görülme: merkezi çok yakınsa vur
+                                    if math.abs(noteCenterY - hitY) < 25 then
                                         shouldHit = true
                                     end
                                 end
                             end
 
-                            -- Ek güvence: hızlı notalarda küçük mesafe eşiği
-                            if not shouldHit and not prevY and math.abs(noteCenterY - laneCenterY) < 10 then
+                            -- Ek güvence: eğer nota çoktan geçtiyse ve yakınsa
+                            if not shouldHit and prevY and math.abs(noteCenterY - hitY) < 15 then
                                 shouldHit = true
                             end
 
@@ -313,16 +336,16 @@ function GameModule:Init(Window)
                             end
                         end
 
-                        -- Hold bırakma: notanın alt kenarı merkeze ulaştığında
+                        -- Hold bırakma: notanın alt kenarı vuruş çizgisine ulaştığında
                         if isHoldNote and HitNotes[note] and ActiveHolds[note] then
                             if prevY then
-                                if prevY <= laneCenterY and noteBottom >= laneCenterY then
+                                if prevY <= hitY and noteBottom >= hitY then
                                     SendKeyUp(laneKey)
                                     ActiveHolds[note] = nil
                                     NoteStates[note] = "passed"
                                 end
                             else
-                                if math.abs(noteBottom - laneCenterY) < 5 then
+                                if math.abs(noteBottom - hitY) < 25 then
                                     SendKeyUp(laneKey)
                                     ActiveHolds[note] = nil
                                     NoteStates[note] = "passed"
@@ -332,7 +355,7 @@ function GameModule:Init(Window)
 
                         -- Normal nota geçtiyse state güncelle
                         if not isHoldNote and HitNotes[note] then
-                            if noteTop > laneCenterY + 20 then
+                            if noteTop > hitY + 20 then
                                 NoteStates[note] = "passed"
                             end
                         end
