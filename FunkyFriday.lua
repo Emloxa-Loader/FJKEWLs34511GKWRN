@@ -1,7 +1,7 @@
 -- =========================================================================
 -- EMLOXA WARE: FUNKY FRIDAY V29 (V27 FULL PERFECT CORE + AUTO-KEY SYSTEM - PREMIUM)
+-- İSİMLERE BAKMAYAN ULTRA SİSTEM – HER NOTA KONUMA GÖRE TAKİP EDİLİR
 -- TARAF ALGILAMA: HUD.Scores.Left.Emloxa / Right.Emloxa
--- NOTA SİSTEMİ: TEK SAYIM + KESİN VURUŞ
 -- =========================================================================
 local GameModule = {}
 
@@ -59,7 +59,7 @@ function GameModule:Init(Window)
     local LaneStats = {}
     for i = 1, 9 do LaneStats["Lane"..i] = {Seen = 0, Taps = 0} end
     
-    -- Nota takip tabloları
+    -- Nota takip tabloları (obje referansı ile, isim asla kullanılmaz)
     local CountedNotes = {}       -- sayıldı mı?
     local HitNotes = {}           -- vuruldu mu?
     local ActiveHolds = {}        -- hold aktif mi? (note -> key)
@@ -90,7 +90,7 @@ function GameModule:Init(Window)
         end
     end
 
-    -- Dinamik nokta (görsel yardım)
+    -- Dinamik nokta (görsel yardım) – isimle ilgisi yok
     local function ManageDynamicDot(note, dist)
         local dot = note:FindFirstChild("EmloxaDynamicDot")
         if not dot then
@@ -128,6 +128,7 @@ function GameModule:Init(Window)
             SendKeyUp(key)
             SendKeyDown(key)
             task.wait(0.01)
+            -- Eğer aynı tuşta aktif hold yoksa bırak
             local isHolding = false
             for _, k in pairs(ActiveHolds) do
                 if k == key then isHolding = true break end
@@ -158,7 +159,7 @@ function GameModule:Init(Window)
                         cachedMySide = sideName
                         return sideName
                     end
-                    -- Ekstra: Emloxa adında bir çocuk var mı? (kullanıcı özel durumu)
+                    -- Ekstra: Emloxa adında bir çocuk var mı?
                     if side:FindFirstChild("Emloxa") then
                         cachedMySide = sideName
                         return sideName
@@ -199,7 +200,7 @@ function GameModule:Init(Window)
         local fields = ui.Game.Fields[mySide].Inner
         local anyNoteSeenThisFrame = false
 
-        -- Lane'leri topla ve sırala
+        -- Lane'leri topla ve sırala (isim "Lane1", "Lane2" vb. olduğu için sıralama güvenli)
         local laneFrames = {}
         for _, obj in pairs(fields:GetChildren()) do
             if obj:IsA("GuiObject") and obj.Name:find("Lane") and obj:FindFirstChild("Notes") then
@@ -234,7 +235,7 @@ function GameModule:Init(Window)
                         local noteCenterY = noteTop + (note.AbsoluteSize.Y / 2)
                         local prevY = LastYPositions[note]
 
-                        -- İlk görülme: say
+                        -- İlk görülme: say (isim kullanılmıyor, referans ile)
                         if not CountedNotes[note] then
                             CountedNotes[note] = true
                             LaneStats[laneName].Seen = LaneStats[laneName].Seen + 1
@@ -254,7 +255,7 @@ function GameModule:Init(Window)
                             end
                         end
 
-                        -- Hold notası tespiti
+                        -- Hold notası tespiti (isim kullanılmaz, sadece şekil/çocuk sayısı)
                         local childCount = 0
                         for _, c in ipairs(note:GetChildren()) do
                             if c.Name ~= "EmloxaDynamicDot" then childCount = childCount + 1 end
@@ -281,7 +282,7 @@ function GameModule:Init(Window)
                                     end
                                 end
                             else
-                                -- Normal nota: merkez geçişi veya merkeze yakınlık
+                                -- Normal nota: merkez geçişi
                                 if prevY then
                                     if (prevY <= laneCenterY and noteCenterY >= laneCenterY) or
                                        (prevY >= laneCenterY and noteCenterY <= laneCenterY) then
@@ -294,7 +295,7 @@ function GameModule:Init(Window)
                                 end
                             end
 
-                            -- Eğer not çok hızlıysa ve geçiş kaçırılmışsa, küçük mesafe eşiği
+                            -- Ek güvence: hızlı notalarda küçük mesafe eşiği
                             if not shouldHit and not prevY and math.abs(noteCenterY - laneCenterY) < 10 then
                                 shouldHit = true
                             end
