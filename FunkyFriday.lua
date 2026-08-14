@@ -1,6 +1,6 @@
 -- =========================================================================
 -- EMLOXA WARE: FUNKY FRIDAY V29 (V27 FULL PERFECT CORE + AUTO-KEY SYSTEM - PREMIUM)
--- ENHANCED VERSION WITH ROBUST SIDE DETECTION AND LANE HANDLING
+-- ULTRA HASSAS VERSİYON – HER NOTA TEK SAYILIR, HIZA OTOMATİK UYUM
 -- =========================================================================
 local GameModule = {}
 
@@ -44,7 +44,7 @@ function GameModule:Init(Window)
     local AdvancedTab = Window:CreateTab("Advanced")
     
     local AutoPlayerEnabled = false
-    local AutoplayMethod = "Hybrid"
+    local AutoplayMethod = "Hybrid"  -- "Hybrid", "Calculate", "Rapid checks" (opsiyonel)
     
     local KeyMaps = {
         [4] = {Enum.KeyCode.Left, Enum.KeyCode.Down, Enum.KeyCode.Up, Enum.KeyCode.Right},
@@ -58,10 +58,12 @@ function GameModule:Init(Window)
     local LaneStats = {}
     for i = 1, 9 do LaneStats["Lane"..i] = {Seen = 0, Taps = 0} end
     
-    local ActiveHolds = {}
-    local TappedNotes = {}
-    local CountedNotes = {} 
-    local LastYPositions = {} 
+    -- Tablolar: her nota nesnesi için takip
+    local CountedNotes = {}       -- sayıldı mı?
+    local HitNotes = {}           -- vuruldu mu?
+    local ActiveHolds = {}        -- hold aktif mi? (note -> key)
+    local LastYPositions = {}     -- önceki Y pozisyonu
+    local NoteStates = {}         -- "incoming" veya "passed" (reset tespiti için)
     local LastNoteSeenTime = tick()
 
     FunkyTab:CreatePremiumToggle("Enable God Mode (Flawless V29)", function(s) AutoPlayerEnabled = s end)
@@ -107,7 +109,32 @@ function GameModule:Init(Window)
         end
     end
 
-    -- Enhanced side detection: try scoreboard first, fallback to lane activity
+    -- Güvenli tuş gönderimi
+    local function SendKeyDown(key)
+        task.spawn(function()
+            pcall(function() VirtualInputManager:SendKeyEvent(true, key, false, game) end)
+        end)
+    end
+    local function SendKeyUp(key)
+        task.spawn(function()
+            pcall(function() VirtualInputManager:SendKeyEvent(false, key, false, game) end)
+        end)
+    end
+    local function SendKeyTap(key)
+        task.spawn(function()
+            SendKeyUp(key)
+            SendKeyDown(key)
+            task.wait(0.01)
+            -- Eğer aynı tuşta aktif hold yoksa bırak
+            local isHolding = false
+            for _, k in pairs(ActiveHolds) do
+                if k == key then isHolding = true break end
+            end
+            if not isHolding then SendKeyUp(key) end
+        end)
+    end
+
+    -- Gelişmiş taraf algılama (skor tablosu + fallback)
     local cachedMySide = nil
     local function GetMySide(ui)
         if cachedMySide then
@@ -132,7 +159,7 @@ function GameModule:Init(Window)
             end
         end
 
-        -- Fallback: check which side has notes
+        -- Fallback: hangi tarafta nota varsa
         local fields = ui.Game:FindFirstChild("Fields")
         if fields then
             for _, sideName in ipairs({"Left", "Right"}) do
@@ -140,8 +167,7 @@ function GameModule:Init(Window)
                 if inner then
                     for _, lane in pairs(inner:GetChildren()) do
                         if lane:IsA("GuiObject") and lane.Name:find("Lane") and lane:FindFirstChild("Notes") then
-                            local notes = lane.Notes:GetChildren()
-                            if #notes > 0 then
+                            if #lane.Notes:GetChildren() > 0 then
                                 cachedMySide = sideName
                                 return sideName
                             end
@@ -165,7 +191,7 @@ function GameModule:Init(Window)
         local fields = ui.Game.Fields[mySide].Inner
         local anyNoteSeenThisFrame = false
 
-        -- Count lanes properly: only frames that have a Notes folder
+        -- Lane'leri topla ve sırala
         local laneFrames = {}
         for _, obj in pairs(fields:GetChildren()) do
             if obj:IsA("GuiObject") and obj.Name:find("Lane") and obj:FindFirstChild("Notes") then
@@ -198,98 +224,113 @@ function GameModule:Init(Window)
                         local noteTop = note.AbsolutePosition.Y
                         local noteBottom = noteTop + note.AbsoluteSize.Y
                         local noteCenterY = noteTop + (note.AbsoluteSize.Y / 2)
-                        local dist = math.abs(noteCenterY - laneCenterY)
-                        
-                        if LastYPositions[note] and math.abs(noteCenterY - LastYPositions[note]) > 50 then
-                            CountedNotes[note] = nil
-                            TappedNotes[note] = nil
-                            ActiveHolds[note] = nil
-                        end
-                        
-                        local noteVelocity = 0
-                        if LastYPositions[note] then
-                            noteVelocity = math.abs(noteCenterY - LastYPositions[note]) / math.max(deltaTime, 0.0001)
-                        end
-                        LastYPositions[note] = noteCenterY
 
+                        -- İlk görülme kontrolü
                         if not CountedNotes[note] then
                             CountedNotes[note] = true
                             LaneStats[laneName].Seen = LaneStats[laneName].Seen + 1
+                            NoteStates[note] = "incoming"
                         end
 
-                        ManageDynamicDot(note, dist)
+                        -- Nota nesnesi yeniden kullanılıyorsa (alttan üste atlama) yeni tur olarak say
+                        local prevY = LastYPositions[note]
+                        if prevY and NoteStates[note] == "passed" then
+                            if prevY > laneCenterY + 50 and noteCenterY < laneCenterY - 50 then
+                                -- Yeniden doğdu, sayacı sıfırla ve yeni not olarak kabul et
+                                CountedNotes[note] = nil
+                                HitNotes[note] = nil
+                                ActiveHolds[note] = nil
+                                CountedNotes[note] = true
+                                LaneStats[laneName].Seen = LaneStats[laneName].Seen + 1
+                                NoteStates[note] = "incoming"
+                            end
+                        end
 
+                        -- Hold notası tespiti
                         local childCount = 0
                         for _, c in ipairs(note:GetChildren()) do
                             if c.Name ~= "EmloxaDynamicDot" then childCount = childCount + 1 end
                         end
                         local isHoldNote = (childCount > 1) or (note.AbsoluteSize.Y > note.AbsoluteSize.X * 1.5)
 
-                        local shouldHit = false
-                        local frameTravel = noteVelocity * deltaTime
-                        
-                        if AutoplayMethod == "Rapid checks" then
-                            shouldHit = (dist <= 3)
-                        elseif AutoplayMethod == "Calculate" then
-                            shouldHit = (dist <= math.max(2, frameTravel / 1.5))
-                        elseif AutoplayMethod == "Hybrid" then
-                            shouldHit = (dist <= math.max(3, frameTravel / 1.2))
-                        end
+                        -- Dinamik nokta
+                        local dist = math.abs(noteCenterY - laneCenterY)
+                        ManageDynamicDot(note, dist)
 
-                        if shouldHit and not TappedNotes[note] then
-                            TappedNotes[note] = true
-                            LaneStats[laneName].Taps = LaneStats[laneName].Taps + 1
+                        -- Vuruş kontrolü (kesin geçiş algılama)
+                        if not HitNotes[note] then
+                            local shouldHit = false
                             
                             if isHoldNote then
-                                ActiveHolds[note] = laneKey
-                                task.spawn(function() VirtualInputManager:SendKeyEvent(true, laneKey, false, game) end)
+                                -- Hold başlangıcı: notanın üstü merkezden geçtiğinde
+                                if prevY and prevY <= laneCenterY and noteTop >= laneCenterY then
+                                    shouldHit = true
+                                end
+                                -- Eğer deltaTime çok küçükse ve prevY yoksa, mesafe tabanlı yedek
+                                if not prevY and math.abs(noteTop - laneCenterY) < 5 then
+                                    shouldHit = true
+                                end
                             else
-                                task.spawn(function()
-                                    VirtualInputManager:SendKeyEvent(false, laneKey, false, game)
-                                    VirtualInputManager:SendKeyEvent(true, laneKey, false, game)
-                                    task.wait(0.01)
-                                    local isHolding = false
-                                    for hNote, k in pairs(ActiveHolds) do
-                                        if k == laneKey and hNote.Parent then isHolding = true break end
-                                    end
-                                    if not isHolding then VirtualInputManager:SendKeyEvent(false, laneKey, false, game) end
-                                end)
+                                -- Normal nota: merkezden geçiş
+                                if prevY and prevY <= laneCenterY and noteCenterY >= laneCenterY then
+                                    shouldHit = true
+                                end
+                                if not prevY and math.abs(noteCenterY - laneCenterY) < 5 then
+                                    shouldHit = true
+                                end
                             end
-                        end
-                        
-                        if isHoldNote and TappedNotes[note] then
-                            -- Release hold when the note's bottom has passed above the lane center
-                            local releaseOffset = 10 -- pixels above center
-                            if noteBottom < laneCenterY - releaseOffset then
-                                if ActiveHolds[note] then
-                                    task.spawn(function() VirtualInputManager:SendKeyEvent(false, laneKey, false, game) end)
-                                    ActiveHolds[note] = nil
+
+                            if shouldHit then
+                                HitNotes[note] = true
+                                LaneStats[laneName].Taps = LaneStats[laneName].Taps + 1
+                                
+                                if isHoldNote then
+                                    ActiveHolds[note] = laneKey
+                                    SendKeyDown(laneKey)
+                                else
+                                    SendKeyTap(laneKey)
                                 end
                             end
                         end
+
+                        -- Hold bırakma: notanın altı merkezden geçtiğinde
+                        if isHoldNote and HitNotes[note] and ActiveHolds[note] then
+                            if prevY and prevY <= laneCenterY and noteBottom >= laneCenterY then
+                                SendKeyUp(laneKey)
+                                ActiveHolds[note] = nil
+                                NoteStates[note] = "passed"
+                            end
+                        end
+
+                        -- Normal nota geçip gittiyse state'i güncelle
+                        if not isHoldNote and HitNotes[note] then
+                            if noteTop > laneCenterY + 20 then
+                                NoteStates[note] = "passed"
+                            end
+                        end
+
+                        LastYPositions[note] = noteCenterY
                     end
                 end
             end
             
-            -- Clean up holds whose notes are gone
+            -- Parent'ı silinmiş hold'ları temizle
             for holdNote, key in pairs(ActiveHolds) do
                 if key == laneKey and not holdNote.Parent then
-                    task.spawn(function() VirtualInputManager:SendKeyEvent(false, key, false, game) end)
+                    SendKeyUp(key)
                     ActiveHolds[holdNote] = nil
                 end
             end
         end
 
-        -- Reset stats if no notes seen for a while
+        -- 2.5 saniye hiç nota yoksa istatistikleri sıfırla (şarkı bitti)
         if not anyNoteSeenThisFrame and (tick() - LastNoteSeenTime > 2.5) then
             for i = 1, 9 do LaneStats["Lane"..i] = {Seen = 0, Taps = 0} end
-            TappedNotes = {}
             CountedNotes = {}
-            LastYPositions = {}
-            for holdNote, key in pairs(ActiveHolds) do
-                VirtualInputManager:SendKeyEvent(false, key, false, game)
-            end
+            HitNotes = {}
             ActiveHolds = {}
+            LastYPositions = {}
+            NoteStates = {}
             LastNoteSeenTime = tick()
         end
     end)
@@ -314,7 +355,7 @@ function GameModule:Init(Window)
         AutoPlayerEnabled = false
         for _, keys in pairs(KeyMaps) do
             for _, key in pairs(keys) do
-                VirtualInputManager:SendKeyEvent(false, key, false, game)
+                SendKeyUp(key)
             end
         end
         local ui = game:GetService("CoreGui"):FindFirstChild("EmloxaPremium") or LocalPlayer.PlayerGui:FindFirstChild("EmloxaPremium")
