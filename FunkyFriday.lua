@@ -1,6 +1,7 @@
 -- =========================================================================
 -- EMLOXA WARE: FUNKY FRIDAY V29 (V27 FULL PERFECT CORE + AUTO-KEY SYSTEM - PREMIUM)
--- ULTRA HASSAS VERSİYON – HER NOTA TEK SAYILIR, HIZA OTOMATİK UYUM
+-- TARAF ALGILAMA: HUD.Scores.Left.Emloxa / Right.Emloxa
+-- NOTA SİSTEMİ: TEK SAYIM + KESİN VURUŞ
 -- =========================================================================
 local GameModule = {}
 
@@ -44,7 +45,7 @@ function GameModule:Init(Window)
     local AdvancedTab = Window:CreateTab("Advanced")
     
     local AutoPlayerEnabled = false
-    local AutoplayMethod = "Hybrid"  -- "Hybrid", "Calculate", "Rapid checks" (opsiyonel)
+    local AutoplayMethod = "Hybrid"  -- "Hybrid", "Calculate", "Rapid checks"
     
     local KeyMaps = {
         [4] = {Enum.KeyCode.Left, Enum.KeyCode.Down, Enum.KeyCode.Up, Enum.KeyCode.Right},
@@ -58,17 +59,18 @@ function GameModule:Init(Window)
     local LaneStats = {}
     for i = 1, 9 do LaneStats["Lane"..i] = {Seen = 0, Taps = 0} end
     
-    -- Tablolar: her nota nesnesi için takip
+    -- Nota takip tabloları
     local CountedNotes = {}       -- sayıldı mı?
     local HitNotes = {}           -- vuruldu mu?
     local ActiveHolds = {}        -- hold aktif mi? (note -> key)
     local LastYPositions = {}     -- önceki Y pozisyonu
-    local NoteStates = {}         -- "incoming" veya "passed" (reset tespiti için)
+    local NoteStates = {}         -- "incoming" veya "passed"
     local LastNoteSeenTime = tick()
 
     FunkyTab:CreatePremiumToggle("Enable God Mode (Flawless V29)", function(s) AutoPlayerEnabled = s end)
     AdvancedTab:CreateDropdown("Autoplay Method", {"Calculate", "Rapid checks", "Hybrid"}, "Hybrid", nil, function(val) AutoplayMethod = val end)
 
+    -- İstatistik etiketi
     local function UpdateLaneStats(laneFrame, laneName)
         local statLabel = laneFrame:FindFirstChild("EmloxaStats")
         if not statLabel then
@@ -88,6 +90,7 @@ function GameModule:Init(Window)
         end
     end
 
+    -- Dinamik nokta (görsel yardım)
     local function ManageDynamicDot(note, dist)
         local dot = note:FindFirstChild("EmloxaDynamicDot")
         if not dot then
@@ -125,7 +128,6 @@ function GameModule:Init(Window)
             SendKeyUp(key)
             SendKeyDown(key)
             task.wait(0.01)
-            -- Eğer aynı tuşta aktif hold yoksa bırak
             local isHolding = false
             for _, k in pairs(ActiveHolds) do
                 if k == key then isHolding = true break end
@@ -134,7 +136,7 @@ function GameModule:Init(Window)
         end)
     end
 
-    -- Gelişmiş taraf algılama (skor tablosu + fallback)
+    -- Taraf algılama: Scores.Left.Emloxa veya Scores.Right.Emloxa
     local cachedMySide = nil
     local function GetMySide(ui)
         if cachedMySide then
@@ -151,7 +153,13 @@ function GameModule:Init(Window)
             for _, sideName in ipairs({"Left", "Right"}) do
                 local side = scores[sideName]
                 if side then
+                    -- Öncelikle LocalPlayer adını ara
                     if side:FindFirstChild(LocalPlayer.Name) or side:FindFirstChild(LocalPlayer.DisplayName) then
+                        cachedMySide = sideName
+                        return sideName
+                    end
+                    -- Ekstra: Emloxa adında bir çocuk var mı? (kullanıcı özel durumu)
+                    if side:FindFirstChild("Emloxa") then
                         cachedMySide = sideName
                         return sideName
                     end
@@ -159,7 +167,7 @@ function GameModule:Init(Window)
             end
         end
 
-        -- Fallback: hangi tarafta nota varsa
+        -- Fallback: notaların olduğu taraf
         local fields = ui.Game:FindFirstChild("Fields")
         if fields then
             for _, sideName in ipairs({"Left", "Right"}) do
@@ -224,19 +232,19 @@ function GameModule:Init(Window)
                         local noteTop = note.AbsolutePosition.Y
                         local noteBottom = noteTop + note.AbsoluteSize.Y
                         local noteCenterY = noteTop + (note.AbsoluteSize.Y / 2)
+                        local prevY = LastYPositions[note]
 
-                        -- İlk görülme kontrolü
+                        -- İlk görülme: say
                         if not CountedNotes[note] then
                             CountedNotes[note] = true
                             LaneStats[laneName].Seen = LaneStats[laneName].Seen + 1
                             NoteStates[note] = "incoming"
                         end
 
-                        -- Nota nesnesi yeniden kullanılıyorsa (alttan üste atlama) yeni tur olarak say
-                        local prevY = LastYPositions[note]
+                        -- Nota nesnesi yeniden kullanılıyorsa (respawn tespiti)
                         if prevY and NoteStates[note] == "passed" then
+                            -- Nota yukarıdan aşağı hareket eder: respawn = Y koordinatı büyükten küçüğe sıçrar
                             if prevY > laneCenterY + 50 and noteCenterY < laneCenterY - 50 then
-                                -- Yeniden doğdu, sayacı sıfırla ve yeni not olarak kabul et
                                 CountedNotes[note] = nil
                                 HitNotes[note] = nil
                                 ActiveHolds[note] = nil
@@ -257,27 +265,38 @@ function GameModule:Init(Window)
                         local dist = math.abs(noteCenterY - laneCenterY)
                         ManageDynamicDot(note, dist)
 
-                        -- Vuruş kontrolü (kesin geçiş algılama)
+                        -- Vuruş kontrolü
                         if not HitNotes[note] then
                             local shouldHit = false
                             
                             if isHoldNote then
-                                -- Hold başlangıcı: notanın üstü merkezden geçtiğinde
-                                if prevY and prevY <= laneCenterY and noteTop >= laneCenterY then
-                                    shouldHit = true
-                                end
-                                -- Eğer deltaTime çok küçükse ve prevY yoksa, mesafe tabanlı yedek
-                                if not prevY and math.abs(noteTop - laneCenterY) < 5 then
-                                    shouldHit = true
+                                -- Hold başlangıcı: notanın üst kenarı merkeze ulaştığında
+                                if prevY then
+                                    if prevY <= laneCenterY and noteTop >= laneCenterY then
+                                        shouldHit = true
+                                    end
+                                else
+                                    if math.abs(noteTop - laneCenterY) < 5 then
+                                        shouldHit = true
+                                    end
                                 end
                             else
-                                -- Normal nota: merkezden geçiş
-                                if prevY and prevY <= laneCenterY and noteCenterY >= laneCenterY then
-                                    shouldHit = true
+                                -- Normal nota: merkez geçişi veya merkeze yakınlık
+                                if prevY then
+                                    if (prevY <= laneCenterY and noteCenterY >= laneCenterY) or
+                                       (prevY >= laneCenterY and noteCenterY <= laneCenterY) then
+                                        shouldHit = true
+                                    end
+                                else
+                                    if math.abs(noteCenterY - laneCenterY) < 5 then
+                                        shouldHit = true
+                                    end
                                 end
-                                if not prevY and math.abs(noteCenterY - laneCenterY) < 5 then
-                                    shouldHit = true
-                                end
+                            end
+
+                            -- Eğer not çok hızlıysa ve geçiş kaçırılmışsa, küçük mesafe eşiği
+                            if not shouldHit and not prevY and math.abs(noteCenterY - laneCenterY) < 10 then
+                                shouldHit = true
                             end
 
                             if shouldHit then
@@ -293,16 +312,24 @@ function GameModule:Init(Window)
                             end
                         end
 
-                        -- Hold bırakma: notanın altı merkezden geçtiğinde
+                        -- Hold bırakma: notanın alt kenarı merkeze ulaştığında
                         if isHoldNote and HitNotes[note] and ActiveHolds[note] then
-                            if prevY and prevY <= laneCenterY and noteBottom >= laneCenterY then
-                                SendKeyUp(laneKey)
-                                ActiveHolds[note] = nil
-                                NoteStates[note] = "passed"
+                            if prevY then
+                                if prevY <= laneCenterY and noteBottom >= laneCenterY then
+                                    SendKeyUp(laneKey)
+                                    ActiveHolds[note] = nil
+                                    NoteStates[note] = "passed"
+                                end
+                            else
+                                if math.abs(noteBottom - laneCenterY) < 5 then
+                                    SendKeyUp(laneKey)
+                                    ActiveHolds[note] = nil
+                                    NoteStates[note] = "passed"
+                                end
                             end
                         end
 
-                        -- Normal nota geçip gittiyse state'i güncelle
+                        -- Normal nota geçtiyse state güncelle
                         if not isHoldNote and HitNotes[note] then
                             if noteTop > laneCenterY + 20 then
                                 NoteStates[note] = "passed"
@@ -323,7 +350,7 @@ function GameModule:Init(Window)
             end
         end
 
-        -- 2.5 saniye hiç nota yoksa istatistikleri sıfırla (şarkı bitti)
+        -- 2.5 saniye hiç nota yoksa istatistikleri sıfırla
         if not anyNoteSeenThisFrame and (tick() - LastNoteSeenTime > 2.5) then
             for i = 1, 9 do LaneStats["Lane"..i] = {Seen = 0, Taps = 0} end
             CountedNotes = {}
