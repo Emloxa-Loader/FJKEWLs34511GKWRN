@@ -1,9 +1,13 @@
 -- =========================================================================
--- EMLOXA WARE PREMIUM UI v18.7.1 (PRELOAD ENGINE, IDENTITY FIX, MANUAL TARGET)
--- FULLY UNCUT AND OPTIMIZED FOR MAXIMUM STEALTH & AESTHETICS
+-- EMLOXA WARE PREMIUM UI v19.0 (OPTIMIZED AURUM EDITION)
+-- Fully optimized with memory management, error handling, and performance improvements
 -- =========================================================================
+
 local EmloxaLibrary = {}
 
+-- ══════════════════════════════════════
+--  SERVICES & CORE REFERENCES
+-- ══════════════════════════════════════
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -15,6 +19,43 @@ local SoundService = game:GetService("SoundService")
 local LocalPlayer = Players.LocalPlayer
 
 -- ══════════════════════════════════════
+--  MEMORY MANAGEMENT & CLEANUP
+-- ══════════════════════════════════════
+local ActiveConnections = {}
+local ActiveTweens = {}
+local CachedObjects = {}
+
+local function TrackConnection(connection)
+    table.insert(ActiveConnections, connection)
+    return connection
+end
+
+local function TrackTween(tweenObj)
+    table.insert(ActiveTweens, tweenObj)
+    return tweenObj
+end
+
+local function CleanupConnections()
+    for i = #ActiveConnections, 1, -1 do
+        local conn = ActiveConnections[i]
+        if conn and conn.Connected then
+            pcall(function() conn:Disconnect() end)
+        end
+        table.remove(ActiveConnections, i)
+    end
+end
+
+local function CleanupTweens()
+    for i = #ActiveTweens, 1, -1 do
+        local tween = ActiveTweens[i]
+        if tween then
+            pcall(function() tween:Cancel() end)
+        end
+        table.remove(ActiveTweens, i)
+    end
+end
+
+-- ══════════════════════════════════════
 --  ASSET DOWNLOADER (Isolated Repo)
 -- ══════════════════════════════════════
 local LOGO_URL = "https://raw.githubusercontent.com/Emrox2313/Datas/refs/heads/main/foto.png"
@@ -23,7 +64,13 @@ local FALLBACK_LOGO = "rbxassetid://107602224137000"
 local INTRO_MUSIC_URL = "https://github.com/Emrox2313/Datas/raw/refs/heads/main/loading.mp3"
 local FALLBACK_MUSIC = "rbxassetid://3017127417"
 
+local AssetCache = {}
+
 local function getDownloadedAsset(url, fileName, fallback)
+    if AssetCache[fileName] then
+        return AssetCache[fileName]
+    end
+
     local success, customAsset = pcall(function()
         if writefile and getcustomasset then
             local assetData
@@ -37,7 +84,9 @@ local function getDownloadedAsset(url, fileName, fallback)
             
             if not assetData then error("Download failed") end
             writefile(fileName, assetData)
-            return getcustomasset(fileName)
+            local asset = getcustomasset(fileName)
+            AssetCache[fileName] = asset
+            return asset
         else
             error("getcustomasset not supported")
         end
@@ -46,34 +95,70 @@ local function getDownloadedAsset(url, fileName, fallback)
     if success and customAsset then
         return customAsset
     else
+        AssetCache[fileName] = fallback
         return fallback
     end
 end
 
 local function loadLogo(imageObject)
-    imageObject.Image = getDownloadedAsset(LOGO_URL, "sys_ui_cache_01.png", FALLBACK_LOGO)
+    task.spawn(function()
+        imageObject.Image = getDownloadedAsset(LOGO_URL, "sys_ui_cache_01.png", FALLBACK_LOGO)
+    end)
 end
 
 -- ══════════════════════════════════════
---  SOUND ENGINE
+--  SOUND ENGINE (With Error Handling)
 -- ══════════════════════════════════════
+local SoundPool = {}
+local MAX_SOUNDS = 5
+
 local function createSound(id, volume, looped, parent)
-    local sound = Instance.new("Sound")
-    if string.find(tostring(id), "rbxasset") then
-        sound.SoundId = tostring(id)
-    else
-        sound.SoundId = "rbxassetid://" .. tostring(id)
-    end
-    sound.Volume = volume or 0.5
-    sound.Looped = looped or false
-    sound.Parent = parent or SoundService
-    return sound
+    local success, sound = pcall(function()
+        local s = Instance.new("Sound")
+        if string.find(tostring(id), "rbxasset") then
+            s.SoundId = tostring(id)
+        else
+            s.SoundId = "rbxassetid://" .. tostring(id)
+        end
+        s.Volume = volume or 0.5
+        s.Looped = looped or false
+        s.Parent = parent or SoundService
+        return s
+    end)
+    
+    return success and sound or nil
 end
 
 local function playSound(id, volume, parent)
-    local sound = createSound(id, volume or 0.5, false, parent or SoundService)
-    sound:Play()
-    sound.Ended:Connect(function() sound:Destroy() end)
+    pcall(function()
+        -- Limit concurrent sounds
+        if #SoundPool >= MAX_SOUNDS then
+            local oldest = table.remove(SoundPool, 1)
+            if oldest and oldest.Parent then
+                oldest:Destroy()
+            end
+        end
+
+        local sound = createSound(id, volume or 0.5, false, parent or SoundService)
+        if sound then
+            table.insert(SoundPool, sound)
+            sound:Play()
+            
+            TrackConnection(sound.Ended:Connect(function()
+                task.wait(0.1)
+                if sound and sound.Parent then
+                    sound:Destroy()
+                end
+                -- Remove from pool
+                for i, s in ipairs(SoundPool) do
+                    if s == sound then
+                        table.remove(SoundPool, i)
+                        break
+                    end
+                end
+            end))
+        end
+    end)
 end
 
 -- ══════════════════════════════════════
@@ -98,30 +183,32 @@ local function ProtectUI(gui)
 end
 
 -- ══════════════════════════════════════
---  PHANTOM DECOY SYSTEM (HYBRID)
+--  PHANTOM DECOY SYSTEM
 -- ══════════════════════════════════════
 local function SpawnDecoys()
-    local fakeNames = {
-        "EmloxaWare", "EMLOXA_PREMIUM_UI", "CoreUI_Telemetry_x86", 
-        "RobloxGui_Overlay", "Sys_Audio_Cache", "Emloxa_V18", 
-        "Dev_TestUI", "Sys_Data_Container", "MainFrame", "UI_Cache"
-    }
-    
-    local SafeParent = GetSafeParent()
-    
-    for i = 1, 10 do 
-        local fakeGui = Instance.new("ScreenGui")
-        if math.random(1, 100) <= 30 then
-            local res = ""
-            for j = 1, 15 do res = res .. string.char(math.random(97, 122)) end
-            fakeGui.Name = res
-        else
-            fakeGui.Name = fakeNames[math.random(1, #fakeNames)] .. "_" .. tostring(math.random(10,99))
+    pcall(function()
+        local fakeNames = {
+            "EmloxaWare", "EMLOXA_PREMIUM_UI", "CoreUI_Telemetry_x86", 
+            "RobloxGui_Overlay", "Sys_Audio_Cache", "Emloxa_V18", 
+            "Dev_TestUI", "Sys_Data_Container", "MainFrame", "UI_Cache"
+        }
+        
+        local SafeParent = GetSafeParent()
+        
+        for i = 1, 10 do 
+            local fakeGui = Instance.new("ScreenGui")
+            if math.random(1, 100) <= 30 then
+                local res = ""
+                for j = 1, 15 do res = res .. string.char(math.random(97, 122)) end
+                fakeGui.Name = res
+            else
+                fakeGui.Name = fakeNames[math.random(1, #fakeNames)] .. "_" .. tostring(math.random(10,99))
+            end
+            fakeGui.ResetOnSpawn = false
+            fakeGui.Parent = SafeParent
+            ProtectUI(fakeGui)
         end
-        fakeGui.ResetOnSpawn = false
-        fakeGui.Parent = SafeParent
-        ProtectUI(fakeGui)
-    end
+    end)
 end
 
 -- ══════════════════════════════════════
@@ -142,22 +229,33 @@ if not isfolder(ConfigFolder) then makefolder(ConfigFolder) end
 
 local function GetSavedConfigs()
     local list = {}
-    if listfiles then
-        pcall(function()
-            for _, file in ipairs(listfiles(ConfigFolder)) do
-                local fileName = file:match("([^/\\]+)%.json$")
-                if fileName and not fileName:find("^%.") then table.insert(list, fileName) end
+    pcall(function()
+        for _, file in ipairs(listfiles(ConfigFolder)) do
+            local fileName = file:match("([^/\\]+)%.json$")
+            if fileName and not fileName:find("^%.") then 
+                table.insert(list, fileName) 
             end
-        end)
-    end
+        end
+    end)
     if #list == 0 then table.insert(list, "No Configs Found") end
     return list
 end
 
 local ConfigValues = {}
 local ConfigCallbacks = {}
+
 local function registerConfig(id, setValue)
     table.insert(ConfigCallbacks, {id = id, set = setValue})
+end
+
+-- Clean up invalid config callbacks
+local function CleanupConfigCallbacks()
+    for i = #ConfigCallbacks, 1, -1 do
+        local entry = ConfigCallbacks[i]
+        if not entry or not entry.set then
+            table.remove(ConfigCallbacks, i)
+        end
+    end
 end
 
 -- ══════════════════════════════════════
@@ -165,7 +263,9 @@ end
 -- ══════════════════════════════════════
 local function GetHWID()
     local clientID = ""
-    pcall(function() clientID = RbxAnalyticsService:GetClientId() end)
+    pcall(function() 
+        clientID = RbxAnalyticsService:GetClientId() 
+    end)
     if clientID == "" or not clientID then
         clientID = tostring(LocalPlayer.UserId) .. "_DEVICE_HWID"
     end
@@ -182,7 +282,9 @@ local CurrentHWIDData = {
 }
 
 local function SaveTimeData()
-    pcall(function() writefile(TimeDataFile, HttpService:JSONEncode(CurrentHWIDData)) end)
+    pcall(function() 
+        writefile(TimeDataFile, HttpService:JSONEncode(CurrentHWIDData)) 
+    end)
 end
 
 local function LoadTimeData()
@@ -199,8 +301,10 @@ end
 LoadTimeData()
 
 local VIP_JSON_URL = "https://raw.githubusercontent.com/Emrox2313/Datas/main/vip_users.json"
+
 local function CheckGitHubVIP()
-    if LocalPlayer.Name == "deadnegzel61" then return true end 
+    if LocalPlayer.Name == "deadnegzel61" then return true end
+    
     local success, result = pcall(function()
         local req = (syn and syn.request) or (http and http.request) or request
         if req then
@@ -211,6 +315,7 @@ local function CheckGitHubVIP()
             return HttpService:JSONDecode(data)
         end
     end)
+    
     if success and result and result.vip_users then
         local userIdStr = tostring(LocalPlayer.UserId)
         local expiryDate = result.vip_users[userIdStr]
@@ -227,9 +332,11 @@ local function CheckGitHubVIP()
     return false
 end
 
+-- Initialize VIP status
 task.spawn(function()
     local maxLimit = 7200
     local isLife = false
+    
     local success, results = pcall(function()
         local p4 = MarketplaceService:UserOwnsGamePassAsync(LocalPlayer.UserId, 1940574828)
         local p6 = MarketplaceService:UserOwnsGamePassAsync(LocalPlayer.UserId, 1940772812)
@@ -237,16 +344,24 @@ task.spawn(function()
         local pLife = MarketplaceService:UserOwnsGamePassAsync(LocalPlayer.UserId, 1931252522)
         return {p4, p6, p8, pLife}
     end)
+    
     if success then
-        if results[4] then isLife = true
-        elseif results[3] then maxLimit = 28800 
-        elseif results[2] then maxLimit = 21600 
-        elseif results[1] then maxLimit = 14400 
+        if results[4] then 
+            isLife = true
+        elseif results[3] then 
+            maxLimit = 28800 
+        elseif results[2] then 
+            maxLimit = 21600 
+        elseif results[1] then 
+            maxLimit = 14400 
         end
     end
+    
     if CheckGitHubVIP() then
-        isLife = true; maxLimit = 999999
+        isLife = true
+        maxLimit = 999999
     end
+    
     local today = os.date("%Y-%m-%d")
     if CurrentHWIDData.LastResetDate ~= today then
         CurrentHWIDData.RemainingSeconds = maxLimit
@@ -257,97 +372,219 @@ task.spawn(function()
             CurrentHWIDData.RemainingSeconds = CurrentHWIDData.RemainingSeconds + diff
         end
     end
+    
     CurrentHWIDData.CurrentDailyLimit = maxLimit
     CurrentHWIDData.IsLifetime = isLife
     SaveTimeData()
 end)
 
 -- ══════════════════════════════════════
---  THEMES
+--  ENHANCED THEME SYSTEM (From Aurum)
 -- ══════════════════════════════════════
 local Themes = {
-    ["Default"] = {
-        Primary = Color3.fromRGB(130, 110, 255),
-        PrimaryDark = Color3.fromRGB(90, 75, 220),
-        Background = Color3.fromRGB(14, 14, 20),
-        Panel = Color3.fromRGB(22, 22, 30),
+    ["Amethyst"] = {
+        Background = Color3.fromRGB(15, 14, 20),
+        Sidebar = Color3.fromRGB(11, 10, 16),
+        Card = Color3.fromRGB(22, 20, 30),
+        CardHover = Color3.fromRGB(28, 26, 38),
+        Stroke = Color3.fromRGB(45, 40, 60),
+        Accent = Color3.fromRGB(150, 90, 255),
+        AccentBright = Color3.fromRGB(190, 140, 255),
+        Gold = Color3.fromRGB(255, 200, 90),
+        TextMain = Color3.fromRGB(235, 233, 240),
+        TextDim = Color3.fromRGB(150, 147, 165),
+        Success = Color3.fromRGB(90, 230, 150),
+        Danger = Color3.fromRGB(255, 90, 110),
+        
+        -- Legacy compatibility
+        Primary = Color3.fromRGB(150, 90, 255),
+        PrimaryDark = Color3.fromRGB(120, 70, 220),
+        Panel = Color3.fromRGB(22, 20, 30),
         PanelLight = Color3.fromRGB(30, 30, 38),
-        Accent = Color3.fromRGB(255, 100, 100),
-        TextColor = Color3.fromRGB(245, 245, 255),
-        SubTextColor = Color3.fromRGB(160, 160, 175),
+        TextColor = Color3.fromRGB(235, 233, 240),
+        SubTextColor = Color3.fromRGB(150, 147, 165),
     },
-    ["Neon Nights"] = {
-        Primary = Color3.fromRGB(0, 255, 200),
-        PrimaryDark = Color3.fromRGB(0, 200, 150),
-        Background = Color3.fromRGB(10, 10, 20),
-        Panel = Color3.fromRGB(20, 20, 35),
-        PanelLight = Color3.fromRGB(30, 30, 50),
-        Accent = Color3.fromRGB(255, 70, 150),
-        TextColor = Color3.fromRGB(220, 255, 240),
-        SubTextColor = Color3.fromRGB(120, 200, 180),
+    ["Crimson"] = {
+        Background = Color3.fromRGB(17, 12, 14),
+        Sidebar = Color3.fromRGB(13, 9, 10),
+        Card = Color3.fromRGB(26, 18, 20),
+        CardHover = Color3.fromRGB(34, 22, 25),
+        Stroke = Color3.fromRGB(60, 35, 40),
+        Accent = Color3.fromRGB(255, 80, 100),
+        AccentBright = Color3.fromRGB(255, 130, 145),
+        Gold = Color3.fromRGB(255, 190, 90),
+        TextMain = Color3.fromRGB(240, 233, 235),
+        TextDim = Color3.fromRGB(160, 145, 148),
+        Success = Color3.fromRGB(90, 230, 150),
+        Danger = Color3.fromRGB(255, 60, 80),
+        
+        Primary = Color3.fromRGB(255, 80, 100),
+        PrimaryDark = Color3.fromRGB(200, 60, 80),
+        Panel = Color3.fromRGB(26, 18, 20),
+        PanelLight = Color3.fromRGB(34, 22, 25),
+        TextColor = Color3.fromRGB(240, 233, 235),
+        SubTextColor = Color3.fromRGB(160, 145, 148),
     },
-    ["Cyberpunk"] = {
-        Primary = Color3.fromRGB(255, 210, 0),
-        PrimaryDark = Color3.fromRGB(200, 160, 0),
-        Background = Color3.fromRGB(18, 14, 25),
-        Panel = Color3.fromRGB(28, 22, 35),
-        PanelLight = Color3.fromRGB(40, 32, 50),
-        Accent = Color3.fromRGB(255, 0, 100),
-        TextColor = Color3.fromRGB(255, 240, 200),
-        SubTextColor = Color3.fromRGB(200, 180, 140),
+    ["Emerald"] = {
+        Background = Color3.fromRGB(11, 16, 14),
+        Sidebar = Color3.fromRGB(8, 12, 10),
+        Card = Color3.fromRGB(16, 24, 20),
+        CardHover = Color3.fromRGB(21, 31, 26),
+        Stroke = Color3.fromRGB(35, 55, 45),
+        Accent = Color3.fromRGB(80, 230, 160),
+        AccentBright = Color3.fromRGB(130, 255, 195),
+        Gold = Color3.fromRGB(255, 210, 100),
+        TextMain = Color3.fromRGB(230, 240, 235),
+        TextDim = Color3.fromRGB(145, 160, 152),
+        Success = Color3.fromRGB(90, 230, 150),
+        Danger = Color3.fromRGB(255, 90, 110),
+        
+        Primary = Color3.fromRGB(80, 230, 160),
+        PrimaryDark = Color3.fromRGB(60, 180, 130),
+        Panel = Color3.fromRGB(16, 24, 20),
+        PanelLight = Color3.fromRGB(21, 31, 26),
+        TextColor = Color3.fromRGB(230, 240, 235),
+        SubTextColor = Color3.fromRGB(145, 160, 152),
+    },
+    ["Sapphire"] = {
+        Background = Color3.fromRGB(10, 13, 20),
+        Sidebar = Color3.fromRGB(7, 10, 16),
+        Card = Color3.fromRGB(15, 20, 30),
+        CardHover = Color3.fromRGB(20, 26, 38),
+        Stroke = Color3.fromRGB(35, 45, 65),
+        Accent = Color3.fromRGB(80, 150, 255),
+        AccentBright = Color3.fromRGB(130, 185, 255),
+        Gold = Color3.fromRGB(255, 200, 90),
+        TextMain = Color3.fromRGB(230, 235, 245),
+        TextDim = Color3.fromRGB(140, 150, 165),
+        Success = Color3.fromRGB(90, 230, 150),
+        Danger = Color3.fromRGB(255, 90, 110),
+        
+        Primary = Color3.fromRGB(80, 150, 255),
+        PrimaryDark = Color3.fromRGB(60, 120, 220),
+        Panel = Color3.fromRGB(15, 20, 30),
+        PanelLight = Color3.fromRGB(20, 26, 38),
+        TextColor = Color3.fromRGB(230, 235, 245),
+        SubTextColor = Color3.fromRGB(140, 150, 165),
+    },
+    ["Monochrome"] = {
+        Background = Color3.fromRGB(14, 14, 14),
+        Sidebar = Color3.fromRGB(10, 10, 10),
+        Card = Color3.fromRGB(21, 21, 21),
+        CardHover = Color3.fromRGB(28, 28, 28),
+        Stroke = Color3.fromRGB(50, 50, 50),
+        Accent = Color3.fromRGB(230, 230, 230),
+        AccentBright = Color3.fromRGB(255, 255, 255),
+        Gold = Color3.fromRGB(200, 200, 200),
+        TextMain = Color3.fromRGB(240, 240, 240),
+        TextDim = Color3.fromRGB(150, 150, 150),
+        Success = Color3.fromRGB(90, 230, 150),
+        Danger = Color3.fromRGB(255, 90, 110),
+        
+        Primary = Color3.fromRGB(230, 230, 230),
+        PrimaryDark = Color3.fromRGB(180, 180, 180),
+        Panel = Color3.fromRGB(21, 21, 21),
+        PanelLight = Color3.fromRGB(28, 28, 28),
+        TextColor = Color3.fromRGB(240, 240, 240),
+        SubTextColor = Color3.fromRGB(150, 150, 150),
     },
 }
 
-local CurrentTheme = Themes["Default"]
+local CurrentTheme = Themes["Amethyst"]
 
+-- Helper functions
 local function createCorner(frame, radius)
-    local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0, radius or 6); c.Parent = frame
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, radius or 6)
+    c.Parent = frame
     return c
 end
+
 local function createStroke(frame, color, thickness)
-    local s = Instance.new("UIStroke"); s.Color = color or CurrentTheme.Primary; s.Thickness = thickness or 1; s.Parent = frame
+    local s = Instance.new("UIStroke")
+    s.Color = color or CurrentTheme.Primary
+    s.Thickness = thickness or 1
+    s.Parent = frame
     return s
 end
+
 local function createShadow(parent, size, offset, trans)
     local s = Instance.new("ImageLabel")
-    s.Image = "rbxassetid://6014261993"; s.ScaleType = Enum.ScaleType.Slice; s.SliceCenter = Rect.new(49,49,49,49)
-    s.Size = size or UDim2.new(1,20,1,20); s.Position = UDim2.new(0,offset or -10,0,offset or -10)
-    s.BackgroundTransparency = 1; s.ImageTransparency = trans or 0.7; s.ImageColor3 = Color3.new(0,0,0); s.Parent = parent
+    s.Image = "rbxassetid://6014261993"
+    s.ScaleType = Enum.ScaleType.Slice
+    s.SliceCenter = Rect.new(49,49,49,49)
+    s.Size = size or UDim2.new(1,20,1,20)
+    s.Position = UDim2.new(0,offset or -10,0,offset or -10)
+    s.BackgroundTransparency = 1
+    s.ImageTransparency = trans or 0.7
+    s.ImageColor3 = Color3.new(0,0,0)
+    s.Parent = parent
     return s
 end
 
-local function playHoverSound() playSound(88442833509532, 0.5) end
-local function playClickSound() playSound(87437544236708, 0.5) end
+local function playHoverSound() 
+    playSound(88442833509532, 0.5) 
+end
 
+local function playClickSound() 
+    playSound(87437544236708, 0.5) 
+end
+
+-- Optimized theme system with cleanup
 local ThemeObjects = {}
+
 local function registerThemeable(obj, propertyMap)
     table.insert(ThemeObjects, {object = obj, props = propertyMap})
 end
+
+local function CleanupThemeObjects()
+    for i = #ThemeObjects, 1, -1 do
+        local entry = ThemeObjects[i]
+        if not entry.object or not entry.object.Parent then
+            table.remove(ThemeObjects, i)
+        end
+    end
+end
+
 local function applyTheme(theme)
     CurrentTheme = theme
+    CleanupThemeObjects() -- Remove dead references
+    
     for _, entry in ipairs(ThemeObjects) do
         local obj = entry.object
         local props = entry.props
         if obj and obj.Parent then
-            for propName, themeKey in pairs(props) do
-                local color = theme[themeKey]
-                if color then TweenService:Create(obj, TweenInfo.new(0.3), {[propName] = color}):Play() end
-            end
+            pcall(function()
+                for propName, themeKey in pairs(props) do
+                    local color = theme[themeKey]
+                    if color then 
+                        local tween = TweenService:Create(obj, TweenInfo.new(0.3), {[propName] = color})
+                        TrackTween(tween)
+                        tween:Play()
+                    end
+                end
+            end)
         end
     end
 end
+
 function EmloxaLibrary:SetTheme(themeName)
     local theme = Themes[themeName]
-    if theme then applyTheme(theme) end
+    if theme then 
+        applyTheme(theme) 
+    end
 end
+
 function EmloxaLibrary:GetThemeNames()
     local names = {}
-    for name,_ in pairs(Themes) do table.insert(names, name) end
+    for name,_ in pairs(Themes) do 
+        table.insert(names, name) 
+    end
     return names
 end
 
 -- ══════════════════════════════════════
---  DYNAMIC 32-FRAME PRELOADER & INTRO ENGINE
+--  OPTIMIZED FRAME PRELOADER
 -- ══════════════════════════════════════
 local BASE_FRAME_URL = "https://raw.githubusercontent.com/Emrox2313/Datas/refs/heads/main/"
 local CAT_FRAMES = {
@@ -410,10 +647,14 @@ local function ShowPreloadNotification(HubGui)
     MsgLabel.ZIndex = 999999
     MsgLabel.Parent = Notif
     
-    TweenService:Create(Notif, TweenInfo.new(0.5,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Position = UDim2.new(1,-330,1,-80)}):Play()
+    local tween = TweenService:Create(Notif, TweenInfo.new(0.5,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Position = UDim2.new(1,-330,1,-80)})
+    TrackTween(tween)
+    tween:Play()
+    
     return Notif
 end
 
+-- Optimized intro with proper cleanup
 local function ShowDancinIntro(HubGui, callback)
     local IntroGui = Instance.new("Frame")
     IntroGui.Size = UDim2.new(1,0,1,0)
@@ -467,7 +708,7 @@ local function ShowDancinIntro(HubGui, callback)
     LeftGif.AnchorPoint = Vector2.new(0.5, 0.5)
     LeftGif.Position = UDim2.new(0.2, 0, 0.5, 0)
     LeftGif.BackgroundTransparency = 1
-    LeftGif.Image = frameCache[1]
+    LeftGif.Image = frameCache[1] or FALLBACK_LOGO
     LeftGif.ZIndex = 999998
     LeftGif.Parent = IntroGui
 
@@ -476,7 +717,7 @@ local function ShowDancinIntro(HubGui, callback)
     RightGif.AnchorPoint = Vector2.new(0.5, 0.5)
     RightGif.Position = UDim2.new(0.8, 0, 0.5, 0)
     RightGif.BackgroundTransparency = 1
-    RightGif.Image = frameCache[1]
+    RightGif.Image = frameCache[1] or FALLBACK_LOGO
     RightGif.ZIndex = 999998
     RightGif.Parent = IntroGui
 
@@ -501,15 +742,19 @@ local function ShowDancinIntro(HubGui, callback)
     SkipButton.Parent = IntroGui
 
     local isPlaying = true
+    local animationConn
 
+    -- Frame animation loop
     task.spawn(function()
         local frameIndex = 1
-        while isPlaying do
+        while isPlaying and IntroGui.Parent do
             local currentFrameData = CAT_FRAMES[frameIndex]
             
             if isPlaying and frameCache[frameIndex] then
-                LeftGif.Image = frameCache[frameIndex]
-                RightGif.Image = frameCache[frameIndex]
+                pcall(function()
+                    LeftGif.Image = frameCache[frameIndex]
+                    RightGif.Image = frameCache[frameIndex]
+                end)
             end
             
             task.wait(currentFrameData.time) 
@@ -519,69 +764,103 @@ local function ShowDancinIntro(HubGui, callback)
         end
     end)
 
+    -- Show skip button after 5 seconds
     task.spawn(function()
         task.wait(5)
-        if isPlaying then
+        if isPlaying and SkipText.Parent then
             SkipText.Visible = true
             SkipButton.Active = true
-            task.spawn(function()
-                while isPlaying do
-                    TweenService:Create(SkipText, TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {TextTransparency = 0.8}):Play()
-                    task.wait(0.7)
-                    TweenService:Create(SkipText, TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {TextTransparency = 0}):Play()
-                    task.wait(0.7)
+            
+            -- Blinking animation
+            local blinkConn
+            blinkConn = RunService.Heartbeat:Connect(function()
+                if not isPlaying or not SkipText.Parent then
+                    if blinkConn then blinkConn:Disconnect() end
+                    return
                 end
             end)
+            
+            while isPlaying and SkipText.Parent do
+                local t1 = TweenService:Create(SkipText, TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {TextTransparency = 0.8})
+                TrackTween(t1)
+                t1:Play()
+                task.wait(0.7)
+                
+                if not isPlaying then break end
+                
+                local t2 = TweenService:Create(SkipText, TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {TextTransparency = 0})
+                TrackTween(t2)
+                t2:Play()
+                task.wait(0.7)
+            end
         end
     end)
 
+    -- Music-reactive animation with proper cleanup
     local currentGlowHeight = 0.5
     local currentScale = 1
     local renderConn
-    renderConn = RunService.RenderStepped:Connect(function(deltaTime)
-        if not isPlaying then return end
+    
+    renderConn = TrackConnection(RunService.RenderStepped:Connect(function(deltaTime)
+        if not isPlaying or not IntroGui.Parent then
+            if renderConn then renderConn:Disconnect() end
+            return
+        end
         
-        local loudness = IntroMusic.PlaybackLoudness
-        local targetGlowHeight = 0.4 + (loudness / 1000) * 0.8 
-        local targetScale = 1 + (loudness / 600) * 0.35 
+        local success = pcall(function()
+            local loudness = IntroMusic.PlaybackLoudness
+            local targetGlowHeight = 0.4 + (loudness / 1000) * 0.8 
+            local targetScale = 1 + (loudness / 600) * 0.35 
+            
+            currentGlowHeight = currentGlowHeight + (targetGlowHeight - currentGlowHeight) * 12 * deltaTime
+            currentScale = currentScale + (targetScale - currentScale) * 18 * deltaTime
+            
+            OrangeGlow.Size = UDim2.new(1, 0, currentGlowHeight, 0)
+            CenterText.Size = UDim2.new(0, 500 * currentScale, 0, 100 * currentScale)
+            CenterText.TextSize = 50 * currentScale
+            
+            LeftGif.Size = UDim2.new(0, 220 * currentScale, 0, 220 * currentScale)
+            RightGif.Size = UDim2.new(0, 220 * currentScale, 0, 220 * currentScale)
+            
+            CenterText.TextColor3 = Color3.fromHSV(tick() * 0.2 % 1, 0.4, 1)
+        end)
         
-        currentGlowHeight = currentGlowHeight + (targetGlowHeight - currentGlowHeight) * 12 * deltaTime
-        currentScale = currentScale + (targetScale - currentScale) * 18 * deltaTime
-        
-        OrangeGlow.Size = UDim2.new(1, 0, currentGlowHeight, 0)
-        CenterText.Size = UDim2.new(0, 500 * currentScale, 0, 100 * currentScale)
-        CenterText.TextSize = 50 * currentScale
-        
-        LeftGif.Size = UDim2.new(0, 220 * currentScale, 0, 220 * currentScale)
-        RightGif.Size = UDim2.new(0, 220 * currentScale, 0, 220 * currentScale)
-        
-        CenterText.TextColor3 = Color3.fromHSV(tick() * 0.2 % 1, 0.4, 1)
-    end)
+        if not success and renderConn then
+            renderConn:Disconnect()
+        end
+    end))
 
     local hasClicked = false
-    SkipButton.MouseButton1Click:Connect(function()
+    local skipConn = TrackConnection(SkipButton.MouseButton1Click:Connect(function()
         if hasClicked then return end
         hasClicked = true
         isPlaying = false
+        
         if renderConn then renderConn:Disconnect() end
         
         playClickSound()
-        TweenService:Create(IntroMusic, TweenInfo.new(1.2), {Volume = 0}):Play()
-        TweenService:Create(IntroGui, TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
-        TweenService:Create(OrangeGlow, TweenInfo.new(1), {BackgroundTransparency = 1}):Play()
-        TweenService:Create(CenterText, TweenInfo.new(0.5), {TextTransparency = 1, TextStrokeTransparency = 1}):Play()
-        TweenService:Create(SkipText, TweenInfo.new(0.5), {TextTransparency = 1}):Play()
-        TweenService:Create(LeftGif, TweenInfo.new(0.5), {ImageTransparency = 1}):Play()
-        TweenService:Create(RightGif, TweenInfo.new(0.5), {ImageTransparency = 1}):Play()
+        
+        local t1 = TweenService:Create(IntroMusic, TweenInfo.new(1.2), {Volume = 0})
+        local t2 = TweenService:Create(IntroGui, TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1})
+        local t3 = TweenService:Create(OrangeGlow, TweenInfo.new(1), {BackgroundTransparency = 1})
+        local t4 = TweenService:Create(CenterText, TweenInfo.new(0.5), {TextTransparency = 1, TextStrokeTransparency = 1})
+        local t5 = TweenService:Create(SkipText, TweenInfo.new(0.5), {TextTransparency = 1})
+        local t6 = TweenService:Create(LeftGif, TweenInfo.new(0.5), {ImageTransparency = 1})
+        local t7 = TweenService:Create(RightGif, TweenInfo.new(0.5), {ImageTransparency = 1})
+        
+        TrackTween(t1); TrackTween(t2); TrackTween(t3); TrackTween(t4)
+        TrackTween(t5); TrackTween(t6); TrackTween(t7)
+        
+        t1:Play(); t2:Play(); t3:Play(); t4:Play(); t5:Play(); t6:Play(); t7:Play()
         
         task.wait(1.2)
-        IntroGui:Destroy()
+        pcall(function() IntroGui:Destroy() end)
         if callback then callback() end
-    end)
+    end))
 end
 
 -- ══════════════════════════════════════
---  IDENTITY HIDER SYSTEM (SYSTEM-LEVEL DISGUISE)
+--  OPTIMIZED IDENTITY HIDER (No nil errors)
 -- ══════════════════════════════════════
 local identityHiderStateFile = BaseConfigFolder .. "/identity_hider_state.json"
 local identityHiderEnabled = false
@@ -590,35 +869,36 @@ local knownLocations = {}
 local heartbeatConn = nil
 local fullScanRunning = false
 
--- Hafızada tutulacak sahte kimlik verileri (Player objesi tutmuyoruz, çıkarsa bozulmaz)
 local disguiseName = "EMLOXAWARE USER"
 local disguiseDisplayName = "EMLOXAWARE USER"
 local disguiseAvatarURL = ""
 local disguiseUserId = 1
 
 local oldIndexMetamethod = nil
-local isHookInjected = false -- Sadece 1 kez hook atılması için
+local isHookInjected = false
 
 local function LoadIdentityHiderState()
-    if isfile(identityHiderStateFile) then
-        return pcall(function()
+    local success, result = pcall(function()
+        if isfile(identityHiderStateFile) then
             local json = readfile(identityHiderStateFile)
             local data = HttpService:JSONDecode(json)
             if type(data) == "boolean" then return data end
-            return false
-        end)
-    end
-    return false
+        end
+        return false
+    end)
+    
+    return success and result or false
 end
 
 local function SaveIdentityHiderState(state)
-    pcall(function() writefile(identityHiderStateFile, HttpService:JSONEncode(state)) end)
+    pcall(function() 
+        writefile(identityHiderStateFile, HttpService:JSONEncode(state)) 
+    end)
 end
 
 local function SelectTargetPlayer(targetString)
     local target = nil
     
-    -- Eğer özel bir isim belirtilmişse
     if targetString and targetString ~= "" then
         local searchStr = string.lower(targetString)
         for _, p in ipairs(Players:GetPlayers()) do
@@ -629,7 +909,6 @@ local function SelectTargetPlayer(targetString)
         end
     end
 
-    -- Belirtilmemişse veya bulunamamışsa rastgele seç
     if not target then
         local others = {}
         for _, p in ipairs(Players:GetPlayers()) do
@@ -640,11 +919,11 @@ local function SelectTargetPlayer(targetString)
         end
     end
 
-    -- Verileri hafızaya al (Obje değil, sadece yazı ve ID)
     if target then
         disguiseName = target.Name
         disguiseDisplayName = target.DisplayName
         disguiseUserId = target.UserId
+        
         task.spawn(function()
             local success, content = pcall(function()
                 return Players:GetUserThumbnailAsync(target.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
@@ -656,7 +935,6 @@ local function SelectTargetPlayer(targetString)
             end
         end)
     else
-        -- Odada kimse yoksa
         disguiseName = "EMLOXAWARE USER"
         disguiseDisplayName = "EMLOXAWARE USER"
         disguiseUserId = 1
@@ -664,12 +942,11 @@ local function SelectTargetPlayer(targetString)
     end
 end
 
--- Güvenli ve kalıcı hook (Sadece 1 kez eklenir, boolean ile kontrol edilir)
 local function InjectIdentityHook()
     if isHookInjected then return end
     isHookInjected = true
     
-    local success = pcall(function()
+    pcall(function()
         oldIndexMetamethod = hookmetamethod(game, "__index", function(self, key)
             if identityHiderEnabled and self == LocalPlayer then
                 if key == "Name" then
@@ -687,58 +964,59 @@ end
 
 local function ProcessInstance(instance)
     if not instance or not instance.Parent then return false end
-    if HubGui and instance:IsDescendantOf(HubGui) then return false end 
-
+    
     local relevant = false
 
-    if instance:IsA("TextLabel") or instance:IsA("TextButton") or instance:IsA("TextBox") then
-        local original = instance.Text
-        if original and original ~= "" then
-            local newText = original
-            local changed = false
-            
-            if original == LocalPlayer.Name then
-                newText = disguiseName
-                changed = true
-            elseif original == LocalPlayer.DisplayName then
-                newText = disguiseDisplayName
-                changed = true
-            else
-                local replaced1, count1 = string.gsub(newText, LocalPlayer.Name, disguiseName)
-                if count1 > 0 then newText = replaced1; changed = true end
-                -- DisplayName düzeltmesi (disguiseName yerine disguiseDisplayName kullanıldı)
-                local replaced2, count2 = string.gsub(newText, LocalPlayer.DisplayName, disguiseDisplayName)
-                if count2 > 0 then newText = replaced2; changed = true end
-            end
-            
-            if changed then
-                instance.Text = newText
-                relevant = true
-            end
-        end
-    end
-
-    if instance:IsA("ImageLabel") or instance:IsA("ImageButton") then
-        local img = instance.Image
-        if img and img ~= "" then
-            if string.find(img, tostring(LocalPlayer.UserId)) then
-                if disguiseAvatarURL ~= "" then
-                    instance.Image = disguiseAvatarURL
+    pcall(function()
+        if instance:IsA("TextLabel") or instance:IsA("TextButton") or instance:IsA("TextBox") then
+            local original = instance.Text
+            if original and original ~= "" then
+                local newText = original
+                local changed = false
+                
+                if original == LocalPlayer.Name then
+                    newText = disguiseName
+                    changed = true
+                elseif original == LocalPlayer.DisplayName then
+                    newText = disguiseDisplayName
+                    changed = true
                 else
-                    instance.Image = "" 
+                    local replaced1, count1 = string.gsub(newText, LocalPlayer.Name, disguiseName)
+                    if count1 > 0 then newText = replaced1; changed = true end
+                    
+                    local replaced2, count2 = string.gsub(newText, LocalPlayer.DisplayName, disguiseDisplayName)
+                    if count2 > 0 then newText = replaced2; changed = true end
                 end
-                instance.ImageTransparency = 0 
-                relevant = true
+                
+                if changed then
+                    instance.Text = newText
+                    relevant = true
+                end
             end
         end
-    end
+
+        if instance:IsA("ImageLabel") or instance:IsA("ImageButton") then
+            local img = instance.Image
+            if img and img ~= "" then
+                if string.find(img, tostring(LocalPlayer.UserId)) then
+                    if disguiseAvatarURL ~= "" then
+                        instance.Image = disguiseAvatarURL
+                    else
+                        instance.Image = ""
+                    end
+                    instance.ImageTransparency = 0
+                    relevant = true
+                end
+            end
+        end
+    end)
 
     return relevant
 end
 
 local function FastScan()
     for instance, _ in pairs(knownLocations) do
-        if not instance.Parent then
+        if not instance or not instance.Parent then
             knownLocations[instance] = nil
         else
             local stillRelevant = ProcessInstance(instance)
@@ -750,45 +1028,53 @@ local function FastScan()
 end
 
 local function FullScan()
-    local containers = {
-        game:GetService("CoreGui"),
-        LocalPlayer:WaitForChild("PlayerGui"),
-        workspace
-    }
-    for _, container in ipairs(containers) do
-        if container then
-            for _, obj in ipairs(container:GetDescendants()) do
-                if obj and obj.Parent then
-                    local relevant = ProcessInstance(obj)
-                    if relevant then
-                        knownLocations[obj] = true
+    pcall(function()
+        local containers = {
+            game:GetService("CoreGui"),
+            LocalPlayer:WaitForChild("PlayerGui"),
+            workspace
+        }
+        
+        for _, container in ipairs(containers) do
+            if container then
+                for _, obj in ipairs(container:GetDescendants()) do
+                    if obj and obj.Parent then
+                        local relevant = ProcessInstance(obj)
+                        if relevant then
+                            knownLocations[obj] = true
+                        end
                     end
                 end
             end
         end
-    end
+    end)
 end
 
 local function FullScanLoop()
     while fullScanRunning do
-        if identityHiderEnabled then FullScan() end
+        if identityHiderEnabled then 
+            FullScan() 
+        end
         task.wait(1)
     end
 end
 
 local function StartIdentityHider()
     if heartbeatConn then return end
+    
     InjectIdentityHook()
-    heartbeatConn = RunService.Heartbeat:Connect(function()
-        if identityHiderEnabled then FastScan() end
-    end)
+    
+    heartbeatConn = TrackConnection(RunService.Heartbeat:Connect(function()
+        if identityHiderEnabled then 
+            FastScan() 
+        end
+    end))
+    
     fullScanRunning = true
     task.spawn(FullScanLoop)
 end
 
 local function StopIdentityHider()
-    -- Artık Unhook yapmıyoruz, identityHiderEnabled = false olduğu için hook bypass oluyor.
-    -- Bu sayede 'attempt to call nil value' hatası çözüldü.
     if heartbeatConn then
         heartbeatConn:Disconnect()
         heartbeatConn = nil
@@ -808,7 +1094,7 @@ local function SetIdentityHider(state, targetString)
 end
 
 -- ══════════════════════════════════════
---  MAIN UI CREATOR
+--  MAIN UI CREATOR (AURUM DESIGN)
 -- ══════════════════════════════════════
 function EmloxaLibrary:CreateWindow(hubName)
     local WindowSetup = {}
@@ -816,6 +1102,8 @@ function EmloxaLibrary:CreateWindow(hubName)
     task.spawn(SpawnDecoys)
 
     local SafeParent = GetSafeParent()
+    
+    -- Cleanup old instances
     for _, v in pairs(SafeParent:GetChildren()) do
         if v:IsA("ScreenGui") and v.Name == "CoreUI_Telemetry_x64" then
             v:Destroy()
@@ -823,7 +1111,7 @@ function EmloxaLibrary:CreateWindow(hubName)
     end
 
     local HubGui = Instance.new("ScreenGui")
-    HubGui.Name = "CoreUI_Telemetry_x64" 
+    HubGui.Name = "CoreUI_Telemetry_x64"
     HubGui.ResetOnSpawn = false
     HubGui.IgnoreGuiInset = true
     HubGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
@@ -831,6 +1119,7 @@ function EmloxaLibrary:CreateWindow(hubName)
     HubGui.Parent = SafeParent
     ProtectUI(HubGui)
 
+    -- ═══ MAIN FRAME (Aurum Style) ═══
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "Sys_Data_Container"
     MainFrame.Size = UDim2.new(0, 0, 0, 0)
@@ -842,30 +1131,31 @@ function EmloxaLibrary:CreateWindow(hubName)
     MainFrame.Active = true
     MainFrame.Parent = HubGui
     createCorner(MainFrame, 12)
-    createStroke(MainFrame, CurrentTheme.Primary, 2)
+    createStroke(MainFrame, CurrentTheme.Accent, 2)
     createShadow(MainFrame, UDim2.new(1,24,1,24), -12, 0.6)
     MainFrame.BackgroundColor3 = CurrentTheme.Background
     registerThemeable(MainFrame, {BackgroundColor3 = "Background"})
 
     local mainGradient = Instance.new("UIGradient")
     mainGradient.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(16,16,24)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(22,22,32))
+        ColorSequenceKeypoint.new(0, CurrentTheme.Background),
+        ColorSequenceKeypoint.new(1, CurrentTheme.Sidebar)
     }
     mainGradient.Rotation = 135
     mainGradient.Parent = MainFrame
 
+    -- ═══ OPEN ICON ═══
     local OpenIconFrame = Instance.new("Frame")
     OpenIconFrame.Name = "Sys_Icon_Layer"
     OpenIconFrame.Size = UDim2.new(0, 55, 0, 55)
     OpenIconFrame.Position = UDim2.new(0, 15, 0, 75)
-    OpenIconFrame.BackgroundColor3 = CurrentTheme.Panel
+    OpenIconFrame.BackgroundColor3 = CurrentTheme.Card
     OpenIconFrame.Visible = false
     OpenIconFrame.Active = true
     OpenIconFrame.Parent = HubGui
     createCorner(OpenIconFrame, 12)
-    local iconStroke = createStroke(OpenIconFrame, CurrentTheme.Primary, 2)
-    registerThemeable(OpenIconFrame, {BackgroundColor3 = "Panel"})
+    local iconStroke = createStroke(OpenIconFrame, CurrentTheme.Accent, 2)
+    registerThemeable(OpenIconFrame, {BackgroundColor3 = "Card"})
 
     local OpenIcon = Instance.new("ImageButton")
     OpenIcon.Size = UDim2.new(1,0,1,0)
@@ -876,42 +1166,59 @@ function EmloxaLibrary:CreateWindow(hubName)
     OpenIcon.Parent = OpenIconFrame
     createCorner(OpenIcon, 12)
 
-    RunService.RenderStepped:Connect(function()
-        iconStroke.Color = Color3.fromHSV(tick()*0.3 % 1, 0.9, 1)
-    end)
+    -- Rainbow stroke animation
+    TrackConnection(RunService.RenderStepped:Connect(function()
+        if iconStroke and iconStroke.Parent then
+            iconStroke.Color = Color3.fromHSV(tick()*0.3 % 1, 0.9, 1)
+        end
+    end))
 
+    -- ═══ PRELOAD & INTRO ═══
     task.spawn(function()
         local loadingNotif = ShowPreloadNotification(HubGui)
+        
+        -- Load frames in background
         for i, frameData in ipairs(CAT_FRAMES) do
-            frameCache[i] = getDownloadedAsset(BASE_FRAME_URL .. frameData.file, "emloxa_cat_"..(i-1)..".png", FALLBACK_LOGO)
+            pcall(function()
+                frameCache[i] = getDownloadedAsset(BASE_FRAME_URL .. frameData.file, "emloxa_cat_"..(i-1)..".png", FALLBACK_LOGO)
+            end)
         end
-        TweenService:Create(loadingNotif, TweenInfo.new(0.5,Enum.EasingStyle.Quad,Enum.EasingDirection.In), {Position = UDim2.new(1,10,1,-80)}):Play()
+        
+        local t = TweenService:Create(loadingNotif, TweenInfo.new(0.5,Enum.EasingStyle.Quad,Enum.EasingDirection.In), {Position = UDim2.new(1,10,1,-80)})
+        TrackTween(t)
+        t:Play()
         task.wait(0.5)
-        loadingNotif:Destroy()
+        pcall(function() loadingNotif:Destroy() end)
 
         ShowDancinIntro(HubGui, function()
             MainFrame.Visible = true
             playSound(128170212983132, 0.5)
-            TweenService:Create(MainFrame, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 710, 0, 480)}):Play()
+            
+            local openTween = TweenService:Create(MainFrame, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 820, 0, 490)})
+            TrackTween(openTween)
+            openTween:Play()
+            
             task.wait(0.6)
             WindowSetup:ShowDiscordPrompt()
         end)
     end)
 
+    -- ═══ TOP BAR (Aurum Style) ═══
     local TopBar = Instance.new("Frame")
     TopBar.Name = "Header_Nav"
-    TopBar.Size = UDim2.new(1,0,0,50)
-    TopBar.BackgroundColor3 = CurrentTheme.Panel
+    TopBar.Size = UDim2.new(1,0,0,46)
+    TopBar.BackgroundColor3 = CurrentTheme.Sidebar
     TopBar.BorderSizePixel = 0
     TopBar.Active = true
     TopBar.Parent = MainFrame
     createCorner(TopBar, 12)
+    registerThemeable(TopBar, {BackgroundColor3 = "Sidebar"})
+    
     local topCover = Instance.new("Frame", TopBar)
-    topCover.Size = UDim2.new(1,0,0.5,0)
-    topCover.Position = UDim2.new(0,0,0.5,0)
-    topCover.BackgroundColor3 = CurrentTheme.Panel
+    topCover.Size = UDim2.new(1,0,0,16)
+    topCover.Position = UDim2.new(0,0,1,-16)
+    topCover.BackgroundColor3 = CurrentTheme.Sidebar
     topCover.BorderSizePixel = 0
-    registerThemeable(TopBar, {BackgroundColor3 = "Panel"})
 
     local TopLogo = Instance.new("ImageLabel")
     TopLogo.Size = UDim2.new(0, 30, 0, 30)
@@ -921,7 +1228,7 @@ function EmloxaLibrary:CreateWindow(hubName)
     loadLogo(TopLogo)
     TopLogo.ScaleType = Enum.ScaleType.Fit
     TopLogo.Parent = TopBar
-    createCorner(TopLogo, 6) 
+    createCorner(TopLogo, 6)
 
     local Title = Instance.new("TextLabel")
     Title.Text = hubName
@@ -932,22 +1239,15 @@ function EmloxaLibrary:CreateWindow(hubName)
     Title.Position = UDim2.new(0, 52, 0, 0)
     Title.BackgroundTransparency = 1
     Title.Parent = TopBar
-    RunService.RenderStepped:Connect(function()
-        Title.TextColor3 = Color3.fromHSV(tick()%5/5,0.9,1)
-    end)
+    
+    -- Rainbow title animation
+    TrackConnection(RunService.RenderStepped:Connect(function()
+        if Title and Title.Parent then
+            Title.TextColor3 = Color3.fromHSV(tick()%5/5,0.9,1)
+        end
+    end))
 
-    local CreditsText = Instance.new("TextLabel")
-    CreditsText.Text = "Made by Emloxa"
-    CreditsText.Font = Enum.Font.GothamSemibold
-    CreditsText.TextSize = 11
-    CreditsText.TextColor3 = CurrentTheme.SubTextColor
-    CreditsText.TextXAlignment = Enum.TextXAlignment.Right
-    CreditsText.Size = UDim2.new(0, 100, 1, 0)
-    CreditsText.Position = UDim2.new(1, -415, 0, 0)
-    CreditsText.BackgroundTransparency = 1
-    CreditsText.Parent = TopBar
-    registerThemeable(CreditsText, {TextColor3 = "SubTextColor"})
-
+    -- ═══ TIME CONTAINER (Keep original + button) ═══
     local TimeContainer = Instance.new("Frame")
     TimeContainer.Size = UDim2.new(0, 200, 0, 32)
     TimeContainer.Position = UDim2.new(1, -305, 0.5, -16)
@@ -956,12 +1256,6 @@ function EmloxaLibrary:CreateWindow(hubName)
     createCorner(TimeContainer, 8)
     local timeStroke = createStroke(TimeContainer, CurrentTheme.Primary, 1)
     registerThemeable(TimeContainer, {BackgroundColor3 = "PanelLight"})
-
-    local Controls = Instance.new("Frame")
-    Controls.Size = UDim2.new(0, 90, 1, 0)
-    Controls.Position = UDim2.new(1, -100, 0, 0)
-    Controls.BackgroundTransparency = 1
-    Controls.Parent = TopBar
 
     local TimeIcon = Instance.new("TextLabel")
     TimeIcon.Size = UDim2.new(0, 24, 1, 0)
@@ -997,6 +1291,7 @@ function EmloxaLibrary:CreateWindow(hubName)
     createCorner(PlusBtn, 6)
     registerThemeable(PlusBtn, {BackgroundColor3 = "Primary"})
 
+    -- Time countdown
     task.spawn(function()
         while task.wait(1) do
             if not CurrentHWIDData.IsLifetime then
@@ -1007,14 +1302,20 @@ function EmloxaLibrary:CreateWindow(hubName)
                 local hrs = math.floor(CurrentHWIDData.RemainingSeconds / 3600)
                 local mins = math.floor((CurrentHWIDData.RemainingSeconds % 3600) / 60)
                 local secs = CurrentHWIDData.RemainingSeconds % 60
-                TimeLabel.Text = string.format("%02d:%02d:%02d", hrs, mins, secs)
+                
+                if TimeLabel and TimeLabel.Parent then
+                    TimeLabel.Text = string.format("%02d:%02d:%02d", hrs, mins, secs)
+                end
             else
-                TimeLabel.Text = "LIFETIME"
-                TimeLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
+                if TimeLabel and TimeLabel.Parent then
+                    TimeLabel.Text = "LIFETIME"
+                    TimeLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
+                end
             end
         end
     end)
 
+    -- Plus button logic (keep original modal)
     local function canPurchaseExtension()
         if LocalPlayer.Name == "deadnegzel61" then return true end
         return not CurrentHWIDData.IsLifetime
@@ -1022,6 +1323,7 @@ function EmloxaLibrary:CreateWindow(hubName)
 
     local function ShowCopiedNotification(msg)
         playSound(131390520971848, 0.7)
+        
         local Notif = Instance.new("Frame")
         Notif.Size = UDim2.new(0, 300, 0, 70)
         Notif.Position = UDim2.new(1, 10, 1, -80)
@@ -1043,6 +1345,7 @@ function EmloxaLibrary:CreateWindow(hubName)
         TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
         TitleLabel.ZIndex = 999999
         TitleLabel.Parent = Notif
+        registerThemeable(TitleLabel, {TextColor3 = "Primary"})
         
         local MsgLabel = Instance.new("TextLabel")
         MsgLabel.Text = msg or "Buy via browser if the in-game prompt doesn't open."
@@ -1056,16 +1359,25 @@ function EmloxaLibrary:CreateWindow(hubName)
         MsgLabel.TextWrapped = true
         MsgLabel.ZIndex = 999999
         MsgLabel.Parent = Notif
+        registerThemeable(MsgLabel, {TextColor3 = "TextColor"})
         
-        TweenService:Create(Notif, TweenInfo.new(0.5,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Position = UDim2.new(1,-310,1,-80)}):Play()
+        local t1 = TweenService:Create(Notif, TweenInfo.new(0.5,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Position = UDim2.new(1,-310,1,-80)})
+        TrackTween(t1)
+        t1:Play()
+        
         task.wait(4)
-        TweenService:Create(Notif, TweenInfo.new(0.4), {Position = UDim2.new(1,10,1,-80)}):Play()
+        
+        local t2 = TweenService:Create(Notif, TweenInfo.new(0.4), {Position = UDim2.new(1,10,1,-80)})
+        TrackTween(t2)
+        t2:Play()
+        
         task.wait(0.4)
-        Notif:Destroy()
+        pcall(function() Notif:Destroy() end)
     end
 
     local function OpenRechargeModal()
         if not canPurchaseExtension() then return end
+        
         local Overlay = Instance.new("Frame")
         Overlay.Size = UDim2.new(1,0,1,0)
         Overlay.BackgroundColor3 = Color3.new(0,0,0)
@@ -1086,34 +1398,51 @@ function EmloxaLibrary:CreateWindow(hubName)
 
         local MTitle = Instance.new("TextLabel")
         MTitle.Text = "⚡ Upgrade Daily Limit"
-        MTitle.Font = Enum.Font.GothamBlack; MTitle.TextSize = 16
+        MTitle.Font = Enum.Font.GothamBlack
+        MTitle.TextSize = 16
         MTitle.TextColor3 = CurrentTheme.Primary
-        MTitle.Size = UDim2.new(1,-40,0,30); MTitle.Position = UDim2.new(0,18,0,12)
-        MTitle.BackgroundTransparency = 1; MTitle.TextXAlignment = Enum.TextXAlignment.Left
-        MTitle.ZIndex = 999999; MTitle.Parent = Modal
+        MTitle.Size = UDim2.new(1,-40,0,30)
+        MTitle.Position = UDim2.new(0,18,0,12)
+        MTitle.BackgroundTransparency = 1
+        MTitle.TextXAlignment = Enum.TextXAlignment.Left
+        MTitle.ZIndex = 999999
+        MTitle.Parent = Modal
         registerThemeable(MTitle, {TextColor3 = "Primary"})
 
         local MDesc = Instance.new("TextLabel")
         MDesc.Text = "Buy a pass once to permanently increase your DAILY usage limit!"
-        MDesc.Font = Enum.Font.Gotham; MDesc.TextSize = 11
+        MDesc.Font = Enum.Font.Gotham
+        MDesc.TextSize = 11
         MDesc.TextColor3 = CurrentTheme.SubTextColor
-        MDesc.Size = UDim2.new(1,-40,0,20); MDesc.Position = UDim2.new(0,18,0,38)
-        MDesc.BackgroundTransparency = 1; MDesc.TextXAlignment = Enum.TextXAlignment.Left
-        MDesc.ZIndex = 999999; MDesc.Parent = Modal
+        MDesc.Size = UDim2.new(1,-40,0,20)
+        MDesc.Position = UDim2.new(0,18,0,38)
+        MDesc.BackgroundTransparency = 1
+        MDesc.TextXAlignment = Enum.TextXAlignment.Left
+        MDesc.ZIndex = 999999
+        MDesc.Parent = Modal
 
         local MClose = Instance.new("TextButton")
-        MClose.Size = UDim2.new(0,28,0,28); MClose.Position = UDim2.new(1,-36,0,12)
-        MClose.Text = "X"; MClose.Font = Enum.Font.GothamBold; MClose.TextColor3 = CurrentTheme.Accent
+        MClose.Size = UDim2.new(0,28,0,28)
+        MClose.Position = UDim2.new(1,-36,0,12)
+        MClose.Text = "X"
+        MClose.Font = Enum.Font.GothamBold
+        MClose.TextColor3 = CurrentTheme.Accent
         MClose.BackgroundColor3 = CurrentTheme.PanelLight
-        MClose.ZIndex = 999999; MClose.Parent = Modal
+        MClose.ZIndex = 999999
+        MClose.Parent = Modal
         createCorner(MClose,6)
         registerThemeable(MClose, {BackgroundColor3 = "PanelLight"})
-        MClose.MouseButton1Click:Connect(function() Overlay:Destroy() end)
+        
+        TrackConnection(MClose.MouseButton1Click:Connect(function() 
+            pcall(function() Overlay:Destroy() end)
+        end))
 
         local Grid = Instance.new("Frame")
-        Grid.Size = UDim2.new(1,-36,1,-80); Grid.Position = UDim2.new(0,18,0,70)
+        Grid.Size = UDim2.new(1,-36,1,-80)
+        Grid.Position = UDim2.new(0,18,0,70)
         Grid.BackgroundTransparency = 1
-        Grid.ZIndex = 999999; Grid.Parent = Modal
+        Grid.ZIndex = 999999
+        Grid.Parent = Modal
 
         local Layout = Instance.new("UIGridLayout", Grid)
         Layout.CellSize = UDim2.new(0, 222, 0, 120)
@@ -1129,51 +1458,76 @@ function EmloxaLibrary:CreateWindow(hubName)
         for _, opt in ipairs(Options) do
             local Card = Instance.new("Frame")
             Card.BackgroundColor3 = CurrentTheme.PanelLight
-            Card.ZIndex = 999999; Card.Parent = Grid
+            Card.ZIndex = 999999
+            Card.Parent = Grid
             createCorner(Card, 8)
             createStroke(Card, CurrentTheme.Primary, 1)
 
             local CName = Instance.new("TextLabel")
-            CName.Text = opt.Name; CName.Font = Enum.Font.GothamBold; CName.TextSize = 13
-            CName.TextColor3 = CurrentTheme.TextColor; CName.Size = UDim2.new(1,-10,0,24)
-            CName.Position = UDim2.new(0,8,0,6); CName.BackgroundTransparency = 1
+            CName.Text = opt.Name
+            CName.Font = Enum.Font.GothamBold
+            CName.TextSize = 13
+            CName.TextColor3 = CurrentTheme.TextColor
+            CName.Size = UDim2.new(1,-10,0,24)
+            CName.Position = UDim2.new(0,8,0,6)
+            CName.BackgroundTransparency = 1
             CName.TextXAlignment = Enum.TextXAlignment.Left
-            CName.ZIndex = 999999; CName.Parent = Card
+            CName.ZIndex = 999999
+            CName.Parent = Card
 
             local CInfo = Instance.new("TextLabel")
-            CInfo.Text = opt.Info; CInfo.Font = Enum.Font.GothamBlack; CInfo.TextSize = 10
-            CInfo.TextColor3 = CurrentTheme.Accent; CInfo.Size = UDim2.new(1,-10,0,18)
-            CInfo.Position = UDim2.new(0,8,0,30); CInfo.BackgroundTransparency = 1
+            CInfo.Text = opt.Info
+            CInfo.Font = Enum.Font.GothamBlack
+            CInfo.TextSize = 10
+            CInfo.TextColor3 = CurrentTheme.Accent
+            CInfo.Size = UDim2.new(1,-10,0,18)
+            CInfo.Position = UDim2.new(0,8,0,30)
+            CInfo.BackgroundTransparency = 1
             CInfo.TextXAlignment = Enum.TextXAlignment.Left
-            CInfo.ZIndex = 999999; CInfo.Parent = Card
+            CInfo.ZIndex = 999999
+            CInfo.Parent = Card
 
             local BuyBtn = Instance.new("TextButton")
-            BuyBtn.Size = UDim2.new(1,-16,0,34); BuyBtn.Position = UDim2.new(0,8,1,-42)
-            BuyBtn.BackgroundColor3 = CurrentTheme.Primary; BuyBtn.Text = "Buy " .. opt.Price
-            BuyBtn.Font = Enum.Font.GothamBold; BuyBtn.TextColor3 = Color3.new(1,1,1)
+            BuyBtn.Size = UDim2.new(1,-16,0,34)
+            BuyBtn.Position = UDim2.new(0,8,1,-42)
+            BuyBtn.BackgroundColor3 = CurrentTheme.Primary
+            BuyBtn.Text = "Buy " .. opt.Price
+            BuyBtn.Font = Enum.Font.GothamBold
+            BuyBtn.TextColor3 = Color3.new(1,1,1)
             BuyBtn.TextSize = 12
-            BuyBtn.ZIndex = 999999; BuyBtn.Parent = Card
+            BuyBtn.ZIndex = 999999
+            BuyBtn.Parent = Card
             createCorner(BuyBtn, 6)
 
-            BuyBtn.MouseButton1Click:Connect(function()
-                pcall(function() MarketplaceService:PromptGamePassPurchase(LocalPlayer, opt.ID) end)
-                if setclipboard then setclipboard("https://www.roblox.com/game-pass/" .. tostring(opt.ID)) end
+            TrackConnection(BuyBtn.MouseButton1Click:Connect(function()
+                pcall(function()
+                    MarketplaceService:PromptGamePassPurchase(LocalPlayer, opt.ID)
+                end)
+                if setclipboard then 
+                    setclipboard("https://www.roblox.com/game-pass/" .. tostring(opt.ID))
+                end
                 task.spawn(ShowCopiedNotification)
-            end)
+            end))
         end
     end
-    PlusBtn.MouseButton1Click:Connect(OpenRechargeModal)
+    
+    TrackConnection(PlusBtn.MouseButton1Click:Connect(OpenRechargeModal))
 
-    MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player, gamePassId, isPurchased)
+    -- Purchase completion handler
+    TrackConnection(MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player, gamePassId, isPurchased)
         if isPurchased and player == LocalPlayer then
             local newLimit = nil
             local wasLife = CurrentHWIDData.IsLifetime
+            
             if gamePassId == 1931252522 then
                 CurrentHWIDData.IsLifetime = true
                 wasLife = true
-            elseif gamePassId == 1942452785 then newLimit = 28800
-            elseif gamePassId == 1940772812 then newLimit = 21600
-            elseif gamePassId == 1940574828 then newLimit = 14400
+            elseif gamePassId == 1942452785 then 
+                newLimit = 28800
+            elseif gamePassId == 1940772812 then 
+                newLimit = 21600
+            elseif gamePassId == 1940574828 then 
+                newLimit = 14400
             end
 
             if not wasLife and newLimit and newLimit > CurrentHWIDData.CurrentDailyLimit then
@@ -1185,6 +1539,7 @@ function EmloxaLibrary:CreateWindow(hubName)
             SaveTimeData()
             playSound(131390520971848, 0.7)
             
+            -- Show success notification
             local Notif = Instance.new("Frame")
             Notif.Size = UDim2.new(0, 240, 0, 60)
             Notif.Position = UDim2.new(1, 10, 1, -80)
@@ -1223,13 +1578,27 @@ function EmloxaLibrary:CreateWindow(hubName)
             MsgLabel.ZIndex = 999999
             MsgLabel.Parent = Notif
             
-            TweenService:Create(Notif, TweenInfo.new(0.5,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Position = UDim2.new(1,-250,1,-80)}):Play()
+            local t1 = TweenService:Create(Notif, TweenInfo.new(0.5,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Position = UDim2.new(1,-250,1,-80)})
+            TrackTween(t1)
+            t1:Play()
+            
             task.wait(3)
-            TweenService:Create(Notif, TweenInfo.new(0.4), {Position = UDim2.new(1,10,1,-80)}):Play()
+            
+            local t2 = TweenService:Create(Notif, TweenInfo.new(0.4), {Position = UDim2.new(1,10,1,-80)})
+            TrackTween(t2)
+            t2:Play()
+            
             task.wait(0.4)
-            Notif:Destroy()
+            pcall(function() Notif:Destroy() end)
         end
-    end)
+    end))
+
+    -- ═══ WINDOW CONTROLS ═══
+    local Controls = Instance.new("Frame")
+    Controls.Size = UDim2.new(0, 90, 1, 0)
+    Controls.Position = UDim2.new(1, -100, 0, 0)
+    Controls.BackgroundTransparency = 1
+    Controls.Parent = TopBar
 
     local MinBtn = Instance.new("TextButton")
     MinBtn.Size = UDim2.new(0,32,0,32)
@@ -1256,179 +1625,245 @@ function EmloxaLibrary:CreateWindow(hubName)
     registerThemeable(CloseBtn, {BackgroundColor3 = "PanelLight", TextColor3 = "Accent"})
 
     local function addHover(btn)
-        btn.MouseEnter:Connect(function()
-            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = CurrentTheme.Primary, TextColor3 = Color3.new(1,1,1)}):Play()
+        TrackConnection(btn.MouseEnter:Connect(function()
+            local t = TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = CurrentTheme.Primary, TextColor3 = Color3.new(1,1,1)})
+            TrackTween(t)
+            t:Play()
             playHoverSound()
-        end)
-        btn.MouseLeave:Connect(function()
+        end))
+        
+        TrackConnection(btn.MouseLeave:Connect(function()
             local origColor = btn == CloseBtn and CurrentTheme.Accent or Color3.new(1,1,1)
-            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = CurrentTheme.PanelLight, TextColor3 = origColor}):Play()
-        end)
+            local t = TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = CurrentTheme.PanelLight, TextColor3 = origColor})
+            TrackTween(t)
+            t:Play()
+        end))
     end
+    
     addHover(MinBtn)
     addHover(CloseBtn)
 
     local isMinimized = false
+    
     local function animateWindow(targetSize)
-        TweenService:Create(MainFrame, TweenInfo.new(0.45, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = targetSize}):Play()
+        local t = TweenService:Create(MainFrame, TweenInfo.new(0.45, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = targetSize})
+        TrackTween(t)
+        t:Play()
     end
 
-    MinBtn.MouseButton1Click:Connect(function()
+    TrackConnection(MinBtn.MouseButton1Click:Connect(function()
         isMinimized = not isMinimized
         playClickSound()
-        animateWindow(isMinimized and UDim2.new(0,710,0,50) or UDim2.new(0,710,0,480))
-        TweenService:Create(MinBtn, TweenInfo.new(0.2), {TextColor3 = isMinimized and CurrentTheme.Primary or Color3.new(1,1,1)}):Play()
-    end)
+        animateWindow(isMinimized and UDim2.new(0,820,0,46) or UDim2.new(0,820,0,490))
+        
+        local t = TweenService:Create(MinBtn, TweenInfo.new(0.2), {TextColor3 = isMinimized and CurrentTheme.Primary or Color3.new(1,1,1)})
+        TrackTween(t)
+        t:Play()
+    end))
 
-    CloseBtn.MouseButton1Click:Connect(function()
+    TrackConnection(CloseBtn.MouseButton1Click:Connect(function()
         playClickSound()
-        TweenService:Create(MainFrame, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Size = UDim2.new(0,0,0,0)}):Play()
+        
+        local t = TweenService:Create(MainFrame, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Size = UDim2.new(0,0,0,0)})
+        TrackTween(t)
+        t:Play()
+        
         task.wait(0.35)
         MainFrame.Visible = false
         OpenIconFrame.Visible = true
         OpenIconFrame.Size = UDim2.new(0,0,0,0)
-        TweenService:Create(OpenIconFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0,55,0,55)}):Play()
-    end)
+        
+        local t2 = TweenService:Create(OpenIconFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0,55,0,55)})
+        TrackTween(t2)
+        t2:Play()
+    end))
 
-    OpenIcon.MouseButton1Click:Connect(function()
+    TrackConnection(OpenIcon.MouseButton1Click:Connect(function()
         playClickSound()
-        TweenService:Create(OpenIconFrame, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {Size = UDim2.new(0,0,0,0)}):Play()
+        
+        local t = TweenService:Create(OpenIconFrame, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {Size = UDim2.new(0,0,0,0)})
+        TrackTween(t)
+        t:Play()
+        
         task.wait(0.25)
         OpenIconFrame.Visible = false
         MainFrame.Visible = true
-        animateWindow(isMinimized and UDim2.new(0,710,0,50) or UDim2.new(0,710,0,480))
-    end)
+        animateWindow(isMinimized and UDim2.new(0,820,0,46) or UDim2.new(0,820,0,490))
+    end))
 
+    -- ═══ DRAGGING ═══
     local dragging, dragStart, startPos = false, nil, nil
-    TopBar.InputBegan:Connect(function(input)
+    
+    TrackConnection(TopBar.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = true
             dragStart = input.Position
             startPos = MainFrame.Position
         end
-    end)
-    TopBar.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
-    end)
-    UserInputService.InputChanged:Connect(function(input)
+    end))
+    
+    TrackConnection(TopBar.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then 
+            dragging = false 
+        end
+    end))
+    
+    TrackConnection(UserInputService.InputChanged:Connect(function(input)
         if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
             local delta = input.Position - dragStart
             local targetPos = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
             MainFrame.Position = MainFrame.Position:Lerp(targetPos, 0.35)
         end
-    end)
+    end))
 
-    local TabContainer = Instance.new("Frame")
-    TabContainer.Name = "Nav_Panel"
-    TabContainer.Size = UDim2.new(0, 160, 1, -50)
-    TabContainer.Position = UDim2.new(0, 0, 0, 50)
-    TabContainer.BackgroundColor3 = CurrentTheme.Panel
-    TabContainer.BorderSizePixel = 0
-    TabContainer.Active = true
-    TabContainer.Parent = MainFrame
-    registerThemeable(TabContainer, {BackgroundColor3 = "Panel"})
+    -- ═══ SIDEBAR (Aurum Style) ═══
+    local Sidebar = Instance.new("Frame")
+    Sidebar.Name = "Sidebar"
+    Sidebar.Size = UDim2.new(0, 195, 1, -46)
+    Sidebar.Position = UDim2.new(0, 0, 0, 46)
+    Sidebar.BackgroundColor3 = CurrentTheme.Sidebar
+    Sidebar.BorderSizePixel = 0
+    Sidebar.Parent = MainFrame
+    registerThemeable(Sidebar, {BackgroundColor3 = "Sidebar"})
 
-    local tabGradient = Instance.new("UIGradient")
-    tabGradient.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(20,20,28)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(28,28,36))
-    }
-    tabGradient.Rotation = 90
-    tabGradient.Parent = TabContainer
+    local SidebarScroll = Instance.new("ScrollingFrame")
+    SidebarScroll.Size = UDim2.fromScale(1,1)
+    SidebarScroll.BackgroundTransparency = 1
+    SidebarScroll.BorderSizePixel = 0
+    SidebarScroll.ScrollBarThickness = 2
+    SidebarScroll.ScrollBarImageColor3 = CurrentTheme.Accent
+    SidebarScroll.ScrollBarImageTransparency = 0.5
+    SidebarScroll.CanvasSize = UDim2.new(0,0,0,0)
+    SidebarScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    SidebarScroll.Parent = Sidebar
 
     local TabList = Instance.new("UIListLayout")
-    TabList.FillDirection = Enum.FillDirection.Vertical
+    TabList.Padding = UDim.new(0, 6)
     TabList.SortOrder = Enum.SortOrder.LayoutOrder
-    TabList.Padding = UDim.new(0, 4)
-    TabList.Parent = TabContainer
+    TabList.Parent = SidebarScroll
+    
+    local sidePadding = Instance.new("UIPadding", SidebarScroll)
+    sidePadding.PaddingTop = UDim.new(0, 14)
+    sidePadding.PaddingLeft = UDim.new(0, 10)
+    sidePadding.PaddingRight = UDim.new(0, 10)
+    sidePadding.PaddingBottom = UDim.new(0, 10)
 
-    local PageContainer = Instance.new("Frame")
-    PageContainer.Size = UDim2.new(1, -160, 1, -50)
-    PageContainer.Position = UDim2.new(0, 160, 0, 50)
-    PageContainer.BackgroundTransparency = 1
-    PageContainer.Active = true
-    PageContainer.ClipsDescendants = true
-    PageContainer.Parent = MainFrame
+    -- ═══ CONTENT AREA ═══
+    local ContentArea = Instance.new("Frame")
+    ContentArea.Name = "ContentArea"
+    ContentArea.Size = UDim2.new(1, -195, 1, -46)
+    ContentArea.Position = UDim2.fromOffset(195, 46)
+    ContentArea.BackgroundTransparency = 1
+    ContentArea.ClipsDescendants = true
+    ContentArea.Parent = MainFrame
 
     local Pages = {}
     local Tabs = {}
 
+    -- ═══ TAB CREATION (Keep original names) ═══
     local function CreateTabInternal(tabName, layoutOrder)
         local TabSetup = {}
 
         local TabBtn = Instance.new("TextButton")
-        TabBtn.Size = UDim2.new(1, 0, 0, 42)
+        TabBtn.Size = UDim2.new(1, 0, 0, 38)
         TabBtn.Text = tabName
         TabBtn.Font = Enum.Font.GothamBold
         TabBtn.TextSize = 13
-        TabBtn.TextColor3 = CurrentTheme.SubTextColor
+        TabBtn.TextColor3 = CurrentTheme.TextDim
         TabBtn.TextXAlignment = Enum.TextXAlignment.Center
-        TabBtn.BackgroundTransparency = 1
+        TabBtn.BackgroundColor3 = CurrentTheme.Sidebar
         TabBtn.LayoutOrder = layoutOrder or #Tabs
-        TabBtn.Parent = TabContainer
-        registerThemeable(TabBtn, {TextColor3 = "SubTextColor"})
+        TabBtn.Parent = SidebarScroll
+        createCorner(TabBtn, 8)
+        registerThemeable(TabBtn, {TextColor3 = "TextDim", BackgroundColor3 = "Sidebar"})
 
         local Indicator = Instance.new("Frame")
-        Indicator.Size = UDim2.new(0, 0, 0, 2)
-        Indicator.AnchorPoint = Vector2.new(0.5, 1)
-        Indicator.Position = UDim2.new(0.5, 0, 1, 0)
-        Indicator.BackgroundColor3 = Color3.new(1,1,1)
+        Indicator.Size = UDim2.new(0, 3, 0.6, 0)
+        Indicator.AnchorPoint = Vector2.new(0, 0.5)
+        Indicator.Position = UDim2.new(0, 2, 0.5, 0)
+        Indicator.BackgroundColor3 = CurrentTheme.AccentBright
+        Indicator.BackgroundTransparency = 1
         Indicator.BorderSizePixel = 0
         Indicator.Parent = TabBtn
+        createCorner(Indicator, 2)
+
+        -- Gradient for indicator
+        local indicatorGrad = Instance.new("UIGradient")
+        indicatorGrad.Rotation = 90
+        indicatorGrad.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, CurrentTheme.AccentBright),
+            ColorSequenceKeypoint.new(1, CurrentTheme.Gold or CurrentTheme.Accent)
+        })
+        indicatorGrad.Parent = Indicator
 
         local PageScroll = Instance.new("ScrollingFrame")
         PageScroll.Size = UDim2.new(1,0,1,0)
         PageScroll.BackgroundTransparency = 1
         PageScroll.BorderSizePixel = 0
         PageScroll.ScrollBarThickness = 3
-        PageScroll.ScrollBarImageColor3 = CurrentTheme.Primary
+        PageScroll.ScrollBarImageColor3 = CurrentTheme.Accent
         PageScroll.Active = true
         PageScroll.Visible = false
         PageScroll.CanvasSize = UDim2.new(0,0,0,0)
-        PageScroll.Parent = PageContainer
+        PageScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        PageScroll.Parent = ContentArea
 
         local PageLayout = Instance.new("UIListLayout")
         PageLayout.SortOrder = Enum.SortOrder.LayoutOrder
-        PageLayout.Padding = UDim.new(0,10) 
+        PageLayout.Padding = UDim.new(0,12)
         PageLayout.Parent = PageScroll
-        Instance.new("UIPadding", PageScroll).PaddingTop = UDim.new(0,12)
-        Instance.new("UIPadding", PageScroll).PaddingLeft = UDim.new(0,18)
-        Instance.new("UIPadding", PageScroll).PaddingRight = UDim.new(0,18)
+        
+        local pagePadding = Instance.new("UIPadding", PageScroll)
+        pagePadding.PaddingTop = UDim.new(0,18)
+        pagePadding.PaddingLeft = UDim.new(0,20)
+        pagePadding.PaddingRight = UDim.new(0,16)
+        pagePadding.PaddingBottom = UDim.new(0,18)
 
-        PageScroll.ChildAdded:Connect(function(child)
-            if child:IsA("GuiObject") then
-                task.wait()
-                PageScroll.CanvasSize = UDim2.new(0,0,0,PageLayout.AbsoluteContentSize.Y + 24)
-            end
-        end)
-
-        TabBtn.MouseEnter:Connect(function()
+        TrackConnection(TabBtn.MouseEnter:Connect(function()
             playHoverSound()
-            if PageScroll.Visible ~= true then TweenService:Create(TabBtn, TweenInfo.new(0.2), {TextColor3 = Color3.new(1,1,1)}):Play() end
-        end)
-        TabBtn.MouseLeave:Connect(function()
-            if PageScroll.Visible ~= true then TweenService:Create(TabBtn, TweenInfo.new(0.2), {TextColor3 = CurrentTheme.SubTextColor}):Play() end
-        end)
+            if PageScroll.Visible ~= true then
+                local t = TweenService:Create(TabBtn, TweenInfo.new(0.2), {BackgroundColor3 = CurrentTheme.CardHover})
+                TrackTween(t)
+                t:Play()
+            end
+        end))
+        
+        TrackConnection(TabBtn.MouseLeave:Connect(function()
+            if PageScroll.Visible ~= true then
+                local t = TweenService:Create(TabBtn, TweenInfo.new(0.2), {BackgroundColor3 = CurrentTheme.Sidebar})
+                TrackTween(t)
+                t:Play()
+            end
+        end))
 
-        TabBtn.MouseButton1Click:Connect(function()
+        TrackConnection(TabBtn.MouseButton1Click:Connect(function()
             playClickSound()
+            
             for _,p in pairs(Pages) do p.Visible = false end
             for _,t in pairs(Tabs) do
-                TweenService:Create(t.Indicator, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0,0,0,2)}):Play()
-                TweenService:Create(t.Btn, TweenInfo.new(0.3), {TextColor3 = CurrentTheme.SubTextColor}):Play()
+                local t1 = TweenService:Create(t.Indicator, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1})
+                local t2 = TweenService:Create(t.Btn, TweenInfo.new(0.3), {TextColor3 = CurrentTheme.TextDim, BackgroundColor3 = CurrentTheme.Sidebar})
+                TrackTween(t1); TrackTween(t2)
+                t1:Play(); t2:Play()
             end
+            
             PageScroll.Visible = true
-            TweenService:Create(Indicator, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, -30, 0, 2)}):Play()
-            TweenService:Create(TabBtn, TweenInfo.new(0.3), {TextColor3 = Color3.new(1,1,1)}):Play()
-        end)
+            
+            local t1 = TweenService:Create(Indicator, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0})
+            local t2 = TweenService:Create(TabBtn, TweenInfo.new(0.3), {TextColor3 = CurrentTheme.TextMain, BackgroundColor3 = CurrentTheme.Card})
+            TrackTween(t1); TrackTween(t2)
+            t1:Play(); t2:Play()
+        end))
 
         table.insert(Pages, PageScroll)
         table.insert(Tabs, {Btn = TabBtn, Indicator = Indicator})
 
+        -- Auto-select first tab
         if #Pages == 1 then
             PageScroll.Visible = true
-            Indicator.Size = UDim2.new(1, -30, 0, 2)
-            TabBtn.TextColor3 = Color3.new(1,1,1)
+            Indicator.BackgroundTransparency = 0
+            TabBtn.TextColor3 = CurrentTheme.TextMain
+            TabBtn.BackgroundColor3 = CurrentTheme.Card
         end
 
         local elementCounter = 0
@@ -1437,68 +1872,80 @@ function EmloxaLibrary:CreateWindow(hubName)
             return baseName .. "_" .. elementCounter
         end
 
+        -- ═══ ELEMENT CREATORS (Keep original names & functions) ═══
+        
         function TabSetup:CreateToggle(name, callback)
             local id = generateId("toggle_" .. name)
+            
             local ToggleFrame = Instance.new("Frame")
-            ToggleFrame.Size = UDim2.new(1,0,0,42) 
-            ToggleFrame.BackgroundColor3 = CurrentTheme.PanelLight
+            ToggleFrame.Size = UDim2.new(1,0,0,44)
+            ToggleFrame.BackgroundColor3 = CurrentTheme.Card
             ToggleFrame.Active = true
             ToggleFrame.Parent = PageScroll
-            createCorner(ToggleFrame,6)
-            createStroke(ToggleFrame, CurrentTheme.Primary, 1)
-            registerThemeable(ToggleFrame, {BackgroundColor3 = "PanelLight"})
+            createCorner(ToggleFrame,10)
+            createStroke(ToggleFrame, CurrentTheme.Stroke, 1)
+            registerThemeable(ToggleFrame, {BackgroundColor3 = "Card"})
 
             local Label = Instance.new("TextLabel")
             Label.Size = UDim2.new(1,-80,1,0)
-            Label.Position = UDim2.new(0,14,0,0)
+            Label.Position = UDim2.new(0,16,0,0)
             Label.Text = name
             Label.Font = Enum.Font.GothamSemibold
-            Label.TextSize = 13
-            Label.TextColor3 = CurrentTheme.TextColor
+            Label.TextSize = 13.5
+            Label.TextColor3 = CurrentTheme.TextMain
             Label.TextXAlignment = Enum.TextXAlignment.Left
             Label.BackgroundTransparency = 1
             Label.Parent = ToggleFrame
-            registerThemeable(Label, {TextColor3 = "TextColor"})
+            registerThemeable(Label, {TextColor3 = "TextMain"})
 
             local Btn = Instance.new("TextButton")
-            Btn.Size = UDim2.new(0,42,0,22)
-            Btn.Position = UDim2.new(1,-56,0.5,-11)
-            Btn.BackgroundColor3 = CurrentTheme.Panel
+            Btn.Size = UDim2.new(0,44,0,24)
+            Btn.Position = UDim2.new(1,-56,0.5,-12)
+            Btn.BackgroundColor3 = CurrentTheme.Stroke
             Btn.Text = ""
             Btn.Parent = ToggleFrame
-            createCorner(Btn,11)
-            registerThemeable(Btn, {BackgroundColor3 = "Panel"})
+            createCorner(Btn,12)
+            registerThemeable(Btn, {BackgroundColor3 = "Stroke"})
 
             local Circle = Instance.new("Frame")
-            Circle.Size = UDim2.new(0,16,0,16)
-            Circle.Position = UDim2.new(0,3,0.5,-8)
+            Circle.Size = UDim2.new(0,18,0,18)
+            Circle.Position = UDim2.new(0,3,0.5,-9)
             Circle.BackgroundColor3 = Color3.new(1,1,1)
             Circle.Parent = Btn
-            createCorner(Circle,8)
+            createCorner(Circle,9)
 
             local state = false
             ConfigValues[id] = state
+            
             registerConfig(id, function(val)
                 state = val
-                local gPos = state and UDim2.new(1,-19,0.5,-8) or UDim2.new(0,3,0.5,-8)
-                local gCol = state and CurrentTheme.Primary or CurrentTheme.Panel
-                TweenService:Create(Circle, TweenInfo.new(0.3,Enum.EasingStyle.Quart,Enum.EasingDirection.Out), {Position = gPos}):Play()
-                TweenService:Create(Btn, TweenInfo.new(0.3), {BackgroundColor3 = gCol}):Play()
-                if callback then callback(state) end
+                local gPos = state and UDim2.new(1,-21,0.5,-9) or UDim2.new(0,3,0.5,-9)
+                local gCol = state and CurrentTheme.Accent or CurrentTheme.Stroke
+                
+                local t1 = TweenService:Create(Circle, TweenInfo.new(0.3,Enum.EasingStyle.Quart,Enum.EasingDirection.Out), {Position = gPos})
+                local t2 = TweenService:Create(Btn, TweenInfo.new(0.3), {BackgroundColor3 = gCol})
+                TrackTween(t1); TrackTween(t2)
+                t1:Play(); t2:Play()
+                
+                if callback then 
+                    pcall(function() callback(state) end)
+                end
             end)
 
-            Btn.MouseEnter:Connect(playHoverSound)
-            Btn.MouseButton1Click:Connect(function()
+            TrackConnection(Btn.MouseEnter:Connect(playHoverSound))
+            
+            TrackConnection(Btn.MouseButton1Click:Connect(function()
                 playClickSound()
                 state = not state
                 ConfigValues[id] = state
+                
                 for _, entry in ipairs(ConfigCallbacks) do
                     if entry.id == id then
                         entry.set(state)
                         break
                     end
                 end
-            end)
+            end))
 
             local ToggleAPI = {}
             function ToggleAPI:SetState(val)
@@ -1520,26 +1967,27 @@ function EmloxaLibrary:CreateWindow(hubName)
 
         function TabSetup:CreatePremiumToggle(name, callback)
             local id = generateId("prem_toggle_" .. name)
+            
             local ToggleFrame = Instance.new("Frame")
-            ToggleFrame.Size = UDim2.new(1,0,0,42)
-            ToggleFrame.BackgroundColor3 = CurrentTheme.PanelLight
+            ToggleFrame.Size = UDim2.new(1,0,0,44)
+            ToggleFrame.BackgroundColor3 = CurrentTheme.Card
             ToggleFrame.Active = true
             ToggleFrame.Parent = PageScroll
-            createCorner(ToggleFrame,6)
+            createCorner(ToggleFrame,10)
             createStroke(ToggleFrame, Color3.fromRGB(255, 215, 0), 1)
-            registerThemeable(ToggleFrame, {BackgroundColor3 = "PanelLight"})
+            registerThemeable(ToggleFrame, {BackgroundColor3 = "Card"})
 
             local Label = Instance.new("TextLabel")
-            Label.Size = UDim2.new(1,-110,1,0)
-            Label.Position = UDim2.new(0,14,0,0)
-            Label.Text = name 
+            Label.Size = UDim2.new(1,-120,1,0)
+            Label.Position = UDim2.new(0,16,0,0)
+            Label.Text = name
             Label.Font = Enum.Font.GothamBold
-            Label.TextSize = 13
-            Label.TextColor3 = CurrentTheme.TextColor
+            Label.TextSize = 13.5
+            Label.TextColor3 = CurrentTheme.TextMain
             Label.TextXAlignment = Enum.TextXAlignment.Left
             Label.BackgroundTransparency = 1
             Label.Parent = ToggleFrame
-            registerThemeable(Label, {TextColor3 = "TextColor"})
+            registerThemeable(Label, {TextColor3 = "TextMain"})
 
             local Badge = Instance.new("TextLabel")
             Badge.Size = UDim2.new(0, 50, 0, 16)
@@ -1553,77 +2001,84 @@ function EmloxaLibrary:CreateWindow(hubName)
             createCorner(Badge, 4)
 
             local Btn = Instance.new("TextButton")
-            Btn.Size = UDim2.new(0,42,0,22)
-            Btn.Position = UDim2.new(1,-56,0.5,-11)
-            Btn.BackgroundColor3 = CurrentTheme.Panel
+            Btn.Size = UDim2.new(0,44,0,24)
+            Btn.Position = UDim2.new(1,-56,0.5,-12)
+            Btn.BackgroundColor3 = CurrentTheme.Stroke
             Btn.Text = ""
             Btn.Parent = ToggleFrame
-            createCorner(Btn,11)
-            registerThemeable(Btn, {BackgroundColor3 = "Panel"})
+            createCorner(Btn,12)
 
             local Circle = Instance.new("Frame")
-            Circle.Size = UDim2.new(0,16,0,16)
-            Circle.Position = UDim2.new(0,3,0.5,-8)
+            Circle.Size = UDim2.new(0,18,0,18)
+            Circle.Position = UDim2.new(0,3,0.5,-9)
             Circle.BackgroundColor3 = Color3.new(1,1,1)
             Circle.Parent = Btn
-            createCorner(Circle,8)
+            createCorner(Circle,9)
 
             local state = false
             ConfigValues[id] = state
+            
             registerConfig(id, function(val)
                 state = val
-                local gPos = state and UDim2.new(1,-19,0.5,-8) or UDim2.new(0,3,0.5,-8)
-                local gCol = state and Color3.fromRGB(255, 215, 0) or CurrentTheme.Panel
-                TweenService:Create(Circle, TweenInfo.new(0.3,Enum.EasingStyle.Quart,Enum.EasingDirection.Out), {Position = gPos}):Play()
-                TweenService:Create(Btn, TweenInfo.new(0.3), {BackgroundColor3 = gCol}):Play()
-                callback(state)
+                local gPos = state and UDim2.new(1,-21,0.5,-9) or UDim2.new(0,3,0.5,-9)
+                local gCol = state and Color3.fromRGB(255, 215, 0) or CurrentTheme.Stroke
+                
+                local t1 = TweenService:Create(Circle, TweenInfo.new(0.3,Enum.EasingStyle.Quart,Enum.EasingDirection.Out), {Position = gPos})
+                local t2 = TweenService:Create(Btn, TweenInfo.new(0.3), {BackgroundColor3 = gCol})
+                TrackTween(t1); TrackTween(t2)
+                t1:Play(); t2:Play()
+                
+                pcall(function() callback(state) end)
             end)
 
-            Btn.MouseEnter:Connect(playHoverSound)
-            Btn.MouseButton1Click:Connect(function()
+            TrackConnection(Btn.MouseEnter:Connect(playHoverSound))
+            
+            TrackConnection(Btn.MouseButton1Click:Connect(function()
                 playClickSound()
                 state = not state
                 ConfigValues[id] = state
+                
                 for _, entry in ipairs(ConfigCallbacks) do
                     if entry.id == id then
                         entry.set(state)
                         break
                     end
                 end
-            end)
+            end))
         end
 
         function TabSetup:CreateTextbox(name, placeholder, callback)
             local id = generateId("textbox_" .. name)
+            
             local BoxFrame = Instance.new("Frame")
-            BoxFrame.Size = UDim2.new(1,0,0,42)
-            BoxFrame.BackgroundColor3 = CurrentTheme.PanelLight
+            BoxFrame.Size = UDim2.new(1,0,0,44)
+            BoxFrame.BackgroundColor3 = CurrentTheme.Card
             BoxFrame.Active = true
             BoxFrame.Parent = PageScroll
-            createCorner(BoxFrame,6)
-            createStroke(BoxFrame, CurrentTheme.Primary, 1)
-            registerThemeable(BoxFrame, {BackgroundColor3 = "PanelLight"})
+            createCorner(BoxFrame,10)
+            createStroke(BoxFrame, CurrentTheme.Stroke, 1)
+            registerThemeable(BoxFrame, {BackgroundColor3 = "Card"})
 
             local Label = Instance.new("TextLabel")
             Label.Size = UDim2.new(0.5,0,1,0)
-            Label.Position = UDim2.new(0,14,0,0)
+            Label.Position = UDim2.new(0,16,0,0)
             Label.Text = name
             Label.Font = Enum.Font.GothamSemibold
-            Label.TextSize = 13
-            Label.TextColor3 = CurrentTheme.TextColor
+            Label.TextSize = 13.5
+            Label.TextColor3 = CurrentTheme.TextMain
             Label.TextXAlignment = Enum.TextXAlignment.Left
             Label.BackgroundTransparency = 1
             Label.Parent = BoxFrame
-            registerThemeable(Label, {TextColor3 = "TextColor"})
+            registerThemeable(Label, {TextColor3 = "TextMain"})
 
             local TextBoxBg = Instance.new("Frame")
-            TextBoxBg.Size = UDim2.new(0.40, 0, 0, 26)
-            TextBoxBg.Position = UDim2.new(1, -12, 0.5, -13)
+            TextBoxBg.Size = UDim2.new(0.40, 0, 0, 28)
+            TextBoxBg.Position = UDim2.new(1, -12, 0.5, -14)
             TextBoxBg.AnchorPoint = Vector2.new(1, 0)
-            TextBoxBg.BackgroundColor3 = CurrentTheme.Panel
+            TextBoxBg.BackgroundColor3 = CurrentTheme.PanelLight
             TextBoxBg.Parent = BoxFrame
-            createCorner(TextBoxBg, 4)
-            registerThemeable(TextBoxBg, {BackgroundColor3 = "Panel"})
+            createCorner(TextBoxBg, 6)
+            registerThemeable(TextBoxBg, {BackgroundColor3 = "PanelLight"})
 
             local TxtBox = Instance.new("TextBox")
             TxtBox.Size = UDim2.new(1, -10, 1, 0)
@@ -1633,117 +2088,142 @@ function EmloxaLibrary:CreateWindow(hubName)
             TxtBox.PlaceholderText = placeholder or "Type here..."
             TxtBox.Font = Enum.Font.Gotham
             TxtBox.TextSize = 12
-            TxtBox.TextColor3 = CurrentTheme.TextColor
+            TxtBox.TextColor3 = CurrentTheme.TextMain
             TxtBox.TextXAlignment = Enum.TextXAlignment.Left
             TxtBox.ClearTextOnFocus = false
             TxtBox.Parent = TextBoxBg
-            registerThemeable(TxtBox, {TextColor3 = "TextColor"})
+            registerThemeable(TxtBox, {TextColor3 = "TextMain"})
 
-            TxtBox.FocusLost:Connect(function() callback(TxtBox.Text) end)
+            TrackConnection(TxtBox.FocusLost:Connect(function() 
+                pcall(function() callback(TxtBox.Text) end)
+            end))
         end
 
         function TabSetup:CreateDropdown(name, options, default, callback)
             local id = generateId("dropdown_" .. name)
+            
             local DropdownFrame = Instance.new("Frame")
-            DropdownFrame.Size = UDim2.new(1,0,0,42)
-            DropdownFrame.BackgroundColor3 = CurrentTheme.PanelLight
+            DropdownFrame.Size = UDim2.new(1,0,0,44)
+            DropdownFrame.BackgroundColor3 = CurrentTheme.Card
             DropdownFrame.Active = true
             DropdownFrame.ClipsDescendants = true
             DropdownFrame.Parent = PageScroll
-            createCorner(DropdownFrame,6)
-            createStroke(DropdownFrame, CurrentTheme.Primary, 1)
-            registerThemeable(DropdownFrame, {BackgroundColor3 = "PanelLight"})
+            createCorner(DropdownFrame,10)
+            createStroke(DropdownFrame, CurrentTheme.Stroke, 1)
+            registerThemeable(DropdownFrame, {BackgroundColor3 = "Card"})
 
             local Label = Instance.new("TextLabel")
-            Label.Size = UDim2.new(1,-30,0,42)
-            Label.Position = UDim2.new(0,14,0,0)
+            Label.Size = UDim2.new(1,-30,0,44)
+            Label.Position = UDim2.new(0,16,0,0)
             Label.Text = name .. " : " .. tostring(default)
             Label.Font = Enum.Font.GothamSemibold
-            Label.TextSize = 13
-            Label.TextColor3 = CurrentTheme.TextColor
+            Label.TextSize = 13.5
+            Label.TextColor3 = CurrentTheme.TextMain
             Label.TextXAlignment = Enum.TextXAlignment.Left
             Label.BackgroundTransparency = 1
             Label.Parent = DropdownFrame
-            registerThemeable(Label, {TextColor3 = "TextColor"})
+            registerThemeable(Label, {TextColor3 = "TextMain"})
 
             local ToggleBtn = Instance.new("TextButton")
-            ToggleBtn.Size = UDim2.new(1,0,0,42)
+            ToggleBtn.Size = UDim2.new(1,0,0,44)
             ToggleBtn.BackgroundTransparency = 1
             ToggleBtn.Text = ""
             ToggleBtn.Parent = DropdownFrame
 
             local OptionContainer = Instance.new("Frame")
-            OptionContainer.Size = UDim2.new(1,0,1,-42)
-            OptionContainer.Position = UDim2.new(0,0,0,42)
+            OptionContainer.Size = UDim2.new(1,0,1,-44)
+            OptionContainer.Position = UDim2.new(0,0,0,44)
             OptionContainer.BackgroundTransparency = 1
             OptionContainer.Parent = DropdownFrame
+            
             local UIListLayout = Instance.new("UIListLayout", OptionContainer)
             UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
             local isDropped = false
             local selectedValue = default
             ConfigValues[id] = default
+            
             registerConfig(id, function(val)
                 selectedValue = val
                 Label.Text = name .. " : " .. val
-                callback(val)
+                pcall(function() callback(val) end)
             end)
 
             local function BuildOptions(optList)
                 for _, child in ipairs(OptionContainer:GetChildren()) do
                     if child:IsA("TextButton") then child:Destroy() end
                 end
+                
                 for _, option in ipairs(optList) do
                     local OptBtn = Instance.new("TextButton")
-                    OptBtn.Size = UDim2.new(1,0,0,30)
-                    OptBtn.BackgroundColor3 = CurrentTheme.Panel
+                    OptBtn.Size = UDim2.new(1,0,0,32)
+                    OptBtn.BackgroundColor3 = CurrentTheme.PanelLight
                     OptBtn.Text = "  " .. option
                     OptBtn.Font = Enum.Font.Gotham
-                    OptBtn.TextSize = 12
-                    OptBtn.TextColor3 = CurrentTheme.SubTextColor
+                    OptBtn.TextSize = 12.5
+                    OptBtn.TextColor3 = CurrentTheme.TextDim
                     OptBtn.TextXAlignment = Enum.TextXAlignment.Left
                     OptBtn.Parent = OptionContainer
-                    createCorner(OptBtn,4)
-                    registerThemeable(OptBtn, {BackgroundColor3 = "Panel", TextColor3 = "SubTextColor"})
+                    createCorner(OptBtn,6)
+                    registerThemeable(OptBtn, {BackgroundColor3 = "PanelLight", TextColor3 = "TextDim"})
 
-                    OptBtn.MouseButton1Click:Connect(function()
+                    TrackConnection(OptBtn.MouseButton1Click:Connect(function()
                         playClickSound()
                         selectedValue = option
                         Label.Text = name .. " : " .. option
                         ConfigValues[id] = option
                         isDropped = false
-                        TweenService:Create(DropdownFrame, TweenInfo.new(0.3,Enum.EasingStyle.Quart,Enum.EasingDirection.Out), {Size = UDim2.new(1,0,0,42)}):Play()
-                        TweenService:Create(Label, TweenInfo.new(0.2), {TextColor3 = CurrentTheme.TextColor}):Play()
-                        callback(selectedValue)
-                    end)
+                        
+                        local t1 = TweenService:Create(DropdownFrame, TweenInfo.new(0.3,Enum.EasingStyle.Quart,Enum.EasingDirection.Out), {Size = UDim2.new(1,0,0,44)})
+                        local t2 = TweenService:Create(Label, TweenInfo.new(0.2), {TextColor3 = CurrentTheme.TextMain})
+                        TrackTween(t1); TrackTween(t2)
+                        t1:Play(); t2:Play()
+                        
+                        pcall(function() callback(selectedValue) end)
+                    end))
 
-                    OptBtn.MouseEnter:Connect(function()
+                    TrackConnection(OptBtn.MouseEnter:Connect(function()
                         playHoverSound()
-                        TweenService:Create(OptBtn, TweenInfo.new(0.2), {BackgroundColor3 = CurrentTheme.PrimaryDark, TextColor3 = Color3.new(1,1,1)}):Play()
-                    end)
-                    OptBtn.MouseLeave:Connect(function()
-                        TweenService:Create(OptBtn, TweenInfo.new(0.2), {BackgroundColor3 = CurrentTheme.Panel, TextColor3 = CurrentTheme.SubTextColor}):Play()
-                    end)
+                        local t = TweenService:Create(OptBtn, TweenInfo.new(0.2), {BackgroundColor3 = CurrentTheme.CardHover, TextColor3 = Color3.new(1,1,1)})
+                        TrackTween(t)
+                        t:Play()
+                    end))
+                    
+                    TrackConnection(OptBtn.MouseLeave:Connect(function()
+                        local t = TweenService:Create(OptBtn, TweenInfo.new(0.2), {BackgroundColor3 = CurrentTheme.PanelLight, TextColor3 = CurrentTheme.TextDim})
+                        TrackTween(t)
+                        t:Play()
+                    end))
                 end
             end
+            
             BuildOptions(options)
 
-            ToggleBtn.MouseButton1Click:Connect(function()
+            TrackConnection(ToggleBtn.MouseButton1Click:Connect(function()
                 playClickSound()
                 isDropped = not isDropped
+                
                 local childCount = 0
-                for _,v in pairs(OptionContainer:GetChildren()) do if v:IsA("TextButton") then childCount = childCount + 1 end end
-                local targetHeight = isDropped and (42 + (childCount * 30)) or 42
-                TweenService:Create(DropdownFrame, TweenInfo.new(0.3,Enum.EasingStyle.Quart,Enum.EasingDirection.Out), {Size = UDim2.new(1,0,0,targetHeight)}):Play()
-                TweenService:Create(Label, TweenInfo.new(0.2), {TextColor3 = isDropped and CurrentTheme.Primary or CurrentTheme.TextColor}):Play()
-            end)
+                for _,v in pairs(OptionContainer:GetChildren()) do 
+                    if v:IsA("TextButton") then childCount = childCount + 1 end 
+                end
+                
+                local targetHeight = isDropped and (44 + (childCount * 32)) or 44
+                
+                local t1 = TweenService:Create(DropdownFrame, TweenInfo.new(0.3,Enum.EasingStyle.Quart,Enum.EasingDirection.Out), {Size = UDim2.new(1,0,0,targetHeight)})
+                local t2 = TweenService:Create(Label, TweenInfo.new(0.2), {TextColor3 = isDropped and CurrentTheme.Accent or CurrentTheme.TextMain})
+                TrackTween(t1); TrackTween(t2)
+                t1:Play(); t2:Play()
+            end))
 
             local DropdownAPI = {}
             function DropdownAPI:Refresh(newOptions)
                 BuildOptions(newOptions)
                 if isDropped then
-                    local targetHeight = 42 + (#newOptions * 30)
-                    TweenService:Create(DropdownFrame, TweenInfo.new(0.3), {Size = UDim2.new(1,0,0,targetHeight)}):Play()
+                    local targetHeight = 44 + (#newOptions * 32)
+                    local t = TweenService:Create(DropdownFrame, TweenInfo.new(0.3), {Size = UDim2.new(1,0,0,targetHeight)})
+                    TrackTween(t)
+                    t:Play()
                 end
             end
             return DropdownAPI
@@ -1751,86 +2231,94 @@ function EmloxaLibrary:CreateWindow(hubName)
 
         function TabSetup:CreateSlider(name, min, max, default, callback)
             local id = generateId("slider_" .. name)
+            
             local SliderFrame = Instance.new("Frame")
-            SliderFrame.Size = UDim2.new(1,0,0,52)
-            SliderFrame.BackgroundColor3 = CurrentTheme.PanelLight
+            SliderFrame.Size = UDim2.new(1,0,0,58)
+            SliderFrame.BackgroundColor3 = CurrentTheme.Card
             SliderFrame.Active = true
             SliderFrame.Parent = PageScroll
-            createCorner(SliderFrame,6)
-            createStroke(SliderFrame, CurrentTheme.Primary, 1)
-            registerThemeable(SliderFrame, {BackgroundColor3 = "PanelLight"})
+            createCorner(SliderFrame,10)
+            createStroke(SliderFrame, CurrentTheme.Stroke, 1)
+            registerThemeable(SliderFrame, {BackgroundColor3 = "Card"})
 
             local Label = Instance.new("TextLabel")
             Label.Size = UDim2.new(1,-50,0,24)
-            Label.Position = UDim2.new(0,14,0,6)
+            Label.Position = UDim2.new(0,16,0,8)
             Label.Text = name
             Label.Font = Enum.Font.GothamSemibold
-            Label.TextSize = 13
-            Label.TextColor3 = CurrentTheme.TextColor
+            Label.TextSize = 13.5
+            Label.TextColor3 = CurrentTheme.TextMain
             Label.TextXAlignment = Enum.TextXAlignment.Left
             Label.BackgroundTransparency = 1
             Label.Parent = SliderFrame
-            registerThemeable(Label, {TextColor3 = "TextColor"})
+            registerThemeable(Label, {TextColor3 = "TextMain"})
 
             local ValueText = Instance.new("TextLabel")
             ValueText.Size = UDim2.new(0,50,0,24)
-            ValueText.Position = UDim2.new(1,-60,0,6)
+            ValueText.Position = UDim2.new(1,-60,0,8)
             ValueText.Text = tostring(default)
             ValueText.Font = Enum.Font.GothamBold
-            ValueText.TextSize = 13
-            ValueText.TextColor3 = CurrentTheme.Primary
+            ValueText.TextSize = 13.5
+            ValueText.TextColor3 = CurrentTheme.Accent
             ValueText.TextXAlignment = Enum.TextXAlignment.Right
             ValueText.BackgroundTransparency = 1
             ValueText.Parent = SliderFrame
-            registerThemeable(ValueText, {TextColor3 = "Primary"})
+            registerThemeable(ValueText, {TextColor3 = "Accent"})
 
             local Bar = Instance.new("TextButton")
-            Bar.Size = UDim2.new(1,-28,0,4)
-            Bar.Position = UDim2.new(0,14,0,36)
-            Bar.BackgroundColor3 = CurrentTheme.Panel
+            Bar.Size = UDim2.new(1,-32,0,6)
+            Bar.Position = UDim2.new(0,16,0,40)
+            Bar.BackgroundColor3 = CurrentTheme.Stroke
             Bar.Text = ""
             Bar.Parent = SliderFrame
-            createCorner(Bar,2)
-            registerThemeable(Bar, {BackgroundColor3 = "Panel"})
+            createCorner(Bar,3)
+            registerThemeable(Bar, {BackgroundColor3 = "Stroke"})
 
-            local Fill = Instance.new("Frame")
             local defaultPercent = (default - min) / (max - min)
+            
+            local Fill = Instance.new("Frame")
             Fill.Size = UDim2.new(defaultPercent,0,1,0)
-            Fill.BackgroundColor3 = CurrentTheme.Primary
+            Fill.BackgroundColor3 = CurrentTheme.Accent
             Fill.Parent = Bar
-            createCorner(Fill,2)
-            registerThemeable(Fill, {BackgroundColor3 = "Primary"})
+            createCorner(Fill,3)
+            registerThemeable(Fill, {BackgroundColor3 = "Accent"})
 
             local Knob = Instance.new("Frame")
-            Knob.Size = UDim2.new(0,12,0,12)
-            Knob.Position = UDim2.new(defaultPercent, -6, 0.5, -6)
+            Knob.Size = UDim2.new(0,14,0,14)
+            Knob.Position = UDim2.new(defaultPercent, -7, 0.5, -7)
             Knob.BackgroundColor3 = Color3.new(1,1,1)
             Knob.BorderSizePixel = 0
             Knob.Parent = Bar
-            createCorner(Knob, 6)
+            createCorner(Knob, 7)
 
             local currentValue = default
             ConfigValues[id] = currentValue
+            
             registerConfig(id, function(val)
                 currentValue = math.clamp(val, min, max)
                 local percent = (currentValue - min) / (max - min)
                 Fill.Size = UDim2.new(percent,0,1,0)
-                Knob.Position = UDim2.new(percent, -6, 0.5, -6)
+                Knob.Position = UDim2.new(percent, -7, 0.5, -7)
                 ValueText.Text = tostring(currentValue)
-                callback(currentValue)
+                pcall(function() callback(currentValue) end)
             end)
 
             local draggingSlider = false
-            Bar.InputBegan:Connect(function(input)
+            
+            TrackConnection(Bar.InputBegan:Connect(function(input)
                 if input.UserInputType == Enum.UserInputType.MouseButton1 then
                     draggingSlider = true
                     playClickSound()
                 end
-            end)
-            UserInputService.InputEnded:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingSlider = false end
-            end)
-            UserInputService.InputChanged:Connect(function(input)
+            end))
+            
+            TrackConnection(UserInputService.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 then 
+                    draggingSlider = false 
+                end
+            end))
+            
+            TrackConnection(UserInputService.InputChanged:Connect(function(input)
                 if draggingSlider and input.UserInputType == Enum.UserInputType.MouseMovement then
                     local mousePos = input.Position.X
                     local barPos = Bar.AbsolutePosition.X
@@ -1839,45 +2327,54 @@ function EmloxaLibrary:CreateWindow(hubName)
                     currentValue = math.floor(min + ((max - min) * percent))
                     ConfigValues[id] = currentValue
                     Fill.Size = UDim2.new(percent,0,1,0)
-                    Knob.Position = UDim2.new(percent, -6, 0.5, -6)
+                    Knob.Position = UDim2.new(percent, -7, 0.5, -7)
                     ValueText.Text = tostring(currentValue)
-                    callback(currentValue)
+                    pcall(function() callback(currentValue) end)
                 end
-            end)
+            end))
         end
 
         function TabSetup:CreateButton(name, callback)
             local Btn = Instance.new("TextButton")
-            Btn.Size = UDim2.new(1,0,0,40)
-            Btn.BackgroundColor3 = CurrentTheme.PanelLight
+            Btn.Size = UDim2.new(1,0,0,42)
+            Btn.BackgroundColor3 = CurrentTheme.Card
             Btn.Text = name
             Btn.Font = Enum.Font.GothamBold
             Btn.TextSize = 14
-            Btn.TextColor3 = CurrentTheme.TextColor
+            Btn.TextColor3 = CurrentTheme.TextMain
             Btn.Active = true
             Btn.Parent = PageScroll
-            createCorner(Btn,6)
-            createStroke(Btn, CurrentTheme.Primary, 1)
-            registerThemeable(Btn, {BackgroundColor3 = "PanelLight", TextColor3 = "TextColor"})
+            createCorner(Btn,10)
+            createStroke(Btn, CurrentTheme.Stroke, 1)
+            registerThemeable(Btn, {BackgroundColor3 = "Card", TextColor3 = "TextMain"})
 
-            Btn.MouseEnter:Connect(playHoverSound)
-            Btn.MouseButton1Click:Connect(function()
+            TrackConnection(Btn.MouseEnter:Connect(playHoverSound))
+            
+            TrackConnection(Btn.MouseButton1Click:Connect(function()
                 playClickSound()
-                TweenService:Create(Btn, TweenInfo.new(0.1), {Size = UDim2.new(0.98,0,0,38), BackgroundColor3 = CurrentTheme.Primary}):Play()
+                
+                local t1 = TweenService:Create(Btn, TweenInfo.new(0.1), {Size = UDim2.new(0.98,0,0,40), BackgroundColor3 = CurrentTheme.Accent})
+                TrackTween(t1)
+                t1:Play()
+                
                 task.wait(0.1)
-                TweenService:Create(Btn, TweenInfo.new(0.2), {Size = UDim2.new(1,0,0,40), BackgroundColor3 = CurrentTheme.PanelLight}):Play()
-                callback()
-            end)
+                
+                local t2 = TweenService:Create(Btn, TweenInfo.new(0.2), {Size = UDim2.new(1,0,0,42), BackgroundColor3 = CurrentTheme.Card})
+                TrackTween(t2)
+                t2:Play()
+                
+                pcall(function() callback() end)
+            end))
         end
 
         function TabSetup:CreateDivider()
             local Div = Instance.new("Frame")
-            Div.Size = UDim2.new(1, 0, 0, 2)
-            Div.BackgroundColor3 = CurrentTheme.Primary
+            Div.Size = UDim2.new(1, 0, 0, 1)
+            Div.BackgroundColor3 = CurrentTheme.Stroke
             Div.BackgroundTransparency = 0.5
             Div.BorderSizePixel = 0
             Div.Parent = PageScroll
-            registerThemeable(Div, {BackgroundColor3 = "Primary"})
+            registerThemeable(Div, {BackgroundColor3 = "Stroke"})
         end
 
         function TabSetup:CreateNotification(title, message, duration)
@@ -1885,35 +2382,35 @@ function EmloxaLibrary:CreateWindow(hubName)
             playSound(131390520971848, 0.7) 
             
             local Notif = Instance.new("Frame")
-            Notif.Size = UDim2.new(0, 250, 0, 70)
+            Notif.Size = UDim2.new(0, 280, 0, 70)
             Notif.Position = UDim2.new(1, 10, 1, -80)
-            Notif.BackgroundColor3 = CurrentTheme.Panel
+            Notif.BackgroundColor3 = CurrentTheme.Card
             Notif.Active = true
             Notif.ZIndex = 999999
             Notif.Parent = HubGui
             createCorner(Notif,10)
-            createStroke(Notif, CurrentTheme.Primary,2)
+            createStroke(Notif, CurrentTheme.Accent,2)
             createShadow(Notif, UDim2.new(1,14,1,14), -7, 0.7)
-            registerThemeable(Notif, {BackgroundColor3 = "Panel"})
+            registerThemeable(Notif, {BackgroundColor3 = "Card"})
 
             local TitleLabel = Instance.new("TextLabel")
             TitleLabel.Text = title
             TitleLabel.Font = Enum.Font.GothamBold
             TitleLabel.TextSize = 15
-            TitleLabel.TextColor3 = CurrentTheme.Primary
+            TitleLabel.TextColor3 = CurrentTheme.Accent
             TitleLabel.Size = UDim2.new(1,-20,0,22)
             TitleLabel.Position = UDim2.new(0,10,0,8)
             TitleLabel.BackgroundTransparency = 1
             TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
             TitleLabel.ZIndex = 999999
             TitleLabel.Parent = Notif
-            registerThemeable(TitleLabel, {TextColor3 = "Primary"})
+            registerThemeable(TitleLabel, {TextColor3 = "Accent"})
 
             local MsgLabel = Instance.new("TextLabel")
             MsgLabel.Text = message
             MsgLabel.Font = Enum.Font.Gotham
-            MsgLabel.TextSize = 13
-            MsgLabel.TextColor3 = CurrentTheme.TextColor
+            MsgLabel.TextSize = 12.5
+            MsgLabel.TextColor3 = CurrentTheme.TextMain
             MsgLabel.Size = UDim2.new(1,-20,0,30)
             MsgLabel.Position = UDim2.new(0,10,0,32)
             MsgLabel.BackgroundTransparency = 1
@@ -1921,21 +2418,30 @@ function EmloxaLibrary:CreateWindow(hubName)
             MsgLabel.TextWrapped = true
             MsgLabel.ZIndex = 999999
             MsgLabel.Parent = Notif
-            registerThemeable(MsgLabel, {TextColor3 = "TextColor"})
+            registerThemeable(MsgLabel, {TextColor3 = "TextMain"})
 
-            TweenService:Create(Notif, TweenInfo.new(0.5,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Position = UDim2.new(1,-260,1,-80)}):Play()
+            local t1 = TweenService:Create(Notif, TweenInfo.new(0.5,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Position = UDim2.new(1,-290,1,-80)})
+            TrackTween(t1)
+            t1:Play()
+            
             task.wait(duration)
-            TweenService:Create(Notif, TweenInfo.new(0.4,Enum.EasingStyle.Quad,Enum.EasingDirection.In), {Position = UDim2.new(1,10,1,-80)}):Play()
+            
+            local t2 = TweenService:Create(Notif, TweenInfo.new(0.4,Enum.EasingStyle.Quad,Enum.EasingDirection.In), {Position = UDim2.new(1,10,1,-80)})
+            TrackTween(t2)
+            t2:Play()
+            
             task.wait(0.4)
-            Notif:Destroy()
+            pcall(function() Notif:Destroy() end)
         end
 
         return TabSetup
     end
 
+    -- ═══ MENU TAB (Settings) ═══
     local MenuTab = CreateTabInternal("Menu", 9999)
     
     local targetPlayerInput = ""
+    
     MenuTab:CreateTextbox("Identity Target", "Leave blank for random...", function(val)
         targetPlayerInput = val
         if identityHiderEnabled then
@@ -1952,7 +2458,7 @@ function EmloxaLibrary:CreateWindow(hubName)
         identityHiderToggle:SetState(true)
     end
 
-    MenuTab:CreateDropdown("Theme", EmloxaLibrary:GetThemeNames(), "Default", function(val)
+    MenuTab:CreateDropdown("Theme", EmloxaLibrary:GetThemeNames(), "Amethyst", function(val)
         EmloxaLibrary:SetTheme(val)
     end)
 
@@ -1975,37 +2481,52 @@ function EmloxaLibrary:CreateWindow(hubName)
             MenuTab:CreateNotification("Error", "Please enter a config name first!", 2) 
             return 
         end
+        
+        CleanupConfigCallbacks()
+        
         local data = {}
         for _, entry in ipairs(ConfigCallbacks) do
             data[entry.id] = ConfigValues[entry.id]
         end
+        
         local success, err = pcall(function()
             local json = HttpService:JSONEncode(data)
             writefile(ConfigFolder .. "/" .. ConfigNameInput .. ".json", json)
         end)
+        
         if success then
             MenuTab:CreateNotification("Success", "Saved Config: " .. ConfigNameInput, 2)
             if ConfigDropdown then ConfigDropdown:Refresh(GetSavedConfigs()) end
         else
-            MenuTab:CreateNotification("Error", "Could not save config.", 2)
+            MenuTab:CreateNotification("Error", "Could not save config: " .. tostring(err), 2)
         end
     end)
 
     MenuTab:CreateButton("📂 Load Config", function()
         if SelectedConfig == "" or SelectedConfig == "No Configs Found" then return end
+        
         local path = ConfigFolder .. "/" .. SelectedConfig .. ".json"
+        
         if isfile(path) then
             local success, json = pcall(function() return readfile(path) end)
+            
             if success then
                 local decodeSuccess, data = pcall(HttpService.JSONDecode, HttpService, json)
+                
                 if decodeSuccess then
-                    for id, value in pairs(data) do ConfigValues[id] = value end
+                    for id, value in pairs(data) do 
+                        ConfigValues[id] = value 
+                    end
+                    
                     for _, entry in ipairs(ConfigCallbacks) do
                         if ConfigValues[entry.id] ~= nil then
-                            entry.set(ConfigValues[entry.id])
+                            pcall(function() entry.set(ConfigValues[entry.id]) end)
                         end
                     end
+                    
                     MenuTab:CreateNotification("Success", "Loaded Config: " .. SelectedConfig, 2)
+                else
+                    MenuTab:CreateNotification("Error", "Failed to decode config file!", 2)
                 end
             end
         else
@@ -2015,7 +2536,9 @@ function EmloxaLibrary:CreateWindow(hubName)
 
     MenuTab:CreateButton("🗑️ Delete Config", function()
         if SelectedConfig == "" or SelectedConfig == "No Configs Found" then return end
+        
         local path = ConfigFolder .. "/" .. SelectedConfig .. ".json"
+        
         if isfile(path) then
             delfile(path)
             MenuTab:CreateNotification("Deleted", "Config Removed: " .. SelectedConfig, 2)
@@ -2030,7 +2553,9 @@ function EmloxaLibrary:CreateWindow(hubName)
             MenuTab:CreateNotification("Error", "No config selected!", 2)
             return
         end
+        
         local path = ConfigFolder .. "/" .. SelectedConfig .. ".json"
+        
         if isfile(path) then
             local json = readfile(path)
             if setclipboard then
@@ -2056,99 +2581,131 @@ function EmloxaLibrary:CreateWindow(hubName)
         local Modal = Instance.new("Frame")
         Modal.Size = UDim2.new(0, 400, 0, 300)
         Modal.Position = UDim2.new(0.5, -200, 0.5, -150)
-        Modal.BackgroundColor3 = CurrentTheme.Panel
+        Modal.BackgroundColor3 = CurrentTheme.Card
         Modal.ZIndex = 999999
         Modal.Parent = Overlay
         createCorner(Modal, 12)
-        createStroke(Modal, CurrentTheme.Primary, 2)
-        registerThemeable(Modal, {BackgroundColor3 = "Panel"})
+        createStroke(Modal, CurrentTheme.Accent, 2)
+        registerThemeable(Modal, {BackgroundColor3 = "Card"})
 
         local MTitle = Instance.new("TextLabel")
         MTitle.Text = "📥 Import Config"
-        MTitle.Font = Enum.Font.GothamBlack; MTitle.TextSize = 16
-        MTitle.TextColor3 = CurrentTheme.Primary
-        MTitle.Size = UDim2.new(1,-40,0,30); MTitle.Position = UDim2.new(0,18,0,12)
-        MTitle.BackgroundTransparency = 1; MTitle.TextXAlignment = Enum.TextXAlignment.Left
-        MTitle.ZIndex = 999999; MTitle.Parent = Modal
-        registerThemeable(MTitle, {TextColor3 = "Primary"})
+        MTitle.Font = Enum.Font.GothamBlack
+        MTitle.TextSize = 16
+        MTitle.TextColor3 = CurrentTheme.Accent
+        MTitle.Size = UDim2.new(1,-40,0,30)
+        MTitle.Position = UDim2.new(0,18,0,12)
+        MTitle.BackgroundTransparency = 1
+        MTitle.TextXAlignment = Enum.TextXAlignment.Left
+        MTitle.ZIndex = 999999
+        MTitle.Parent = Modal
+        registerThemeable(MTitle, {TextColor3 = "Accent"})
 
         local NameLabel = Instance.new("TextLabel")
         NameLabel.Text = "Config Name:"
-        NameLabel.Font = Enum.Font.GothamSemibold; NameLabel.TextSize = 12
-        NameLabel.TextColor3 = CurrentTheme.TextColor
-        NameLabel.Size = UDim2.new(1,-36,0,20); NameLabel.Position = UDim2.new(0,18,0,50)
-        NameLabel.BackgroundTransparency = 1; NameLabel.TextXAlignment = Enum.TextXAlignment.Left
-        NameLabel.ZIndex = 999999; NameLabel.Parent = Modal
+        NameLabel.Font = Enum.Font.GothamSemibold
+        NameLabel.TextSize = 12
+        NameLabel.TextColor3 = CurrentTheme.TextMain
+        NameLabel.Size = UDim2.new(1,-36,0,20)
+        NameLabel.Position = UDim2.new(0,18,0,50)
+        NameLabel.BackgroundTransparency = 1
+        NameLabel.TextXAlignment = Enum.TextXAlignment.Left
+        NameLabel.ZIndex = 999999
+        NameLabel.Parent = Modal
 
         local NameBox = Instance.new("TextBox")
-        NameBox.Size = UDim2.new(1,-36,0,30); NameBox.Position = UDim2.new(0,18,0,72)
+        NameBox.Size = UDim2.new(1,-36,0,30)
+        NameBox.Position = UDim2.new(0,18,0,72)
         NameBox.BackgroundColor3 = CurrentTheme.PanelLight
         NameBox.Text = ""
         NameBox.PlaceholderText = "Enter config name..."
-        NameBox.Font = Enum.Font.Gotham; NameBox.TextSize = 12
-        NameBox.TextColor3 = CurrentTheme.TextColor
+        NameBox.Font = Enum.Font.Gotham
+        NameBox.TextSize = 12
+        NameBox.TextColor3 = CurrentTheme.TextMain
         NameBox.ClearTextOnFocus = false
-        NameBox.ZIndex = 999999; NameBox.Parent = Modal
+        NameBox.ZIndex = 999999
+        NameBox.Parent = Modal
         createCorner(NameBox, 6)
-        registerThemeable(NameBox, {BackgroundColor3 = "PanelLight", TextColor3 = "TextColor"})
+        registerThemeable(NameBox, {BackgroundColor3 = "PanelLight", TextColor3 = "TextMain"})
 
         local JSONLabel = Instance.new("TextLabel")
         JSONLabel.Text = "Paste JSON:"
-        JSONLabel.Font = Enum.Font.GothamSemibold; JSONLabel.TextSize = 12
-        JSONLabel.TextColor3 = CurrentTheme.TextColor
-        JSONLabel.Size = UDim2.new(1,-36,0,20); JSONLabel.Position = UDim2.new(0,18,0,110)
-        JSONLabel.BackgroundTransparency = 1; JSONLabel.TextXAlignment = Enum.TextXAlignment.Left
-        JSONLabel.ZIndex = 999999; JSONLabel.Parent = Modal
+        JSONLabel.Font = Enum.Font.GothamSemibold
+        JSONLabel.TextSize = 12
+        JSONLabel.TextColor3 = CurrentTheme.TextMain
+        JSONLabel.Size = UDim2.new(1,-36,0,20)
+        JSONLabel.Position = UDim2.new(0,18,0,110)
+        JSONLabel.BackgroundTransparency = 1
+        JSONLabel.TextXAlignment = Enum.TextXAlignment.Left
+        JSONLabel.ZIndex = 999999
+        JSONLabel.Parent = Modal
 
         local JSONBox = Instance.new("TextBox")
-        JSONBox.Size = UDim2.new(1,-36,0,100); JSONBox.Position = UDim2.new(0,18,0,132)
+        JSONBox.Size = UDim2.new(1,-36,0,100)
+        JSONBox.Position = UDim2.new(0,18,0,132)
         JSONBox.BackgroundColor3 = CurrentTheme.PanelLight
         JSONBox.Text = ""
         JSONBox.PlaceholderText = "Paste config JSON here..."
-        JSONBox.Font = Enum.Font.Gotham; JSONBox.TextSize = 10
-        JSONBox.TextColor3 = CurrentTheme.TextColor
+        JSONBox.Font = Enum.Font.Gotham
+        JSONBox.TextSize = 10
+        JSONBox.TextColor3 = CurrentTheme.TextMain
         JSONBox.ClearTextOnFocus = false
         JSONBox.TextWrapped = true
-        JSONBox.ZIndex = 999999; JSONBox.Parent = Modal
+        JSONBox.ZIndex = 999999
+        JSONBox.Parent = Modal
         createCorner(JSONBox, 6)
-        registerThemeable(JSONBox, {BackgroundColor3 = "PanelLight", TextColor3 = "TextColor"})
+        registerThemeable(JSONBox, {BackgroundColor3 = "PanelLight", TextColor3 = "TextMain"})
 
         local ImportBtn = Instance.new("TextButton")
-        ImportBtn.Size = UDim2.new(0,120,0,34); ImportBtn.Position = UDim2.new(0,18,1,-44)
-        ImportBtn.BackgroundColor3 = CurrentTheme.Primary
+        ImportBtn.Size = UDim2.new(0,120,0,34)
+        ImportBtn.Position = UDim2.new(0,18,1,-44)
+        ImportBtn.BackgroundColor3 = CurrentTheme.Accent
         ImportBtn.Text = "Import"
-        ImportBtn.Font = Enum.Font.GothamBold; ImportBtn.TextColor3 = Color3.new(1,1,1); ImportBtn.TextSize = 13
-        ImportBtn.ZIndex = 999999; ImportBtn.Parent = Modal
+        ImportBtn.Font = Enum.Font.GothamBold
+        ImportBtn.TextColor3 = Color3.new(1,1,1)
+        ImportBtn.TextSize = 13
+        ImportBtn.ZIndex = 999999
+        ImportBtn.Parent = Modal
         createCorner(ImportBtn, 8)
-        registerThemeable(ImportBtn, {BackgroundColor3 = "Primary"})
+        registerThemeable(ImportBtn, {BackgroundColor3 = "Accent"})
 
         local CancelBtn = Instance.new("TextButton")
-        CancelBtn.Size = UDim2.new(0,120,0,34); CancelBtn.Position = UDim2.new(1,-138,1,-44)
+        CancelBtn.Size = UDim2.new(0,120,0,34)
+        CancelBtn.Position = UDim2.new(1,-138,1,-44)
         CancelBtn.BackgroundColor3 = CurrentTheme.PanelLight
         CancelBtn.Text = "Cancel"
-        CancelBtn.Font = Enum.Font.Gotham; CancelBtn.TextColor3 = CurrentTheme.SubTextColor; CancelBtn.TextSize = 13
-        CancelBtn.ZIndex = 999999; CancelBtn.Parent = Modal
+        CancelBtn.Font = Enum.Font.Gotham
+        CancelBtn.TextColor3 = CurrentTheme.TextDim
+        CancelBtn.TextSize = 13
+        CancelBtn.ZIndex = 999999
+        CancelBtn.Parent = Modal
         createCorner(CancelBtn, 8)
-        registerThemeable(CancelBtn, {BackgroundColor3 = "PanelLight", TextColor3 = "SubTextColor"})
+        registerThemeable(CancelBtn, {BackgroundColor3 = "PanelLight", TextColor3 = "TextDim"})
 
         local function CloseImport()
-            TweenService:Create(Modal, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 0)}):Play()
+            local t = TweenService:Create(Modal, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 0)})
+            TrackTween(t)
+            t:Play()
             task.wait(0.3)
-            Overlay:Destroy()
+            pcall(function() Overlay:Destroy() end)
         end
 
-        CancelBtn.MouseButton1Click:Connect(CloseImport)
-        ImportBtn.MouseButton1Click:Connect(function()
+        TrackConnection(CancelBtn.MouseButton1Click:Connect(CloseImport))
+        
+        TrackConnection(ImportBtn.MouseButton1Click:Connect(function()
             local cfgName = NameBox.Text
             local jsonData = JSONBox.Text
+            
             if cfgName == "" or jsonData == "" then
                 MenuTab:CreateNotification("Error", "Name or JSON cannot be empty!", 2)
                 return
             end
+            
             local success, err = pcall(function()
                 HttpService:JSONDecode(jsonData)
                 writefile(ConfigFolder .. "/" .. cfgName .. ".json", jsonData)
             end)
+            
             if success then
                 CloseImport()
                 MenuTab:CreateNotification("Success", "Imported Config: " .. cfgName, 2)
@@ -2156,7 +2713,7 @@ function EmloxaLibrary:CreateWindow(hubName)
             else
                 MenuTab:CreateNotification("Error", "Invalid JSON format!", 2)
             end
-        end)
+        end))
     end)
 
     function WindowSetup:CreateTab(tabName)
@@ -2167,66 +2724,94 @@ function EmloxaLibrary:CreateWindow(hubName)
         local PromptFrame = Instance.new("Frame")
         PromptFrame.Size = UDim2.new(0, 350, 0, 140)
         PromptFrame.Position = UDim2.new(1, 20, 1, -160)
-        PromptFrame.BackgroundColor3 = CurrentTheme.Panel
+        PromptFrame.BackgroundColor3 = CurrentTheme.Card
         PromptFrame.Active = true
         PromptFrame.Parent = HubGui
         createCorner(PromptFrame, 12)
-        createStroke(PromptFrame, CurrentTheme.Primary, 2)
+        createStroke(PromptFrame, CurrentTheme.Accent, 2)
         createShadow(PromptFrame, UDim2.new(1,18,1,18), -9, 0.7)
-        registerThemeable(PromptFrame, {BackgroundColor3 = "Panel"})
+        registerThemeable(PromptFrame, {BackgroundColor3 = "Card"})
 
         local PTitle = Instance.new("TextLabel")
         PTitle.Text = "🔥 Emloxa Discord"
-        PTitle.Font = Enum.Font.GothamBlack; PTitle.TextSize = 18
-        PTitle.TextColor3 = CurrentTheme.Primary
-        PTitle.Size = UDim2.new(1,-20,0,30); PTitle.Position = UDim2.new(0,10,0,10)
-        PTitle.BackgroundTransparency = 1; PTitle.TextXAlignment = Enum.TextXAlignment.Left
+        PTitle.Font = Enum.Font.GothamBlack
+        PTitle.TextSize = 18
+        PTitle.TextColor3 = CurrentTheme.Accent
+        PTitle.Size = UDim2.new(1,-20,0,30)
+        PTitle.Position = UDim2.new(0,10,0,10)
+        PTitle.BackgroundTransparency = 1
+        PTitle.TextXAlignment = Enum.TextXAlignment.Left
         PTitle.Parent = PromptFrame
-        registerThemeable(PTitle, {TextColor3 = "Primary"})
+        registerThemeable(PTitle, {TextColor3 = "Accent"})
 
         local PDesc = Instance.new("TextLabel")
         PDesc.Text = "Join our Discord for the latest scripts and support!"
-        PDesc.Font = Enum.Font.Gotham; PDesc.TextSize = 13
-        PDesc.TextColor3 = CurrentTheme.TextColor
-        PDesc.Size = UDim2.new(1,-20,0,50); PDesc.Position = UDim2.new(0,10,0,45)
-        PDesc.BackgroundTransparency = 1; PDesc.TextXAlignment = Enum.TextXAlignment.Left
-        PDesc.TextWrapped = true; PDesc.Parent = PromptFrame
-        registerThemeable(PDesc, {TextColor3 = "TextColor"})
+        PDesc.Font = Enum.Font.Gotham
+        PDesc.TextSize = 13
+        PDesc.TextColor3 = CurrentTheme.TextMain
+        PDesc.Size = UDim2.new(1,-20,0,50)
+        PDesc.Position = UDim2.new(0,10,0,45)
+        PDesc.BackgroundTransparency = 1
+        PDesc.TextXAlignment = Enum.TextXAlignment.Left
+        PDesc.TextWrapped = true
+        PDesc.Parent = PromptFrame
+        registerThemeable(PDesc, {TextColor3 = "TextMain"})
 
         local BtnYes = Instance.new("TextButton")
-        BtnYes.Size = UDim2.new(0,150,0,34); BtnYes.Position = UDim2.new(0,15,1,-44)
-        BtnYes.BackgroundColor3 = CurrentTheme.Primary; BtnYes.Text = "Copy Link"
-        BtnYes.Font = Enum.Font.GothamBold; BtnYes.TextColor3 = Color3.new(1,1,1); BtnYes.TextSize = 13
-        BtnYes.Parent = PromptFrame; createCorner(BtnYes,8)
-        registerThemeable(BtnYes, {BackgroundColor3 = "Primary"})
+        BtnYes.Size = UDim2.new(0,150,0,34)
+        BtnYes.Position = UDim2.new(0,15,1,-44)
+        BtnYes.BackgroundColor3 = CurrentTheme.Accent
+        BtnYes.Text = "Copy Link"
+        BtnYes.Font = Enum.Font.GothamBold
+        BtnYes.TextColor3 = Color3.new(1,1,1)
+        BtnYes.TextSize = 13
+        BtnYes.Parent = PromptFrame
+        createCorner(BtnYes,8)
+        registerThemeable(BtnYes, {BackgroundColor3 = "Accent"})
 
         local BtnNo = Instance.new("TextButton")
-        BtnNo.Size = UDim2.new(0,150,0,34); BtnNo.Position = UDim2.new(1,-165,1,-44)
-        BtnNo.BackgroundColor3 = CurrentTheme.PanelLight; BtnNo.Text = "No Thanks"
-        BtnNo.Font = Enum.Font.Gotham; BtnNo.TextColor3 = CurrentTheme.SubTextColor; BtnNo.TextSize = 13
-        BtnNo.Parent = PromptFrame; createCorner(BtnNo,8)
-        registerThemeable(BtnNo, {BackgroundColor3 = "PanelLight", TextColor3 = "SubTextColor"})
+        BtnNo.Size = UDim2.new(0,150,0,34)
+        BtnNo.Position = UDim2.new(1,-165,1,-44)
+        BtnNo.BackgroundColor3 = CurrentTheme.PanelLight
+        BtnNo.Text = "No Thanks"
+        BtnNo.Font = Enum.Font.Gotham
+        BtnNo.TextColor3 = CurrentTheme.TextDim
+        BtnNo.TextSize = 13
+        BtnNo.Parent = PromptFrame
+        createCorner(BtnNo,8)
+        registerThemeable(BtnNo, {BackgroundColor3 = "PanelLight", TextColor3 = "TextDim"})
 
-        TweenService:Create(PromptFrame, TweenInfo.new(0.6, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2.new(1,-370,1,-160)}):Play()
+        local t = TweenService:Create(PromptFrame, TweenInfo.new(0.6, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2.new(1,-370,1,-160)})
+        TrackTween(t)
+        t:Play()
 
         local function ClosePrompt()
-            TweenService:Create(PromptFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {Position = UDim2.new(1,20,1,-160)}):Play()
-            task.wait(0.5); PromptFrame:Destroy()
+            local t2 = TweenService:Create(PromptFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {Position = UDim2.new(1,20,1,-160)})
+            TrackTween(t2)
+            t2:Play()
+            task.wait(0.5)
+            pcall(function() PromptFrame:Destroy() end)
         end
 
-        BtnYes.MouseEnter:Connect(playHoverSound)
-        BtnNo.MouseEnter:Connect(playHoverSound)
-        BtnYes.MouseButton1Click:Connect(function()
+        TrackConnection(BtnYes.MouseEnter:Connect(playHoverSound))
+        TrackConnection(BtnNo.MouseEnter:Connect(playHoverSound))
+        
+        TrackConnection(BtnYes.MouseButton1Click:Connect(function()
             playClickSound()
             if setclipboard then setclipboard("https://discord.gg/XjfW7N84jT") end
-            BtnYes.Text = "Copied!"; BtnYes.BackgroundColor3 = Color3.fromRGB(40,200,100)
-            TweenService:Create(BtnYes, TweenInfo.new(0.15), {Size = UDim2.new(0,155,0,36)}):Play()
-            task.wait(1); ClosePrompt()
-        end)
-        BtnNo.MouseButton1Click:Connect(function()
+            BtnYes.Text = "Copied!"
+            BtnYes.BackgroundColor3 = Color3.fromRGB(40,200,100)
+            local t3 = TweenService:Create(BtnYes, TweenInfo.new(0.15), {Size = UDim2.new(0,155,0,36)})
+            TrackTween(t3)
+            t3:Play()
+            task.wait(1)
+            ClosePrompt()
+        end))
+        
+        TrackConnection(BtnNo.MouseButton1Click:Connect(function()
             playClickSound()
             ClosePrompt()
-        end)
+        end))
     end
 
     return WindowSetup
